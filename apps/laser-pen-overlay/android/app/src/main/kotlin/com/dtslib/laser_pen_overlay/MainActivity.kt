@@ -1,5 +1,8 @@
 package com.dtslib.laser_pen_overlay
 
+import android.content.Intent
+import android.graphics.Color
+import android.os.Build
 import android.view.MotionEvent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -7,11 +10,14 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.dtslib.laser_pen_overlay/touch"
+    private val OVERLAY_CHANNEL = "com.dtslib.laser_pen_overlay/overlay"
     private var methodChannel: MethodChannel? = null
+    private var overlayChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
+        // 기존 터치 채널
         methodChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL
@@ -25,6 +31,90 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        
+        // 오버레이 서비스 제어 채널
+        overlayChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            OVERLAY_CHANNEL
+        )
+        
+        overlayChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startService" -> {
+                    startOverlayService()
+                    result.success(true)
+                }
+                "stopService" -> {
+                    stopOverlayService()
+                    result.success(true)
+                }
+                "showOverlay" -> {
+                    showOverlay()
+                    result.success(true)
+                }
+                "hideOverlay" -> {
+                    hideOverlay()
+                    result.success(true)
+                }
+                "isOverlayVisible" -> {
+                    result.success(OverlayService.isOverlayVisible)
+                }
+                "setColor" -> {
+                    val colorName = call.argument<String>("color") ?: "white"
+                    val color = when (colorName) {
+                        "white" -> Color.WHITE
+                        "yellow" -> Color.YELLOW
+                        "black" -> Color.BLACK
+                        else -> Color.WHITE
+                    }
+                    OverlayService.instance?.setColor(color)
+                    result.success(true)
+                }
+                "clear" -> {
+                    OverlayService.instance?.clearCanvas()
+                    result.success(true)
+                }
+                "undo" -> {
+                    OverlayService.instance?.undo()
+                    result.success(true)
+                }
+                "redo" -> {
+                    OverlayService.instance?.redo()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+    
+    private fun startOverlayService() {
+        val intent = Intent(this, OverlayService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+    }
+    
+    private fun stopOverlayService() {
+        val intent = Intent(this, OverlayService::class.java).apply {
+            action = OverlayService.ACTION_STOP
+        }
+        startService(intent)
+    }
+    
+    private fun showOverlay() {
+        val intent = Intent(this, OverlayService::class.java).apply {
+            action = OverlayService.ACTION_SHOW
+        }
+        startService(intent)
+    }
+    
+    private fun hideOverlay() {
+        val intent = Intent(this, OverlayService::class.java).apply {
+            action = OverlayService.ACTION_HIDE
+        }
+        startService(intent)
     }
 
     override fun dispatchTouchEvent(event: MotionEvent?): Boolean {
@@ -32,17 +122,13 @@ class MainActivity : FlutterActivity() {
         
         val toolType = event.getToolType(0)
         
-        // S Pen (STYLUS) 입력만 Flutter로 전달
-        // FINGER 입력은 하위 앱으로 pass-through (오버레이 모드에서)
         return when (toolType) {
             MotionEvent.TOOL_TYPE_STYLUS,
             MotionEvent.TOOL_TYPE_ERASER -> {
-                // Stylus/Eraser 입력 -> Flutter로 전달
                 sendTouchToFlutter(event)
                 super.dispatchTouchEvent(event)
             }
             MotionEvent.TOOL_TYPE_FINGER -> {
-                // 손가락 입력 -> 현재는 Flutter로 전달 (오버레이 모드에서 pass-through 처리)
                 super.dispatchTouchEvent(event)
             }
             else -> super.dispatchTouchEvent(event)
