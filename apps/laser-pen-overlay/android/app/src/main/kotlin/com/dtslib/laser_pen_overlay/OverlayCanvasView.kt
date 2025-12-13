@@ -16,16 +16,17 @@ class OverlayCanvasView(context: Context) : View(context) {
     private val undoneStrokes = mutableListOf<StrokeData>()
     private var currentPath: Path? = null
     private var currentStrokeTime: Long = 0
+    private var currentSegments = mutableListOf<PathSegment>()
     
     private var strokeColor = Color.WHITE
-    private val strokeWidth = 8f
+    private val baseStrokeWidth = 6f
+    private val maxStrokeWidth = 16f
     
     private val paint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
-        strokeWidth = this@OverlayCanvasView.strokeWidth
     }
     
     private val fadeHandler = Handler(Looper.getMainLooper())
@@ -33,22 +34,27 @@ class OverlayCanvasView(context: Context) : View(context) {
         override fun run() {
             updateFadeAndCleanup()
             invalidate()
-            fadeHandler.postDelayed(this, 50) // 20fps for fade animation
+            fadeHandler.postDelayed(this, 50)
         }
     }
     
     init {
-        // 배경 투명
         setBackgroundColor(Color.TRANSPARENT)
         fadeHandler.post(fadeRunnable)
     }
     
+    // 압력 기반 선분
+    data class PathSegment(
+        val x1: Float, val y1: Float,
+        val x2: Float, val y2: Float,
+        val width: Float
+    )
+    
     data class StrokeData(
-        val path: Path,
+        val segments: List<PathSegment>,
         val color: Int,
         val createdAt: Long
     ) {
-        // 3초 후 fade 시작, 3.5초에 완전 투명
         fun getOpacity(): Float {
             val elapsed = System.currentTimeMillis() - createdAt
             return when {
@@ -63,35 +69,52 @@ class OverlayCanvasView(context: Context) : View(context) {
         }
     }
     
+    private var lastX = 0f
+    private var lastY = 0f
+    
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val toolType = event.getToolType(0)
         
-        // S Pen (STYLUS/ERASER)만 처리
+        // S Pen만 처리
         if (toolType != MotionEvent.TOOL_TYPE_STYLUS && 
             toolType != MotionEvent.TOOL_TYPE_ERASER) {
-            // 손가락 입력은 무시 → 하위 앱으로 pass-through
             return false
         }
         
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                currentPath = Path().apply {
-                    moveTo(event.x, event.y)
-                }
+                lastX = event.x
+                lastY = event.y
+                currentSegments.clear()
                 currentStrokeTime = System.currentTimeMillis()
-                undoneStrokes.clear() // 새 스트로크 시작하면 redo 스택 클리어
+                undoneStrokes.clear()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                currentPath?.lineTo(event.x, event.y)
+                // 압력 감지 (0.0 ~ 1.0)
+                val pressure = event.pressure.coerceIn(0.1f, 1f)
+                val width = baseStrokeWidth + (maxStrokeWidth - baseStrokeWidth) * pressure
+                
+                currentSegments.add(PathSegment(
+                    lastX, lastY,
+                    event.x, event.y,
+                    width
+                ))
+                
+                lastX = event.x
+                lastY = event.y
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                currentPath?.let { path ->
-                    strokes.add(StrokeData(path, strokeColor, currentStrokeTime))
+                if (currentSegments.isNotEmpty()) {
+                    strokes.add(StrokeData(
+                        currentSegments.toList(),
+                        strokeColor,
+                        currentStrokeTime
+                    ))
+                    currentSegments.clear()
                 }
-                currentPath = null
                 invalidate()
                 return true
             }
@@ -102,32 +125,39 @@ class OverlayCanvasView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         
-        // 저장된 스트로크 렌더링 (fade 적용)
+        // 저장된 스트로크 렌더링
         for (stroke in strokes) {
             val opacity = stroke.getOpacity()
             if (opacity > 0) {
                 paint.color = stroke.color
                 paint.alpha = (opacity * 255).toInt()
-                canvas.drawPath(stroke.path, paint)
+                drawSegments(canvas, stroke.segments, paint)
             }
         }
         
-        // 현재 그리는 중인 스트로크
-        currentPath?.let { path ->
+        // 현재 그리는 중
+        if (currentSegments.isNotEmpty()) {
             paint.color = strokeColor
             paint.alpha = 255
-            canvas.drawPath(path, paint)
+            drawSegments(canvas, currentSegments, paint)
+        }
+    }
+    
+    private fun drawSegments(canvas: Canvas, segments: List<PathSegment>, paint: Paint) {
+        for (seg in segments) {
+            paint.strokeWidth = seg.width
+            canvas.drawLine(seg.x1, seg.y1, seg.x2, seg.y2, paint)
         }
     }
     
     private fun updateFadeAndCleanup() {
-        // 만료된 스트로크 제거
         strokes.removeAll { it.isExpired() }
     }
     
     fun clear() {
         strokes.clear()
         undoneStrokes.clear()
+        currentSegments.clear()
         invalidate()
     }
     
