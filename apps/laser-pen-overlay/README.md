@@ -1,104 +1,111 @@
-# Laser Pen Overlay v2.3.0
+# Laser Pen Overlay
 
-> **Personal use only. No distribution.**
+> S Pen 전용 웹 오버레이 판서 앱 (Galaxy Tab S9)
 
-S Pen 웹 오버레이 판서 앱 (레이저펜 효과).
+**Personal use only. No distribution.**
 
-## 📥 빠른 다운로드
+## 핵심 기능
 
-[![Download APK](https://img.shields.io/badge/Download-APK-green?style=for-the-badge)](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip)
+- **S Pen만 판서**: S Pen으로 화면 위에 그리기
+- **손가락 패스스루**: 손가락 터치는 하위 앱(브라우저 등)으로 전달
+- **3초 Fade-out**: 스트로크가 3초 후 자동으로 사라짐
+- **압력 감지**: S Pen 압력에 따른 선 굵기 변화
 
-## 🎯 핵심 기능
+## v1.1.0 변경사항 (2025-12-14)
 
-### v2.3 신규 - 플로팅 컨트롤 바 ⭐
-- ✅ **화면 내 컨트롤** - 오버레이 모드에서 하단에 떠있는 버튼들
-- ✅ **즉시 제어** - 색상/Undo/Redo/Clear/숨기기 원탭
-- ✅ **알림 없이도 제어 가능**
+### 수정된 버그
 
-### v2.2 - S Pen 압력 감지
-- ✅ **압력 감지** - 누르는 힘에 따라 선 굵기 (6~16px)
-- ✅ **5색 지원** - ⚪흰색, 🟡노랑, ⚫검정, 🔴빨강, 🔵파랑
+| 버그 | 원인 | 해결 |
+|------|------|------|
+| S Pen이 그려지지 않음 | `onTouchEvent`에서 stylus 이벤트가 소비되지 않음 | `dispatchTouchEvent` 오버라이드로 stylus/finger 분기 |
+| 손가락 패스스루 안 됨 | 오버레이가 모든 터치 이벤트 소비 | finger 이벤트에서 `return false`로 하위 전달 |
+| Exit 버튼 안 눌림 | `setOnClickListener` 이벤트 전달 문제 | `setOnTouchListener`로 직접 터치 처리 |
 
-### v2.1 - Quick Settings Tile
-- ✅ **빠른 설정 타일** - 상태바에서 한 탭 ON/OFF
-- ✅ **알림 액션 버튼** - ON/OFF, 색상, 클리어, 종료
+### 핵심 수정 코드
 
-### v2.0 - 시스템 오버레이
-- ✅ **실제 오버레이** - 다른 앱 위에 판서
-- ✅ **S Pen 전용** - S Pen만 그려짐
-- ✅ **손가락 Pass-through** - 손가락은 하위 앱 조작
+**OverlayCanvasView.kt** - Stylus/Finger 분기:
+```kotlin
+override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+    // Finger → pass-through (하위 앱으로)
+    if (!isStylus(event)) {
+        return false
+    }
+    // Stylus → 이 View에서 처리
+    return super.dispatchTouchEvent(event)
+}
 
-### 기본 기능
-- ✅ 3초 후 페이드아웃
-- ✅ Undo/Redo/Clear
+private fun isStylus(event: MotionEvent): Boolean {
+    val toolType = event.getToolType(0)
+    if (toolType == MotionEvent.TOOL_TYPE_STYLUS ||
+        toolType == MotionEvent.TOOL_TYPE_ERASER) {
+        return true
+    }
+    // Fallback: SOURCE_STYLUS 체크
+    if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
+        return true
+    }
+    return false
+}
+```
 
-## 📱 대상 기기
+## APK 다운로드
 
-- Galaxy Tab S9 (개인 기기)
+1. [GitHub Actions](../../actions/workflows/build-laser-pen.yml) 접속
+2. 최신 성공한 빌드 클릭
+3. Artifacts에서 `laser-pen-overlay-debug` 다운로드
+4. APK 파일을 Galaxy Tab S9에 설치
 
-## 🚀 사용법
+## 사용법
 
-### ⭐ 추천: 플로팅 컨트롤 바 (v2.3)
-1. 앱 실행 → 오버레이 ON
-2. 화면 하단에 컨트롤 바 자동 표시:
+1. 앱 실행
+2. 오버레이 권한 허용 (최초 1회)
+3. "오버레이 ON" 버튼 탭
+4. 브라우저 등 다른 앱으로 이동
+5. S Pen으로 화면 위에 판서
+6. 손가락으로는 웹페이지 스크롤/클릭
 
-| 버튼 | 동작 |
+### 컨트롤 바
+
+| 버튼 | 기능 |
 |------|------|
-| ⚪ | 색상 순환 |
+| ⚪/🟡/⚫/🔴/🔵 | 색상 순환 |
 | ◀ | Undo |
 | ▶ | Redo |
-| 🧹 | 클리어 |
-| 👁 | 오버레이 숨기기 |
+| 🧹 | 전체 지우기 |
+| ✕ | 오버레이 닫기 |
 
-### Quick Settings 타일
-상태바 → Quick Settings 편집 → **Laser Pen** 추가
+## 테스트 체크리스트
 
-### 알림 액션
-알림 패널에서: ON/OFF, 색상, 클리어, 종료
+- [ ] 브라우저에서 손가락 스크롤 동작
+- [ ] 브라우저에서 손가락 링크 클릭 동작
+- [ ] S Pen으로 선 그리기 동작
+- [ ] 3초 후 선 페이드아웃
+- [ ] 색상 버튼 동작
+- [ ] Undo/Redo 동작
+- [ ] Clear 동작
+- [ ] Exit(✕) 버튼 동작
 
-## 🎨 색상
+## 알려진 제한사항
 
-| 이모지 | 색상 |
-|--------|------|
-| ⚪ | 흰색 (기본) |
-| 🟡 | 노랑 |
-| ⚫ | 검정 |
-| 🔴 | 빨강 |
-| 🔵 | 파랑 |
+- Galaxy Tab S9에서만 테스트됨
+- 일부 앱에서 오버레이가 차단될 수 있음
+- 게임/영상 앱에서는 오버레이 권한이 제한될 수 있음
 
-## 🏗️ 아키텍처
+## 기술 스택
+
+- Flutter 3.24.0
+- Kotlin (Native Android)
+- MotionEvent.getToolType() API
+- WindowManager TYPE_APPLICATION_OVERLAY
+
+## 빌드
+
+GitHub Actions가 자동으로 debug APK를 빌드합니다.
 
 ```
-┌─────────────────────────────────┐
-│ Quick Settings Tile             │
-│ Notification Actions            │
-└────────────┬────────────────────┘
-             ▼
-┌─────────────────────────────────┐
-│ OverlayService                  │
-│ ├── OverlayCanvasView (전체화면)│
-│ │   ├── STYLUS + Pressure       │
-│ │   └── FINGER → Pass-through   │
-│ └── FloatingControlBar (하단)   │ ← v2.3
-│     └── 색상/Undo/Redo/Clear/Hide│
-└─────────────────────────────────┘
+push to main → build-laser-pen.yml → app-debug.apk artifact
 ```
 
-## 📋 버전 기록
+---
 
-| 버전 | 날짜 | 변경사항 |
-|------|------|----------|
-| **v2.3.0** | 2025-12-13 | 플로팅 컨트롤 바 (화면 내 제어) |
-| v2.2.0 | 2025-12-13 | S Pen 압력 감지, 5색 지원 |
-| v2.1.0 | 2025-12-13 | Quick Settings Tile, 알림 액션 |
-| v2.0.0 | 2025-12-13 | 시스템 오버레이 |
-| v1.0.0 | 2025-12-13 | MVP |
-
-## ⚠️ 제한사항
-
-- Galaxy Tab S9 전용
-- Debug 빌드
-
-## ⚖️ 헌법 준수
-
-[CONSTITUTION.md](../../CONSTITUTION.md)
+*Personal use only. Not for distribution.*
