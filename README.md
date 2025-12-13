@@ -1,41 +1,55 @@
-# AIVA Prep - Audio Trimmer
+# dtslib-apk-lab
 
-**Personal use only** - Not for distribution.
+> **Personal use only. No distribution.**
 
-AIVA companion prep tool: trim long audio files to 2-minute clips for export.
+Parksy의 개인용 Android APK 모노레포.
 
-## Features
+---
 
-- Import audio (mp3, wav, m4a) via Android SAF
-- Play/pause, scrub timeline
-- Mark IN/OUT points
-- Preset lengths: 30s / 60s / 120s (default) / 180s
-- Auto fade-in/out (10ms) to avoid clicks
-- Export as WAV (PCM 16-bit, 44.1kHz, stereo)
-- Share exported clips via Android Share Sheet
+## 📱 App Catalog
 
-## Install Debug APK from GitHub Actions
+| App | 설명 | 상태 |
+|-----|------|------|
+| [aiva-trimmer](./apps/aiva-trimmer/) | AIVA 음악 2분 트리밍 | 🟡 개발중 |
+| [laser-pen-overlay](./apps/laser-pen-overlay/) | S Pen 웹 오버레이 판서 | 🟢 신규 |
 
-1. Go to [Actions](../../actions) tab
-2. Click the latest successful workflow run
-3. Scroll down to **Artifacts** section
-4. Download `app-debug` artifact (ZIP file)
-5. Extract `app-debug.apk`
-6. Transfer APK to your Android device
-7. Enable "Install from unknown sources" if prompted
-8. Install and run
+---
 
-## Limitations
+## 🏗️ 구조
 
-- Debug build only (not optimized)
-- No MP3 export in v1 (WAV only)
-- No audio-to-MIDI conversion (planned for v2)
-- Tested on Galaxy Tab S9 only
+```
+dtslib-apk-lab/
+├── CONSTITUTION.md          # 개발 헌법 (필독)
+├── README.md                 # 이 파일
+├── .github/workflows/        # CI/CD
+└── apps/
+    ├── aiva-trimmer/         # 오디오 트리머
+    └── laser-pen-overlay/    # S Pen 판서
+```
 
-## Tech Stack
+---
 
-- Flutter 3.24
-- ffmpeg_kit_flutter_audio
-- just_audio
-- file_picker
-- share_plus
+## 📥 APK 설치 방법
+
+1. [GitHub Actions](https://github.com/dtslib1979/dtslib-apk-lab/actions) 접속
+2. 원하는 앱의 최신 성공 빌드 클릭 (✓ 녹색)
+3. 하단 **Artifacts** → `[app-name]-debug` 다운로드
+4. ZIP 해제 → `app-debug.apk`
+5. Galaxy 기기로 전송
+6. 설정 → 보안 → 출처를 알 수 없는 앱 허용
+7. APK 설치
+
+---
+
+## ⚖️ 헌법
+
+모든 개발은 [CONSTITUTION.md](./CONSTITUTION.md)를 준수합니다.
+
+- Debug APK only
+- GitHub Actions 빌드
+- 개인 Galaxy 기기만 테스트
+- 로그인/클라우드/분석 없음
+
+---
+
+*© 2025 Parksy (dtslib.com)*
