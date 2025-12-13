@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
@@ -21,6 +20,8 @@ class OverlayService : Service() {
         const val NOTIFICATION_ID = 1001
         const val ACTION_SHOW = "com.dtslib.laser_pen_overlay.SHOW"
         const val ACTION_HIDE = "com.dtslib.laser_pen_overlay.HIDE"
+        const val ACTION_TOGGLE = "com.dtslib.laser_pen_overlay.TOGGLE"
+        const val ACTION_CLEAR = "com.dtslib.laser_pen_overlay.CLEAR"
         const val ACTION_STOP = "com.dtslib.laser_pen_overlay.STOP"
         
         var instance: OverlayService? = null
@@ -39,8 +40,21 @@ class OverlayService : Service() {
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_SHOW -> showOverlay()
-            ACTION_HIDE -> hideOverlay()
+            ACTION_SHOW -> {
+                showOverlay()
+                updateNotification()
+            }
+            ACTION_HIDE -> {
+                hideOverlay()
+                updateNotification()
+            }
+            ACTION_TOGGLE -> {
+                if (isOverlayVisible) hideOverlay() else showOverlay()
+                updateNotification()
+            }
+            ACTION_CLEAR -> {
+                overlayView?.clear()
+            }
             ACTION_STOP -> {
                 hideOverlay()
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -73,7 +87,6 @@ class OverlayService : Service() {
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            // 핵심: S Pen만 받고, 손가락은 통과
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
@@ -87,10 +100,6 @@ class OverlayService : Service() {
         overlayView = OverlayCanvasView(this)
         windowManager?.addView(overlayView, params)
         isOverlayVisible = true
-        
-        // 알림 업데이트
-        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(NOTIFICATION_ID, createNotification())
     }
     
     private fun hideOverlay() {
@@ -99,6 +108,11 @@ class OverlayService : Service() {
             overlayView = null
         }
         isOverlayVisible = false
+    }
+    
+    private fun updateNotification() {
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(NOTIFICATION_ID, createNotification())
     }
     
     fun clearCanvas() {
@@ -134,26 +148,56 @@ class OverlayService : Service() {
     
     private fun createNotification(): Notification {
         val mainIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
+        val mainPendingIntent = PendingIntent.getActivity(
             this, 0, mainIntent,
             PendingIntent.FLAG_IMMUTABLE
         )
         
+        // 토글 버튼 (ON/OFF)
+        val toggleIntent = Intent(this, OverlayService::class.java).apply {
+            action = ACTION_TOGGLE
+        }
+        val togglePendingIntent = PendingIntent.getService(
+            this, 1, toggleIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        // 클리어 버튼
+        val clearIntent = Intent(this, OverlayService::class.java).apply {
+            action = ACTION_CLEAR
+        }
+        val clearPendingIntent = PendingIntent.getService(
+            this, 2, clearIntent,
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        // 종료 버튼
         val stopIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_STOP
         }
         val stopPendingIntent = PendingIntent.getService(
-            this, 1, stopIntent,
+            this, 3, stopIntent,
             PendingIntent.FLAG_IMMUTABLE
         )
         
-        val statusText = if (isOverlayVisible) "판서 활성화" else "대기 중"
+        val statusText = if (isOverlayVisible) "🖊️ 판서 활성화" else "⏸️ 대기 중"
+        val toggleText = if (isOverlayVisible) "OFF" else "ON"
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Laser Pen")
             .setContentText(statusText)
             .setSmallIcon(android.R.drawable.ic_menu_edit)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(mainPendingIntent)
+            .addAction(
+                android.R.drawable.ic_media_play,
+                toggleText,
+                togglePendingIntent
+            )
+            .addAction(
+                android.R.drawable.ic_menu_delete,
+                "Clear",
+                clearPendingIntent
+            )
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 "종료",
