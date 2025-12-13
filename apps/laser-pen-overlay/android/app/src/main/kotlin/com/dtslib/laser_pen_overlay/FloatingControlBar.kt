@@ -11,11 +11,12 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
+import kotlin.math.abs
 
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class FloatingControlBar(
     context: Context,
-    private val onColorClick: () -> Unit,
+    private val onColorChange: (Int) -> Unit, // 색상 인덱스 전달
     private val onUndoClick: () -> Unit,
     private val onRedoClick: () -> Unit,
     private val onClearClick: () -> Unit,
@@ -26,12 +27,16 @@ class FloatingControlBar(
     private val colorBtn: TextView
     private var currentColorIndex = 0
     
-    // 드래그 상태
+    // 제스처 상태
     private var isDragging = false
+    private var isSwipe = false
     private var initialX = 0
     private var initialY = 0
     private var initialTouchX = 0f
     private var initialTouchY = 0f
+    
+    private val SWIPE_THRESHOLD = 80f
+    private val DRAG_THRESHOLD = 15f
 
     private fun Int.dp(): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP,
@@ -62,8 +67,8 @@ class FloatingControlBar(
         }
         addButton(dragHandle, 28.dp(), btnMargin)
 
-        // 색상 버튼
-        colorBtn = createButton("⚪", btnSize) { onColorClick() }
+        // 색상 버튼 (탭: 순환, 스와이프: 방향별 전환)
+        colorBtn = createButton("⚪", btnSize) { cycleColor(1) }
         addButton(colorBtn, btnSize, btnMargin)
 
         // Undo
@@ -78,14 +83,15 @@ class FloatingControlBar(
         // Close
         addButton(createButton("👁", btnSize) { onCloseClick() }, btnSize, btnMargin)
 
-        setupDragListener()
+        setupGestureListener()
     }
 
-    private fun setupDragListener() {
+    private fun setupGestureListener() {
         setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     isDragging = false
+                    isSwipe = false
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
                     
@@ -100,7 +106,8 @@ class FloatingControlBar(
                     val dx = event.rawX - initialTouchX
                     val dy = event.rawY - initialTouchY
                     
-                    if (!isDragging && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+                    // 드래그 감지 (수직 이동 우선)
+                    if (!isDragging && !isSwipe && abs(dy) > DRAG_THRESHOLD) {
                         isDragging = true
                     }
                     
@@ -112,15 +119,37 @@ class FloatingControlBar(
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!isDragging) {
+                    val dx = event.rawX - initialTouchX
+                    val dy = event.rawY - initialTouchY
+                    
+                    // 스와이프 감지 (수평 이동 + 수직 이동 적음)
+                    if (!isDragging && abs(dx) > SWIPE_THRESHOLD && abs(dy) < SWIPE_THRESHOLD) {
+                        isSwipe = true
+                        if (dx > 0) {
+                            // 오른쪽 스와이프 → 다음 색상
+                            cycleColor(1)
+                        } else {
+                            // 왼쪽 스와이프 → 이전 색상
+                            cycleColor(-1)
+                        }
+                    } else if (!isDragging && !isSwipe) {
                         performClick()
                     }
+                    
                     isDragging = false
+                    isSwipe = false
                     true
                 }
                 else -> false
             }
         }
+    }
+    
+    private fun cycleColor(direction: Int) {
+        val size = OverlayService.COLOR_NAMES.size
+        currentColorIndex = (currentColorIndex + direction + size) % size
+        colorBtn.text = OverlayService.COLOR_NAMES[currentColorIndex]
+        onColorChange(currentColorIndex)
     }
 
     private fun createButton(text: String, size: Int, onClick: () -> Unit): TextView {
@@ -134,7 +163,7 @@ class FloatingControlBar(
                 cornerRadius = (size / 2).toFloat()
             }
             setOnClickListener { 
-                if (!isDragging) onClick() 
+                if (!isDragging && !isSwipe) onClick() 
             }
         }
     }
