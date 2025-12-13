@@ -46,6 +46,19 @@
                 android:value="overlay_drawing"/>
         </service>
         
+        <!-- Quick Settings Tile -->
+        <service
+            android:name=".LaserPenTileService"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher"
+            android:label="Laser Pen"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE"/>
+            </intent-filter>
+        </service>
+        
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
