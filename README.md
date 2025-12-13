@@ -8,10 +8,17 @@ Parksy의 개인용 Android APK 모노레포.
 
 ## 📱 App Catalog
 
-| App | 설명 | 상태 | APK |
+| App | 설명 | 버전 | APK |
 |-----|------|------|-----|
-| [aiva-trimmer](./apps/aiva-trimmer/) | AIVA 음악 2분 트리밍 | 🟢 완료 | `aiva-trimmer-debug` |
-| [laser-pen-overlay](./apps/laser-pen-overlay/) | S Pen 웹 오버레이 판서 | 🟢 완료 | `laser-pen-overlay-debug` |
+| [aiva-trimmer](./apps/aiva-trimmer/) | AIVA 음악 2분 트리밍 | v1.0.1 | `aiva-trimmer-debug` |
+| [laser-pen-overlay](./apps/laser-pen-overlay/) | S Pen 웹 오버레이 판서 | **v2.0.0** | `laser-pen-overlay-debug` |
+
+### 🆕 최신 업데이트
+
+**Laser Pen v2.0.0** (2025-12-13)
+- 시스템 오버레이 기능 추가
+- 다른 앱 위에서 S Pen 판서 가능
+- 손가락은 하위 앱으로 pass-through
 
 ---
 
@@ -28,7 +35,7 @@ dtslib-apk-lab/
 │   └── build-laser-pen.yml
 └── apps/
     ├── aiva-trimmer/         # 오디오 트리머
-    └── laser-pen-overlay/    # S Pen 판서
+    └── laser-pen-overlay/    # S Pen 판서 (v2: 오버레이 지원)
 ```
 
 > ⚠️ root의 `lib/`, `android/`, `pubspec.yaml`은 레거시 (무시)
@@ -61,6 +68,7 @@ dtslib-apk-lab/
 ## 📚 문서
 
 - [S Pen Overlay 기술백서](./docs/SPen_Overlay_Whitepaper.md)
+- [Laser Pen 로드맵](./apps/laser-pen-overlay/ROADMAP.md)
 
 ---
 
