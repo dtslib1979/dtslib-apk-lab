@@ -64,7 +64,7 @@ S Pen 웹 오버레이 판서 앱 (레이저펜 효과).
 
 ## 기술 스택
 
-- Flutter 3.x + Kotlin Native
+- Flutter 3.24 + Kotlin Native
 - MethodChannel (터치 분기)
 - MotionEvent.getToolType() → STYLUS/FINGER 구분
 - SYSTEM_ALERT_WINDOW
@@ -79,3 +79,4 @@ S Pen 웹 오버레이 판서 앱 (레이저펜 효과).
 ## 버전 기록
 
 - **v1.0.0**: MVP (판서 + 페이드아웃 + 터치 분리)
+- **v1.0.1**: 빌드 트리거 (2025-12-13)
