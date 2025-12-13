@@ -45,7 +45,6 @@ class OverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var overlayView: OverlayCanvasView? = null
     private var controlBar: FloatingControlBar? = null
-    private var controlBarParams: WindowManager.LayoutParams? = null
     private var currentColorIndex = 0
     
     private fun Int.dp(): Int = TypedValue.applyDimension(
@@ -127,8 +126,8 @@ class OverlayService : Service() {
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
         windowManager?.addView(overlayView, canvasParams)
         
-        // 플로팅 컨트롤 바 (드래그 + 스와이프)
-        controlBarParams = WindowManager.LayoutParams(
+        // 플로팅 컨트롤 바
+        val barParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
@@ -136,14 +135,13 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            x = 0
             y = 60.dp()
         }
         
         controlBar = FloatingControlBar(
             context = this,
-            onColorChange = { colorIndex ->
-                setColorByIndex(colorIndex)
+            onColorClick = {
+                cycleColor()
                 updateNotification()
             },
             onUndoClick = { overlayView?.undo() },
@@ -152,19 +150,10 @@ class OverlayService : Service() {
             onCloseClick = {
                 hideOverlay()
                 updateNotification()
-            },
-            onPositionChanged = { newX, newY ->
-                controlBarParams?.let { params ->
-                    params.x = newX
-                    params.y = newY
-                    controlBar?.let { bar ->
-                        windowManager?.updateViewLayout(bar, params)
-                    }
-                }
             }
         )
         controlBar?.setColorIndex(currentColorIndex)
-        windowManager?.addView(controlBar, controlBarParams)
+        windowManager?.addView(controlBar, barParams)
         
         isOverlayVisible = true
     }
@@ -178,7 +167,6 @@ class OverlayService : Service() {
             windowManager?.removeView(it)
             controlBar = null
         }
-        controlBarParams = null
         isOverlayVisible = false
     }
     
@@ -186,11 +174,6 @@ class OverlayService : Service() {
         currentColorIndex = (currentColorIndex + 1) % COLORS.size
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
         controlBar?.setColorIndex(currentColorIndex)
-    }
-    
-    private fun setColorByIndex(index: Int) {
-        currentColorIndex = index
-        overlayView?.setStrokeColor(COLORS[currentColorIndex])
     }
     
     private fun updateNotification() {
