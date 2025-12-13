@@ -1,7 +1,7 @@
 name: laser_pen_overlay
 description: S Pen web overlay drawing app with fade-out effect
 publish_to: 'none'
-version: 1.0.1+2
+version: 2.0.0+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
