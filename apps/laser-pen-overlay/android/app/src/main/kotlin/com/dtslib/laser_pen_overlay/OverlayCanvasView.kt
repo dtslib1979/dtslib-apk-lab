@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
+import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 
@@ -14,7 +15,6 @@ class OverlayCanvasView(context: Context) : View(context) {
     
     private val strokes = mutableListOf<StrokeData>()
     private val undoneStrokes = mutableListOf<StrokeData>()
-    private var currentPath: Path? = null
     private var currentStrokeTime: Long = 0
     private var currentSegments = mutableListOf<PathSegment>()
     
@@ -43,7 +43,6 @@ class OverlayCanvasView(context: Context) : View(context) {
         fadeHandler.post(fadeRunnable)
     }
     
-    // 압력 기반 선분
     data class PathSegment(
         val x1: Float, val y1: Float,
         val x2: Float, val y2: Float,
@@ -72,15 +71,33 @@ class OverlayCanvasView(context: Context) : View(context) {
     private var lastX = 0f
     private var lastY = 0f
     
-    override fun onTouchEvent(event: MotionEvent): Boolean {
+    /**
+     * 핵심: Stylus만 캡처, Finger는 pass-through
+     */
+    private fun isStylus(event: MotionEvent): Boolean {
         val toolType = event.getToolType(0)
-        
-        // S Pen만 처리
-        if (toolType != MotionEvent.TOOL_TYPE_STYLUS && 
-            toolType != MotionEvent.TOOL_TYPE_ERASER) {
+        if (toolType == MotionEvent.TOOL_TYPE_STYLUS ||
+            toolType == MotionEvent.TOOL_TYPE_ERASER) {
+            return true
+        }
+        // Fallback: SOURCE_STYLUS 체크
+        if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
+            return true
+        }
+        return false
+    }
+    
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        // Finger → pass-through (하위 앱으로)
+        if (!isStylus(event)) {
             return false
         }
-        
+        // Stylus → 이 View에서 처리
+        return super.dispatchTouchEvent(event)
+    }
+    
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        // dispatchTouchEvent에서 이미 Stylus만 들어옴
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
@@ -91,7 +108,6 @@ class OverlayCanvasView(context: Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                // 압력 감지 (0.0 ~ 1.0)
                 val pressure = event.pressure.coerceIn(0.1f, 1f)
                 val width = baseStrokeWidth + (maxStrokeWidth - baseStrokeWidth) * pressure
                 
@@ -119,13 +135,12 @@ class OverlayCanvasView(context: Context) : View(context) {
                 return true
             }
         }
-        return super.onTouchEvent(event)
+        return false
     }
     
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         
-        // 저장된 스트로크 렌더링
         for (stroke in strokes) {
             val opacity = stroke.getOpacity()
             if (opacity > 0) {
@@ -135,7 +150,6 @@ class OverlayCanvasView(context: Context) : View(context) {
             }
         }
         
-        // 현재 그리는 중
         if (currentSegments.isNotEmpty()) {
             paint.color = strokeColor
             paint.alpha = 255
