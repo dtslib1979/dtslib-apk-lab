@@ -24,12 +24,13 @@ class OverlayService : Service() {
         const val ACTION_TOGGLE = "com.dtslib.laser_pen_overlay.TOGGLE"
         const val ACTION_CLEAR = "com.dtslib.laser_pen_overlay.CLEAR"
         const val ACTION_COLOR = "com.dtslib.laser_pen_overlay.COLOR"
+        const val ACTION_UNDO = "com.dtslib.laser_pen_overlay.UNDO"
+        const val ACTION_REDO = "com.dtslib.laser_pen_overlay.REDO"
         const val ACTION_STOP = "com.dtslib.laser_pen_overlay.STOP"
         
         var instance: OverlayService? = null
         var isOverlayVisible = false
         
-        // 색상 순환: 흰 → 노 → 검 → 빨 → 파
         val COLORS = listOf(
             Color.WHITE,
             Color.YELLOW,
@@ -42,6 +43,7 @@ class OverlayService : Service() {
     
     private var windowManager: WindowManager? = null
     private var overlayView: OverlayCanvasView? = null
+    private var controlBar: FloatingControlBar? = null
     private var currentColorIndex = 0
     
     override fun onCreate() {
@@ -65,21 +67,19 @@ class OverlayService : Service() {
                 if (isOverlayVisible) hideOverlay() else showOverlay()
                 updateNotification()
             }
-            ACTION_CLEAR -> {
-                overlayView?.clear()
-            }
+            ACTION_CLEAR -> overlayView?.clear()
             ACTION_COLOR -> {
                 cycleColor()
                 updateNotification()
             }
+            ACTION_UNDO -> overlayView?.undo()
+            ACTION_REDO -> overlayView?.redo()
             ACTION_STOP -> {
                 hideOverlay()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
-            else -> {
-                startForeground(NOTIFICATION_ID, createNotification())
-            }
+            else -> startForeground(NOTIFICATION_ID, createNotification())
         }
         return START_STICKY
     }
@@ -95,7 +95,8 @@ class OverlayService : Service() {
     private fun showOverlay() {
         if (overlayView != null) return
         
-        val params = WindowManager.LayoutParams(
+        // 캔버스 오버레이
+        val canvasParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -110,13 +111,46 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 0
-            y = 0
         }
         
         overlayView = OverlayCanvasView(this)
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
-        windowManager?.addView(overlayView, params)
+        windowManager?.addView(overlayView, canvasParams)
+        
+        // 플로팅 컨트롤 바
+        val barParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            },
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = 100 // 하단에서 100px 위
+        }
+        
+        controlBar = FloatingControlBar(
+            context = this,
+            onColorClick = {
+                cycleColor()
+                updateNotification()
+            },
+            onUndoClick = { overlayView?.undo() },
+            onRedoClick = { overlayView?.redo() },
+            onClearClick = { overlayView?.clear() },
+            onCloseClick = {
+                hideOverlay()
+                updateNotification()
+            }
+        )
+        controlBar?.setColorIndex(currentColorIndex)
+        windowManager?.addView(controlBar, barParams)
+        
         isOverlayVisible = true
     }
     
@@ -125,12 +159,17 @@ class OverlayService : Service() {
             windowManager?.removeView(it)
             overlayView = null
         }
+        controlBar?.let {
+            windowManager?.removeView(it)
+            controlBar = null
+        }
         isOverlayVisible = false
     }
     
     private fun cycleColor() {
         currentColorIndex = (currentColorIndex + 1) % COLORS.size
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
+        controlBar?.setColorIndex(currentColorIndex)
     }
     
     private fun updateNotification() {
@@ -138,24 +177,19 @@ class OverlayService : Service() {
         nm.notify(NOTIFICATION_ID, createNotification())
     }
     
-    fun clearCanvas() {
-        overlayView?.clear()
-    }
+    fun clearCanvas() = overlayView?.clear()
     
     fun setColor(color: Int) {
         overlayView?.setStrokeColor(color)
-        // 색상 인덱스도 동기화
         val idx = COLORS.indexOf(color)
-        if (idx >= 0) currentColorIndex = idx
+        if (idx >= 0) {
+            currentColorIndex = idx
+            controlBar?.setColorIndex(idx)
+        }
     }
     
-    fun undo() {
-        overlayView?.undo()
-    }
-    
-    fun redo() {
-        overlayView?.redo()
-    }
+    fun undo() = overlayView?.undo()
+    fun redo() = overlayView?.redo()
     
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -175,11 +209,9 @@ class OverlayService : Service() {
     private fun createNotification(): Notification {
         val mainIntent = Intent(this, MainActivity::class.java)
         val mainPendingIntent = PendingIntent.getActivity(
-            this, 0, mainIntent,
-            PendingIntent.FLAG_IMMUTABLE
+            this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE
         )
         
-        // 토글 버튼
         val toggleIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_TOGGLE
         }
@@ -188,7 +220,6 @@ class OverlayService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        // 색상 버튼
         val colorIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_COLOR
         }
@@ -197,32 +228,27 @@ class OverlayService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        // 클리어 버튼
         val clearIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_CLEAR
         }
         val clearPendingIntent = PendingIntent.getService(
-            this, 3, clearIntent,
-            PendingIntent.FLAG_IMMUTABLE
+            this, 3, clearIntent, PendingIntent.FLAG_IMMUTABLE
         )
         
-        // 종료 버튼
         val stopIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_STOP
         }
         val stopPendingIntent = PendingIntent.getService(
-            this, 4, stopIntent,
-            PendingIntent.FLAG_IMMUTABLE
+            this, 4, stopIntent, PendingIntent.FLAG_IMMUTABLE
         )
         
         val statusEmoji = if (isOverlayVisible) "🖊️" else "⏸️"
         val colorEmoji = COLOR_NAMES[currentColorIndex]
-        val statusText = "$statusEmoji $colorEmoji"
         val toggleText = if (isOverlayVisible) "OFF" else "ON"
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Laser Pen")
-            .setContentText(statusText)
+            .setContentText("$statusEmoji $colorEmoji")
             .setSmallIcon(android.R.drawable.ic_menu_edit)
             .setContentIntent(mainPendingIntent)
             .addAction(0, toggleText, togglePendingIntent)
