@@ -21,6 +21,8 @@ Parksy의 개인용 Android APK 모노레포.
 dtslib-apk-lab/
 ├── CONSTITUTION.md          # 개발 헌법 (필독)
 ├── README.md                 # 이 파일
+├── docs/                     # 기술 문서
+│   └── SPen_Overlay_Whitepaper.md
 ├── .github/workflows/        # CI/CD
 │   ├── build-aiva-trimmer.yml
 │   └── build-laser-pen.yml
@@ -28,6 +30,8 @@ dtslib-apk-lab/
     ├── aiva-trimmer/         # 오디오 트리머
     └── laser-pen-overlay/    # S Pen 판서
 ```
+
+> ⚠️ root의 `lib/`, `android/`, `pubspec.yaml`은 레거시 (무시)
 
 ---
 
@@ -51,6 +55,12 @@ dtslib-apk-lab/
 - GitHub Actions 빌드
 - 개인 Galaxy 기기만 테스트
 - 로그인/클라우드/분석 없음
+
+---
+
+## 📚 문서
+
+- [S Pen Overlay 기술백서](./docs/SPen_Overlay_Whitepaper.md)
 
 ---
 
