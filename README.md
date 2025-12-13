@@ -8,17 +8,31 @@ Parksy의 개인용 Android APK 모노레포.
 
 ## 📱 App Catalog
 
-| App | 설명 | 버전 | APK |
-|-----|------|------|-----|
-| [aiva-trimmer](./apps/aiva-trimmer/) | AIVA 음악 2분 트리밍 | v1.0.1 | `aiva-trimmer-debug` |
-| [laser-pen-overlay](./apps/laser-pen-overlay/) | S Pen 웹 오버레이 판서 | **v2.0.0** | `laser-pen-overlay-debug` |
+| App | 설명 | 버전 | 다운로드 |
+|-----|------|------|----------|
+| [laser-pen-overlay](./apps/laser-pen-overlay/) | S Pen 웹 오버레이 판서 | **v2.1.0** | [![Download](https://img.shields.io/badge/APK-Download-green)](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip) |
+| [aiva-trimmer](./apps/aiva-trimmer/) | AIVA 음악 2분 트리밍 | v1.0.1 | [![Download](https://img.shields.io/badge/APK-Download-blue)](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip) |
 
 ### 🆕 최신 업데이트
 
-**Laser Pen v2.0.0** (2025-12-13)
-- 시스템 오버레이 기능 추가
-- 다른 앱 위에서 S Pen 판서 가능
-- 손가락은 하위 앱으로 pass-through
+**Laser Pen v2.1.0** (2025-12-13)
+- ✅ Quick Settings 타일 추가
+- ✅ 알림 액션 버튼 (Toggle/Clear/Stop)
+- ✅ 시스템 오버레이 (다른 앱 위 판서)
+- ✅ S Pen/손가락 입력 분리
+
+---
+
+## 📥 빠른 설치
+
+**Laser Pen (로그인 불필요):**
+```
+https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip
+```
+
+1. 링크 클릭 → ZIP 다운로드
+2. 압축 해제 → `app-debug.apk`
+3. Galaxy 기기에서 설치
 
 ---
 
@@ -35,22 +49,8 @@ dtslib-apk-lab/
 │   └── build-laser-pen.yml
 └── apps/
     ├── aiva-trimmer/         # 오디오 트리머
-    └── laser-pen-overlay/    # S Pen 판서 (v2: 오버레이 지원)
+    └── laser-pen-overlay/    # S Pen 판서 (v2.1: 오버레이+타일)
 ```
-
-> ⚠️ root의 `lib/`, `android/`, `pubspec.yaml`은 레거시 (무시)
-
----
-
-## 📥 APK 설치 방법
-
-1. [GitHub Actions](https://github.com/dtslib1979/dtslib-apk-lab/actions) 접속
-2. 원하는 앱의 최신 성공 빌드 클릭 (✓ 녹색)
-3. 하단 **Artifacts** → `[app-name]-debug` 다운로드
-4. ZIP 해제 → `app-debug.apk`
-5. Galaxy 기기로 전송
-6. 설정 → 보안 → 출처를 알 수 없는 앱 허용
-7. APK 설치
 
 ---
 
@@ -68,7 +68,6 @@ dtslib-apk-lab/
 ## 📚 문서
 
 - [S Pen Overlay 기술백서](./docs/SPen_Overlay_Whitepaper.md)
-- [Laser Pen 로드맵](./apps/laser-pen-overlay/ROADMAP.md)
 
 ---
 
