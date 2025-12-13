@@ -4,6 +4,18 @@
 
 S Pen 웹 오버레이 판서 앱 (레이저펜 효과).
 
+## 📥 빠른 다운로드
+
+**로그인 없이 바로 다운로드:**
+
+[![Download APK](https://img.shields.io/badge/Download-APK-green?style=for-the-badge)](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip)
+
+```
+https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip
+```
+
+> ZIP 다운로드 → 압축 해제 → `app-debug.apk` 설치
+
 ## 🎯 핵심 기능
 
 ### v2.1 - Quick Settings Tile
@@ -25,15 +37,6 @@ S Pen 웹 오버레이 판서 앱 (레이저펜 효과).
 ## 📱 대상 기기
 
 - Galaxy Tab S9 (개인 기기)
-
-## 📥 설치
-
-1. [GitHub Actions](https://github.com/dtslib1979/dtslib-apk-lab/actions) 접속
-2. **Build Laser Pen Overlay** 워크플로우 클릭
-3. 최신 성공 빌드 (✓ 녹색) 클릭
-4. 하단 **Artifacts** → `laser-pen-overlay-debug` 다운로드
-5. ZIP 해제 → `app-debug.apk`
-6. Galaxy 기기로 전송 및 설치
 
 ## 🚀 사용법
 
