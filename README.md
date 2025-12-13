@@ -8,10 +8,10 @@ Parksy의 개인용 Android APK 모노레포.
 
 ## 📱 App Catalog
 
-| App | 설명 | 상태 |
-|-----|------|------|
-| [aiva-trimmer](./apps/aiva-trimmer/) | AIVA 음악 2분 트리밍 | 🟡 개발중 |
-| [laser-pen-overlay](./apps/laser-pen-overlay/) | S Pen 웹 오버레이 판서 | 🟢 신규 |
+| App | 설명 | 상태 | APK |
+|-----|------|------|-----|
+| [aiva-trimmer](./apps/aiva-trimmer/) | AIVA 음악 2분 트리밍 | 🟢 완료 | `aiva-trimmer-debug` |
+| [laser-pen-overlay](./apps/laser-pen-overlay/) | S Pen 웹 오버레이 판서 | 🟢 완료 | `laser-pen-overlay-debug` |
 
 ---
 
@@ -22,6 +22,8 @@ dtslib-apk-lab/
 ├── CONSTITUTION.md          # 개발 헌법 (필독)
 ├── README.md                 # 이 파일
 ├── .github/workflows/        # CI/CD
+│   ├── build-aiva-trimmer.yml
+│   └── build-laser-pen.yml
 └── apps/
     ├── aiva-trimmer/         # 오디오 트리머
     └── laser-pen-overlay/    # S Pen 판서
