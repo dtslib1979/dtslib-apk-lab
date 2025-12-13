@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.WindowManager
@@ -18,6 +19,7 @@ import androidx.core.app.NotificationCompat
 class OverlayService : Service() {
     
     companion object {
+        const val TAG = "OverlayService"
         const val CHANNEL_ID = "laser_pen_overlay"
         const val NOTIFICATION_ID = 1001
         const val ACTION_SHOW = "com.dtslib.laser_pen_overlay.SHOW"
@@ -58,9 +60,12 @@ class OverlayService : Service() {
         instance = this
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
+        Log.d(TAG, "Service created")
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand: action=${intent?.action}")
+        
         when (intent?.action) {
             ACTION_SHOW -> {
                 showOverlay()
@@ -82,6 +87,7 @@ class OverlayService : Service() {
             ACTION_UNDO -> overlayView?.undo()
             ACTION_REDO -> overlayView?.redo()
             ACTION_STOP -> {
+                Log.d(TAG, "ACTION_STOP received")
                 hideOverlay()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -94,13 +100,19 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     
     override fun onDestroy() {
+        Log.d(TAG, "Service destroyed")
         hideOverlay()
         instance = null
         super.onDestroy()
     }
     
     private fun showOverlay() {
-        if (overlayView != null) return
+        if (overlayView != null) {
+            Log.d(TAG, "Overlay already visible")
+            return
+        }
+        
+        Log.d(TAG, "Showing overlay")
         
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -109,14 +121,16 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
         
-        // 캔버스 오버레이
+        // Canvas overlay: 터치 통과 가능하게 설정
+        // FLAG_NOT_TOUCHABLE 제거 → View.dispatchTouchEvent에서 분기
         val canvasParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+            WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -126,7 +140,7 @@ class OverlayService : Service() {
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
         windowManager?.addView(overlayView, canvasParams)
         
-        // 플로팅 컨트롤 바
+        // Control bar: 항상 터치 가능 (focusable 아님, 하지만 clickable)
         val barParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -148,26 +162,46 @@ class OverlayService : Service() {
             onRedoClick = { overlayView?.redo() },
             onClearClick = { overlayView?.clear() },
             onCloseClick = {
-                hideOverlay()
-                updateNotification()
+                Log.d(TAG, "Close button clicked")
+                closeOverlay()
             }
         )
         controlBar?.setColorIndex(currentColorIndex)
         windowManager?.addView(controlBar, barParams)
         
         isOverlayVisible = true
+        Log.d(TAG, "Overlay shown successfully")
     }
     
     private fun hideOverlay() {
-        overlayView?.let {
-            windowManager?.removeView(it)
-            overlayView = null
+        Log.d(TAG, "Hiding overlay")
+        try {
+            overlayView?.let {
+                windowManager?.removeView(it)
+                overlayView = null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error removing overlayView: ${e.message}")
         }
-        controlBar?.let {
-            windowManager?.removeView(it)
-            controlBar = null
+        
+        try {
+            controlBar?.let {
+                windowManager?.removeView(it)
+                controlBar = null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error removing controlBar: ${e.message}")
         }
+        
         isOverlayVisible = false
+    }
+    
+    /**
+     * Exit 버튼용: 오버레이만 닫고 서비스는 유지
+     */
+    fun closeOverlay() {
+        hideOverlay()
+        updateNotification()
     }
     
     private fun cycleColor() {
