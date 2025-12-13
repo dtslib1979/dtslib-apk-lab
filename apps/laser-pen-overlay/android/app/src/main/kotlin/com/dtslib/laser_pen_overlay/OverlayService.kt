@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
@@ -22,14 +23,26 @@ class OverlayService : Service() {
         const val ACTION_HIDE = "com.dtslib.laser_pen_overlay.HIDE"
         const val ACTION_TOGGLE = "com.dtslib.laser_pen_overlay.TOGGLE"
         const val ACTION_CLEAR = "com.dtslib.laser_pen_overlay.CLEAR"
+        const val ACTION_COLOR = "com.dtslib.laser_pen_overlay.COLOR"
         const val ACTION_STOP = "com.dtslib.laser_pen_overlay.STOP"
         
         var instance: OverlayService? = null
         var isOverlayVisible = false
+        
+        // 색상 순환: 흰 → 노 → 검 → 빨 → 파
+        val COLORS = listOf(
+            Color.WHITE,
+            Color.YELLOW,
+            Color.BLACK,
+            Color.RED,
+            Color.CYAN
+        )
+        val COLOR_NAMES = listOf("⚪", "🟡", "⚫", "🔴", "🔵")
     }
     
     private var windowManager: WindowManager? = null
     private var overlayView: OverlayCanvasView? = null
+    private var currentColorIndex = 0
     
     override fun onCreate() {
         super.onCreate()
@@ -54,6 +67,10 @@ class OverlayService : Service() {
             }
             ACTION_CLEAR -> {
                 overlayView?.clear()
+            }
+            ACTION_COLOR -> {
+                cycleColor()
+                updateNotification()
             }
             ACTION_STOP -> {
                 hideOverlay()
@@ -98,6 +115,7 @@ class OverlayService : Service() {
         }
         
         overlayView = OverlayCanvasView(this)
+        overlayView?.setStrokeColor(COLORS[currentColorIndex])
         windowManager?.addView(overlayView, params)
         isOverlayVisible = true
     }
@@ -108,6 +126,11 @@ class OverlayService : Service() {
             overlayView = null
         }
         isOverlayVisible = false
+    }
+    
+    private fun cycleColor() {
+        currentColorIndex = (currentColorIndex + 1) % COLORS.size
+        overlayView?.setStrokeColor(COLORS[currentColorIndex])
     }
     
     private fun updateNotification() {
@@ -121,6 +144,9 @@ class OverlayService : Service() {
     
     fun setColor(color: Int) {
         overlayView?.setStrokeColor(color)
+        // 색상 인덱스도 동기화
+        val idx = COLORS.indexOf(color)
+        if (idx >= 0) currentColorIndex = idx
     }
     
     fun undo() {
@@ -153,7 +179,7 @@ class OverlayService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
         
-        // 토글 버튼 (ON/OFF)
+        // 토글 버튼
         val toggleIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_TOGGLE
         }
@@ -162,12 +188,21 @@ class OverlayService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
+        // 색상 버튼
+        val colorIntent = Intent(this, OverlayService::class.java).apply {
+            action = ACTION_COLOR
+        }
+        val colorPendingIntent = PendingIntent.getService(
+            this, 2, colorIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
         // 클리어 버튼
         val clearIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_CLEAR
         }
         val clearPendingIntent = PendingIntent.getService(
-            this, 2, clearIntent,
+            this, 3, clearIntent,
             PendingIntent.FLAG_IMMUTABLE
         )
         
@@ -176,11 +211,13 @@ class OverlayService : Service() {
             action = ACTION_STOP
         }
         val stopPendingIntent = PendingIntent.getService(
-            this, 3, stopIntent,
+            this, 4, stopIntent,
             PendingIntent.FLAG_IMMUTABLE
         )
         
-        val statusText = if (isOverlayVisible) "🖊️ 판서 활성화" else "⏸️ 대기 중"
+        val statusEmoji = if (isOverlayVisible) "🖊️" else "⏸️"
+        val colorEmoji = COLOR_NAMES[currentColorIndex]
+        val statusText = "$statusEmoji $colorEmoji"
         val toggleText = if (isOverlayVisible) "OFF" else "ON"
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -188,21 +225,10 @@ class OverlayService : Service() {
             .setContentText(statusText)
             .setSmallIcon(android.R.drawable.ic_menu_edit)
             .setContentIntent(mainPendingIntent)
-            .addAction(
-                android.R.drawable.ic_media_play,
-                toggleText,
-                togglePendingIntent
-            )
-            .addAction(
-                android.R.drawable.ic_menu_delete,
-                "Clear",
-                clearPendingIntent
-            )
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "종료",
-                stopPendingIntent
-            )
+            .addAction(0, toggleText, togglePendingIntent)
+            .addAction(0, colorEmoji, colorPendingIntent)
+            .addAction(0, "🧹", clearPendingIntent)
+            .addAction(0, "❌", stopPendingIntent)
             .setOngoing(true)
             .build()
     }
