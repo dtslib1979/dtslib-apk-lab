@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/stroke.dart';
+import '../services/touch_service.dart';
 import '../widgets/drawing_canvas.dart';
 import '../widgets/control_bar.dart';
 
@@ -17,17 +19,46 @@ class _DrawingScreenState extends State<DrawingScreen> {
   Stroke? _currentStroke;
   PenColor _penColor = PenColor.white;
   Timer? _fadeTimer;
+  
+  late TouchService _touchService;
+  bool _useStylusOnly = true;
 
   @override
   void initState() {
     super.initState();
     _startFadeTimer();
+    _initTouchService();
+  }
+
+  void _initTouchService() {
+    _touchService = TouchService();
+    _touchService.onStylusTouch = _handleStylusTouch;
   }
 
   @override
   void dispose() {
     _fadeTimer?.cancel();
+    _touchService.dispose();
     super.dispose();
+  }
+
+  void _handleStylusTouch(StylusTouch touch) {
+    if (!_useStylusOnly) return;
+    
+    final pos = Offset(touch.x, touch.y);
+    
+    switch (touch.action) {
+      case TouchAction.down:
+        _startStroke(pos);
+        break;
+      case TouchAction.move:
+        _updateStroke(pos);
+        break;
+      case TouchAction.up:
+      case TouchAction.cancel:
+        _endStroke();
+        break;
+    }
   }
 
   void _startFadeTimer() {
@@ -40,12 +71,14 @@ class _DrawingScreenState extends State<DrawingScreen> {
   void _updateFades() {
     if (_strokes.isEmpty) return;
     
-    final expired = _strokes.where((s) => s.isExpired).toList();
-    if (expired.isNotEmpty) {
+    final hasExpired = _strokes.any((s) => s.isExpired);
+    final hasFading = _strokes.any((s) => s.shouldFade);
+    
+    if (hasExpired) {
       setState(() {
         _strokes.removeWhere((s) => s.isExpired);
       });
-    } else if (_strokes.any((s) => s.shouldFade)) {
+    } else if (hasFading) {
       setState(() {});
     }
   }
@@ -61,34 +94,48 @@ class _DrawingScreenState extends State<DrawingScreen> {
     }
   }
 
-  void _onPanStart(DragStartDetails details) {
+  void _startStroke(Offset pos) {
     setState(() {
       _currentStroke = Stroke(
-        points: [details.localPosition],
+        points: [pos],
         color: _currentColor,
         width: 4.0,
       );
     });
   }
 
-  void _onPanUpdate(DragUpdateDetails details) {
+  void _updateStroke(Offset pos) {
     if (_currentStroke == null) return;
-    
     setState(() {
       _currentStroke = _currentStroke!.copyWith(
-        points: [..._currentStroke!.points, details.localPosition],
+        points: [..._currentStroke!.points, pos],
       );
     });
   }
 
-  void _onPanEnd(DragEndDetails details) {
+  void _endStroke() {
     if (_currentStroke == null) return;
-    
     setState(() {
       _strokes.add(_currentStroke!);
       _currentStroke = null;
       _undoStack.clear();
     });
+  }
+
+  // Fallback: GestureDetector for non-stylus or testing
+  void _onPanStart(DragStartDetails d) {
+    if (_useStylusOnly) return; // Native handles stylus
+    _startStroke(d.localPosition);
+  }
+
+  void _onPanUpdate(DragUpdateDetails d) {
+    if (_useStylusOnly) return;
+    _updateStroke(d.localPosition);
+  }
+
+  void _onPanEnd(DragEndDetails d) {
+    if (_useStylusOnly) return;
+    _endStroke();
   }
 
   void _cycleColor() {
@@ -132,6 +179,23 @@ class _DrawingScreenState extends State<DrawingScreen> {
     Navigator.of(context).pop();
   }
 
+  void _toggleInputMode() {
+    setState(() {
+      _useStylusOnly = !_useStylusOnly;
+    });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _useStylusOnly 
+            ? 'S Pen 전용 모드' 
+            : '모든 입력 모드',
+        ),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -149,6 +213,42 @@ class _DrawingScreenState extends State<DrawingScreen> {
                 child: DrawingCanvas(
                   strokes: _strokes,
                   currentStroke: _currentStroke,
+                ),
+              ),
+            ),
+          ),
+          // Mode indicator
+          Positioned(
+            top: 16,
+            right: 16,
+            child: GestureDetector(
+              onTap: _toggleInputMode,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _useStylusOnly ? Icons.edit : Icons.touch_app,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _useStylusOnly ? 'S Pen' : 'All',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
