@@ -127,7 +127,7 @@ class OverlayService : Service() {
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
         windowManager?.addView(overlayView, canvasParams)
         
-        // 플로팅 컨트롤 바 (드래그 가능)
+        // 플로팅 컨트롤 바 (드래그 + 스와이프)
         controlBarParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -142,8 +142,8 @@ class OverlayService : Service() {
         
         controlBar = FloatingControlBar(
             context = this,
-            onColorClick = {
-                cycleColor()
+            onColorChange = { colorIndex ->
+                setColorByIndex(colorIndex)
                 updateNotification()
             },
             onUndoClick = { overlayView?.undo() },
@@ -186,6 +186,11 @@ class OverlayService : Service() {
         currentColorIndex = (currentColorIndex + 1) % COLORS.size
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
         controlBar?.setColorIndex(currentColorIndex)
+    }
+    
+    private fun setColorByIndex(index: Int) {
+        currentColorIndex = index
+        overlayView?.setStrokeColor(COLORS[currentColorIndex])
     }
     
     private fun updateNotification() {
