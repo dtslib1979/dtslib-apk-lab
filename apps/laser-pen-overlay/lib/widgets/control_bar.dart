@@ -38,55 +38,50 @@ class ControlBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(32),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Color button with swipe
+          // Color (swipe)
           GestureDetector(
             onHorizontalDragEnd: (_) => onColorChange(),
             onTap: onColorChange,
-            child: _ControlButton(
+            child: _Btn(
               icon: Icons.palette,
               color: _displayColor,
               size: 56,
-              tooltip: '색상 (스와이프)',
             ),
           ),
           const SizedBox(width: 8),
           // Undo
-          _ControlButton(
+          _Btn(
             icon: Icons.undo,
             onTap: canUndo ? onUndo : null,
             enabled: canUndo,
-            tooltip: '되돌리기',
           ),
           const SizedBox(width: 8),
           // Redo
-          _ControlButton(
+          _Btn(
             icon: Icons.redo,
             onTap: canRedo ? onRedo : null,
             enabled: canRedo,
-            tooltip: '다시 실행',
           ),
           const SizedBox(width: 8),
           // Clear
-          _ControlButton(
+          _Btn(
             icon: Icons.delete_outline,
             onTap: onClear,
-            tooltip: '전체 지우기',
           ),
           const SizedBox(width: 8),
           // Exit
-          _ControlButton(
+          _Btn(
             icon: Icons.close,
             onTap: onExit,
             color: Colors.redAccent,
-            tooltip: '종료',
           ),
         ],
       ),
@@ -94,56 +89,36 @@ class ControlBar extends StatelessWidget {
   }
 }
 
-class _ControlButton extends StatelessWidget {
+class _Btn extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final Color? color;
   final double size;
   final bool enabled;
-  final String? tooltip;
 
-  const _ControlButton({
+  const _Btn({
     required this.icon,
     this.onTap,
     this.color,
     this.size = 48,
     this.enabled = true,
-    this.tooltip,
   });
 
   @override
   Widget build(BuildContext context) {
-    final button = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(size / 2),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: enabled 
-                ? (color ?? Colors.white) 
-                : Colors.grey,
-              width: 2,
-            ),
-          ),
-          child: Icon(
-            icon,
-            color: enabled 
-              ? (color ?? Colors.white) 
-              : Colors.grey,
-            size: size * 0.5,
-          ),
+    final c = enabled ? (color ?? Colors.white) : Colors.grey;
+    
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: c, width: 2),
         ),
+        child: Icon(icon, color: c, size: size * 0.5),
       ),
     );
-
-    if (tooltip != null) {
-      return Tooltip(message: tooltip!, child: button);
-    }
-    return button;
   }
 }

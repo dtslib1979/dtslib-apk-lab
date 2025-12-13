@@ -65,5 +65,5 @@ class _StrokePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _StrokePainter oldDelegate) => true;
+  bool shouldRepaint(covariant _StrokePainter old) => true;
 }
