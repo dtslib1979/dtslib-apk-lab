@@ -132,6 +132,18 @@ body {
     background: linear-gradient(135deg, #42A5F5 0%, #2196F3 100%);
 }
 
+.app-card.capture .app-icon {
+    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+}
+
+.app-card.capture .download-btn {
+    background: linear-gradient(135deg, #FF9800 0%, #E65100 100%);
+}
+
+.app-card.capture .download-btn:hover {
+    background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%);
+}
+
 footer {
     text-align: center;
     margin-top: 48px;
