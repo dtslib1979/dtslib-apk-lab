@@ -17,6 +17,15 @@ const apps = [
         icon: '✂️',
         downloadUrl: 'https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip',
         cardClass: 'aiva'
+    },
+    {
+        id: 'capture-pipeline',
+        name: 'Capture Pipeline',
+        desc: '공유 텍스트 캡처 & 아카이빙',
+        version: 'v1.0.0',
+        icon: '📥',
+        downloadUrl: 'https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip',
+        cardClass: 'capture'
     }
 ];
 
