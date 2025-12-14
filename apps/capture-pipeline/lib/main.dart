@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'dart:convert';
-import 'dart:io';
 
 void main() {
   runApp(const CaptureApp());
@@ -32,8 +31,9 @@ class ShareHandler extends StatefulWidget {
 class _ShareHandlerState extends State<ShareHandler> {
   static const platform = MethodChannel('com.parksy.capture/share');
   
-  // TODO: Worker URL 설정 필요
-  static const workerUrl = 'https://YOUR_WORKER.workers.dev';
+  // TODO: Worker 배포 후 URL 설정
+  static const workerUrl = 'https://parksy-capture-worker.workers.dev';
+  static const apiKey = 'CHANGE_ME'; // Worker에 설정한 API_KEY
   
   @override
   void initState() {
@@ -80,7 +80,6 @@ class _ShareHandlerState extends State<ShareHandler> {
       final fname = 'ParksyLog_$ts.md';
       final content = _toMarkdown(text);
       
-      // Invoke native to save via MediaStore
       final result = await platform.invokeMethod<bool>(
         'saveToDownloads',
         {'filename': fname, 'content': content},
@@ -96,7 +95,10 @@ class _ShareHandlerState extends State<ShareHandler> {
       final ts = DateTime.now().toIso8601String();
       final res = await http.post(
         Uri.parse(workerUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
         body: jsonEncode({
           'text': text,
           'source': 'android',
