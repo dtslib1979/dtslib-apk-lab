@@ -1,0 +1,7 @@
+name = "parksy-capture-worker"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+REPO_OWNER = "dtslib1979"
+REPO_NAME = "parksy-logs"
