@@ -1,0 +1,9 @@
+{
+  "id": "aiva-trimmer",
+  "name": "AIVA Trimmer",
+  "desc": "AIVA 음악 2분 트리밍",
+  "version": "v1.0.1",
+  "icon": "✂️",
+  "cardClass": "aiva",
+  "workflow": "build-aiva-trimmer"
+}
