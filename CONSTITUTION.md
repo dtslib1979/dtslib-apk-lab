@@ -28,7 +28,7 @@
 ### 1.1 Strictly Forbidden (Absolute Prohibitions)
 
 - Login / Signup / Authentication
-- Cloud servers, databases, APIs, uploads
+- ~~Cloud servers, databases, APIs, uploads~~ (See Amendment A1)
 - Analytics, telemetry, tracking
 - Ads, subscriptions, payments
 - Multi-user or multi-device support
@@ -203,4 +203,29 @@ If an upgrade introduces:
 
 ---
 
-**END OF CONSTITUTION v1.1**
+## AMENDMENTS
+
+### Amendment A1 — GitHub Archive Exception (2025-12-14)
+
+**Clause:** §1.1 (Strictly Forbidden)
+
+**Change:** 
+- OLD: "Cloud servers, databases, APIs, uploads" (absolute prohibition)
+- NEW: GitHub repository archiving is **PERMITTED** for personal data asset purposes
+
+**Rationale:** 
+- Capture Pipeline requires GitHub API for archiving captured text
+- This serves the core purpose of "Personal workflow acceleration"
+- GitHub is already the "single source of truth" per §2.1
+- Data remains under personal control (private repository)
+- Enables LLM training dataset creation from personal captures
+
+**Scope:**
+- GitHub repository write access ONLY
+- No external cloud services (AWS, Firebase, etc.)
+- No third-party APIs beyond GitHub
+- Cloudflare Worker permitted as stateless proxy only
+
+---
+
+**END OF CONSTITUTION v1.1+A1**
