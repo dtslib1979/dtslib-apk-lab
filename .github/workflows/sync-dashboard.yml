@@ -1,0 +1,68 @@
+name: Sync Dashboard Apps
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**/app-meta.json'
+      - '.github/workflows/sync-dashboard.yml'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate apps.json
+        run: |
+          echo "Collecting app metadata..."
+
+          # Create apps array
+          echo '[' > dashboard/apps.json
+
+          first=true
+          for meta in apps/*/app-meta.json; do
+            if [ -f "$meta" ]; then
+              app_dir=$(dirname "$meta")
+              app_id=$(basename "$app_dir")
+
+              # Read metadata
+              workflow=$(jq -r '.workflow' "$meta")
+              artifact="${app_id}-debug"
+
+              # Build download URL
+              download_url="https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/${workflow}/main/${artifact}.zip"
+
+              # Add comma separator
+              if [ "$first" = true ]; then
+                first=false
+              else
+                echo ',' >> dashboard/apps.json
+              fi
+
+              # Merge metadata with download URL
+              jq --arg url "$download_url" '. + {downloadUrl: $url}' "$meta" >> dashboard/apps.json
+            fi
+          done
+
+          echo ']' >> dashboard/apps.json
+
+          # Pretty print
+          jq '.' dashboard/apps.json > dashboard/apps.tmp && mv dashboard/apps.tmp dashboard/apps.json
+
+          echo "Generated apps.json:"
+          cat dashboard/apps.json
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet dashboard/apps.json; then
+            echo "No changes to apps.json"
+          else
+            git add dashboard/apps.json
+            git commit -m "chore(dashboard): auto-sync apps.json"
+            git push
+          fi
