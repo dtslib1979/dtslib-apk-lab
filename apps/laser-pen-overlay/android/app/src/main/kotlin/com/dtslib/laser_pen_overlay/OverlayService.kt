@@ -31,11 +31,6 @@ class OverlayService : Service() {
         const val ACTION_REDO = "com.dtslib.laser_pen_overlay.REDO"
         const val ACTION_STOP = "com.dtslib.laser_pen_overlay.STOP"
 
-        // Hidden flag for touch pass-through (allows finger touch to slip to apps below)
-        private const val FLAG_SLIPPERY = 0x20000000
-        // Hidden flag for touch modal behavior
-        private const val FLAG_NOT_TOUCH_MODAL = 0x00000020
-
         var instance: OverlayService? = null
         var isOverlayVisible = false
 
@@ -48,18 +43,22 @@ class OverlayService : Service() {
         )
         val COLOR_NAMES = listOf("⚪", "🟡", "⚫", "🔴", "🔵")
     }
-    
+
     private var windowManager: WindowManager? = null
     private var overlayView: OverlayCanvasView? = null
     private var controlBar: FloatingControlBar? = null
     private var currentColorIndex = 0
-    
+
+    private var canvasParams: WindowManager.LayoutParams? = null
+    private var barParams: WindowManager.LayoutParams? = null
+    private var isTouchEnabled = false
+
     private fun Int.dp(): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP,
         this.toFloat(),
         resources.displayMetrics
     ).toInt()
-    
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -67,10 +66,10 @@ class OverlayService : Service() {
         createNotificationChannel()
         Log.d(TAG, "Service created")
     }
-    
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand: action=${intent?.action}")
-        
+
         when (intent?.action) {
             ACTION_SHOW -> {
                 showOverlay()
@@ -101,54 +100,57 @@ class OverlayService : Service() {
         }
         return START_STICKY
     }
-    
+
     override fun onBind(intent: Intent?): IBinder? = null
-    
+
     override fun onDestroy() {
         Log.d(TAG, "Service destroyed")
         hideOverlay()
         instance = null
         super.onDestroy()
     }
-    
+
     private fun showOverlay() {
         if (overlayView != null) {
             Log.d(TAG, "Overlay already visible")
             return
         }
-        
+
         Log.d(TAG, "Showing overlay")
-        
+
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         } else {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
         }
-        
-        // Canvas overlay: S Pen만 캡처, 손가락 터치는 하위 앱으로 통과
-        // FLAG_SLIPPERY: 손가락 터치가 이 윈도우에서 시작해도 하위로 "미끄러짐"
-        // FLAG_NOT_TOUCH_MODAL: 오버레이 외부 터치를 하위로 전달
-        val canvasParams = WindowManager.LayoutParams(
+
+        // Canvas overlay: 기본적으로 터치 통과 (FLAG_NOT_TOUCHABLE)
+        // S Pen 호버 감지시 터치 활성화
+        canvasParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            FLAG_NOT_TOUCH_MODAL or
-            FLAG_SLIPPERY,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,  // 기본: 터치 통과
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
         }
-        
-        overlayView = OverlayCanvasView(this)
+
+        overlayView = OverlayCanvasView(
+            context = this,
+            onStylusNear = { enableTouchMode() },
+            onStylusAway = { disableTouchMode() }
+        )
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
         windowManager?.addView(overlayView, canvasParams)
-        
-        // Control bar: 항상 터치 가능 (focusable 아님, 하지만 clickable)
-        val barParams = WindowManager.LayoutParams(
+        isTouchEnabled = false
+
+        // Control bar: 최하단 배치, 드래그 가능
+        barParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
@@ -156,9 +158,9 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = 60.dp()
+            y = 16.dp()  // 최하단에서 약간 위
         }
-        
+
         controlBar = FloatingControlBar(
             context = this,
             onColorClick = {
@@ -171,15 +173,70 @@ class OverlayService : Service() {
             onCloseClick = {
                 Log.d(TAG, "Close button clicked")
                 closeOverlay()
+            },
+            onDrag = { deltaX, deltaY ->
+                updateControlBarPosition(deltaX, deltaY)
             }
         )
         controlBar?.setColorIndex(currentColorIndex)
         windowManager?.addView(controlBar, barParams)
-        
+
         isOverlayVisible = true
         Log.d(TAG, "Overlay shown successfully")
     }
-    
+
+    /**
+     * S Pen 감지시 터치 모드 활성화
+     */
+    private fun enableTouchMode() {
+        if (isTouchEnabled) return
+        Log.d(TAG, "Enabling touch mode for S Pen")
+
+        canvasParams?.let { params ->
+            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            try {
+                windowManager?.updateViewLayout(overlayView, params)
+                isTouchEnabled = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error enabling touch mode: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * S Pen 떠남 → 터치 모드 비활성화 (손가락 터치 통과)
+     */
+    private fun disableTouchMode() {
+        if (!isTouchEnabled) return
+        Log.d(TAG, "Disabling touch mode - finger can now scroll")
+
+        canvasParams?.let { params ->
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            try {
+                windowManager?.updateViewLayout(overlayView, params)
+                isTouchEnabled = false
+                overlayView?.resetStylusState()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error disabling touch mode: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 컨트롤 바 위치 업데이트 (드래그)
+     */
+    private fun updateControlBarPosition(deltaX: Int, deltaY: Int) {
+        barParams?.let { params ->
+            params.x += deltaX
+            params.y -= deltaY  // y좌표는 반전 (Gravity.BOTTOM 기준)
+            try {
+                windowManager?.updateViewLayout(controlBar, params)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating control bar position: ${e.message}")
+            }
+        }
+    }
+
     private fun hideOverlay() {
         Log.d(TAG, "Hiding overlay")
         try {
@@ -190,7 +247,7 @@ class OverlayService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error removing overlayView: ${e.message}")
         }
-        
+
         try {
             controlBar?.let {
                 windowManager?.removeView(it)
@@ -199,31 +256,31 @@ class OverlayService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Error removing controlBar: ${e.message}")
         }
-        
+
+        canvasParams = null
+        barParams = null
+        isTouchEnabled = false
         isOverlayVisible = false
     }
-    
-    /**
-     * Exit 버튼용: 오버레이만 닫고 서비스는 유지
-     */
+
     fun closeOverlay() {
         hideOverlay()
         updateNotification()
     }
-    
+
     private fun cycleColor() {
         currentColorIndex = (currentColorIndex + 1) % COLORS.size
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
         controlBar?.setColorIndex(currentColorIndex)
     }
-    
+
     private fun updateNotification() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIFICATION_ID, createNotification())
     }
-    
+
     fun clearCanvas() = overlayView?.clear()
-    
+
     fun setColor(color: Int) {
         overlayView?.setStrokeColor(color)
         val idx = COLORS.indexOf(color)
@@ -232,10 +289,10 @@ class OverlayService : Service() {
             controlBar?.setColorIndex(idx)
         }
     }
-    
+
     fun undo() = overlayView?.undo()
     fun redo() = overlayView?.redo()
-    
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -250,13 +307,13 @@ class OverlayService : Service() {
             nm.createNotificationChannel(channel)
         }
     }
-    
+
     private fun createNotification(): Notification {
         val mainIntent = Intent(this, MainActivity::class.java)
         val mainPendingIntent = PendingIntent.getActivity(
             this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE
         )
-        
+
         val toggleIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_TOGGLE
         }
@@ -264,7 +321,7 @@ class OverlayService : Service() {
             this, 1, toggleIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        
+
         val colorIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_COLOR
         }
@@ -272,25 +329,25 @@ class OverlayService : Service() {
             this, 2, colorIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        
+
         val clearIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_CLEAR
         }
         val clearPendingIntent = PendingIntent.getService(
             this, 3, clearIntent, PendingIntent.FLAG_IMMUTABLE
         )
-        
+
         val stopIntent = Intent(this, OverlayService::class.java).apply {
             action = ACTION_STOP
         }
         val stopPendingIntent = PendingIntent.getService(
             this, 4, stopIntent, PendingIntent.FLAG_IMMUTABLE
         )
-        
+
         val statusEmoji = if (isOverlayVisible) "🖊️" else "⏸️"
         val colorEmoji = COLOR_NAMES[currentColorIndex]
         val toggleText = if (isOverlayVisible) "OFF" else "ON"
-        
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Laser Pen")
             .setContentText("$statusEmoji $colorEmoji")
