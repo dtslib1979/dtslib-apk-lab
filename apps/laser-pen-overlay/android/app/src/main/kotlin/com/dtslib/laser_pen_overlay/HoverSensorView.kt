@@ -10,11 +10,13 @@ import android.view.MotionEvent
 import android.view.View
 
 /**
- * 투명한 호버 센서 레이어
+ * 투명한 호버 센서 레이어 (개선 버전)
  *
- * 이 View는 FLAG_NOT_TOUCHABLE 없이 유지되어 항상 호버 이벤트를 수신합니다.
- * 터치 이벤트는 처리하지 않고 아래로 전달합니다.
- * S Pen 호버 감지 시 콜백을 통해 메인 캔버스의 터치 모드를 활성화합니다.
+ * 핵심 변경점:
+ * - 이 View는 오직 S Pen 호버 이벤트만 감지
+ * - 터치 이벤트는 절대 소비하지 않음 (항상 아래로 전달)
+ * - S Pen 호버 감지 시 캔버스의 터치 모드를 활성화
+ * - S Pen이 멀어지면 캔버스 터치 모드 비활성화 → 손가락 터치 통과
  */
 class HoverSensorView(
     context: Context,
@@ -26,13 +28,12 @@ class HoverSensorView(
 
     companion object {
         private const val TAG = "HoverSensorView"
-        private const val STYLUS_TIMEOUT_MS = 500L
-        private const val FINGER_TOUCH_BLOCK_MS = 100L  // finger 터치 감지 후 센서 재활성화 딜레이
+        private const val STYLUS_TIMEOUT_MS = 800L  // 타임아웃 약간 늘림
     }
 
     private val stylusTimeoutHandler = Handler(Looper.getMainLooper())
     private val stylusTimeoutRunnable = Runnable {
-        Log.d(TAG, "Stylus timeout - notifying canvas to disable touch mode")
+        Log.d(TAG, "Stylus timeout - disabling canvas touch mode for finger pass-through")
         isStylusActive = false
         onStylusAway()
     }
@@ -40,18 +41,14 @@ class HoverSensorView(
     @Volatile
     private var isStylusActive = false
 
-    @Volatile
-    private var isFingerBlocking = false
-
     init {
         setBackgroundColor(Color.TRANSPARENT)
-        // 클릭/포커스 비활성화 - 호버만 감지
         isClickable = false
         isFocusable = false
     }
 
     /**
-     * S Pen / Stylus 감지
+     * S Pen / Stylus 감지 (toolType 기반)
      */
     private fun isStylus(event: MotionEvent): Boolean {
         for (i in 0 until event.pointerCount) {
@@ -61,7 +58,7 @@ class HoverSensorView(
                 return true
             }
         }
-        // Fallback: source flag 체크
+        // Fallback: source flag 체크 (일부 구형 기기 대응)
         if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
             return true
         }
@@ -70,78 +67,111 @@ class HoverSensorView(
 
     /**
      * S Pen 호버 이벤트 감지 (화면에 닿기 전)
+     * 이 메서드가 핵심! S Pen이 가까이 오면 캔버스 터치 모드 활성화
      */
     override fun onHoverEvent(event: MotionEvent): Boolean {
         if (isStylus(event)) {
             when (event.actionMasked) {
-                MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE -> {
+                MotionEvent.ACTION_HOVER_ENTER -> {
+                    Log.d(TAG, "S Pen hover ENTER - enabling canvas touch mode")
+                    activateStylus()
+                }
+                MotionEvent.ACTION_HOVER_MOVE -> {
                     if (!isStylusActive) {
-                        Log.d(TAG, "S Pen hover detected - enabling canvas touch mode")
-                        isStylusActive = true
-                        onStylusNear()
+                        Log.d(TAG, "S Pen hover MOVE (was inactive) - enabling canvas touch mode")
+                        activateStylus()
+                    } else {
+                        // 타임아웃만 리셋
+                        resetStylusTimeout()
                     }
-                    // 타임아웃 리셋
-                    stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
-                    stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
                 }
                 MotionEvent.ACTION_HOVER_EXIT -> {
-                    Log.d(TAG, "S Pen hover exit - starting timeout")
-                    stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
-                    stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+                    Log.d(TAG, "S Pen hover EXIT - starting timeout")
+                    startStylusTimeout()
                 }
             }
-            return true
+            return true  // 호버 이벤트는 소비 (아래로 전달 불필요)
         }
         return super.onHoverEvent(event)
     }
 
     /**
      * 터치 이벤트 처리
-     * - stylus 터치: 캔버스 터치 모드 활성화 후 캔버스에 이벤트 전달
-     * - finger 터치: 센서 일시 비활성화 요청 후 false 리턴
+     *
+     * 중요: 이 센서 레이어는 FLAG_NOT_TOUCHABLE로 설정되어 있어서
+     * 일반적으로 터치 이벤트를 받지 않음.
+     * 하지만 S Pen 터치는 호버 없이도 바로 터치할 수 있으므로 대비.
      */
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        // S Pen 터치인 경우
         if (isStylus(event)) {
-            // stylus 터치 시 활성 상태 유지 및 타임아웃 리셋
-            if (!isStylusActive) {
-                Log.d(TAG, "Stylus touch detected (no hover) - enabling canvas touch mode")
-                isStylusActive = true
-                onStylusNear()
-            }
-            stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+            Log.d(TAG, "Stylus TOUCH event: action=${event.actionMasked}")
 
-            // ACTION_UP 시 타임아웃 시작
+            // 호버 없이 바로 터치한 경우 대비
+            if (!isStylusActive) {
+                Log.d(TAG, "Stylus touch without hover - activating")
+                activateStylus()
+            } else {
+                resetStylusTimeout()
+            }
+
+            // ACTION_UP/CANCEL 시 타임아웃 시작
             if (event.actionMasked == MotionEvent.ACTION_UP ||
                 event.actionMasked == MotionEvent.ACTION_CANCEL) {
-                stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+                startStylusTimeout()
             }
 
-            // 캔버스에 이벤트 전달 (호버 없이 바로 터치한 경우 대비)
-            onStylusTouchEvent?.invoke(event)
-            return true  // stylus 이벤트는 소비
+            // 캔버스에 이벤트 전달
+            val consumed = onStylusTouchEvent?.invoke(event) ?: false
+            return consumed
         }
 
-        // finger 터치 감지 → 센서 일시 비활성화 요청
-        // 이렇게 하면 후속 터치 시퀀스부터 아래 앱에 전달됨
-        if (event.actionMasked == MotionEvent.ACTION_DOWN && !isFingerBlocking) {
-            Log.d(TAG, "Finger touch detected - requesting sensor disable for pass-through")
-            isFingerBlocking = true
-            onFingerTouchDetected?.invoke()
-        }
-
-        // finger 터치는 처리하지 않음
+        // 손가락 터치: 절대 소비하지 않음 → 아래 앱으로 전달
+        Log.v(TAG, "Finger touch - NOT consuming, passing through")
         return false
+    }
+
+    /**
+     * 제네릭 모션 이벤트 (추가 호버 감지)
+     */
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_HOVER_MOVE ||
+            event.action == MotionEvent.ACTION_HOVER_ENTER) {
+            if (isStylus(event) && !isStylusActive) {
+                Log.d(TAG, "Generic motion: S Pen detected")
+                activateStylus()
+                return true
+            }
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
+    private fun activateStylus() {
+        isStylusActive = true
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+        onStylusNear()
+    }
+
+    private fun resetStylusTimeout() {
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+        stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+    }
+
+    private fun startStylusTimeout() {
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+        stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
     }
 
     fun resetStylusState() {
         isStylusActive = false
-        isFingerBlocking = false
         stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
     }
 
     fun clearFingerBlock() {
-        isFingerBlocking = false
+        // 더 이상 finger blocking 로직 사용 안 함
     }
+
+    fun isStylusCurrentlyActive(): Boolean = isStylusActive
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()

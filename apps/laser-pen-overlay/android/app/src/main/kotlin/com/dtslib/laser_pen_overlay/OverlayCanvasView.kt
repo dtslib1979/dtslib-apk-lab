@@ -135,11 +135,13 @@ class OverlayCanvasView(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // S Pen 터치만 처리
+        // S Pen 터치만 처리 - 손가락 터치는 아래 앱으로 전달
         if (!isStylus(event)) {
-            Log.v(TAG, "Finger touch ignored")
-            return false
+            Log.d(TAG, "Finger touch detected - NOT consuming, passing to app below")
+            return false  // false 리턴 → 아래 앱으로 이벤트 전달
         }
+
+        Log.d(TAG, "S Pen touch: action=${event.actionMasked}, pressure=${event.pressure}")
 
         // S Pen 활성 상태 유지
         if (!isStylusActive) {

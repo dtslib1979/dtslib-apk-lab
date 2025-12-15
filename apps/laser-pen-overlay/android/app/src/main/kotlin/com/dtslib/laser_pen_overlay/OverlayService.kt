@@ -153,8 +153,9 @@ class OverlayService : Service() {
         windowManager?.addView(overlayView, canvasParams)
         isTouchEnabled = false
 
-        // Hover Sensor: FLAG_NOT_TOUCHABLE 없이 항상 호버 감지
-        // 이 레이어가 S Pen 호버를 감지하면 캔버스 터치 모드 활성화
+        // Hover Sensor: FLAG_NOT_TOUCHABLE로 설정하여 터치는 절대 받지 않음
+        // 중요: FLAG_NOT_TOUCHABLE은 터치만 차단, 호버 이벤트는 여전히 수신 가능!
+        // 이렇게 하면 손가락 터치가 센서를 거치지 않고 바로 아래 앱으로 전달됨
         sensorParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -162,7 +163,7 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,  // 터치는 아래로 전달, 호버 감지
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,  // 터치 완전 차단 (호버만 감지)
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -173,12 +174,12 @@ class OverlayService : Service() {
             onStylusNear = { enableTouchMode() },
             onStylusAway = { disableTouchMode() },
             onStylusTouchEvent = { event ->
-                // 센서가 받은 stylus 터치를 캔버스에 전달
+                // 센서는 FLAG_NOT_TOUCHABLE이므로 터치 이벤트를 받지 않음
+                // 이 콜백은 호환성을 위해 유지하지만 실제로는 호출되지 않음
                 overlayView?.dispatchTouchEvent(event) ?: false
             },
             onFingerTouchDetected = {
-                // finger 터치 감지 → 센서 일시 비활성화하여 후속 터치가 아래 앱으로 전달되도록
-                disableSensorTemporarily()
+                // 더 이상 필요 없음 - 센서가 터치를 받지 않으므로
             }
         )
         windowManager?.addView(hoverSensor, sensorParams)
@@ -265,45 +266,8 @@ class OverlayService : Service() {
         hoverSensor?.resetStylusState()
     }
 
-    private val sensorReenableHandler = Handler(Looper.getMainLooper())
-    private val sensorReenableRunnable = Runnable {
-        enableSensor()
-    }
-
-    /**
-     * finger 터치 감지 시 센서 일시 비활성화
-     * 후속 터치 시퀀스가 아래 앱으로 전달되도록 함
-     */
-    private fun disableSensorTemporarily() {
-        Log.d(TAG, "Disabling sensor temporarily for finger pass-through")
-        sensorParams?.let { params ->
-            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            try {
-                windowManager?.updateViewLayout(hoverSensor, params)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error disabling sensor: ${e.message}")
-            }
-        }
-        // 500ms 후 센서 재활성화 (다음 S Pen 호버 감지 가능하도록)
-        sensorReenableHandler.removeCallbacks(sensorReenableRunnable)
-        sensorReenableHandler.postDelayed(sensorReenableRunnable, 500L)
-    }
-
-    /**
-     * 센서 재활성화 (호버 감지 가능)
-     */
-    private fun enableSensor() {
-        Log.d(TAG, "Re-enabling sensor for hover detection")
-        sensorParams?.let { params ->
-            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-            try {
-                windowManager?.updateViewLayout(hoverSensor, params)
-                hoverSensor?.clearFingerBlock()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error enabling sensor: ${e.message}")
-            }
-        }
-    }
+    // 센서는 이제 항상 FLAG_NOT_TOUCHABLE이므로 enable/disable 로직 불필요
+    // 호버 이벤트는 FLAG_NOT_TOUCHABLE과 무관하게 수신됨
 
     /**
      * 컨트롤 바 위치 업데이트 (드래그)
@@ -322,9 +286,6 @@ class OverlayService : Service() {
 
     private fun hideOverlay() {
         Log.d(TAG, "Hiding overlay")
-
-        // 핸들러 정리
-        sensorReenableHandler.removeCallbacks(sensorReenableRunnable)
 
         try {
             overlayView?.let {
