@@ -2,7 +2,7 @@
   "id": "capture-pipeline",
   "name": "Capture Pipeline",
   "desc": "공유 텍스트 캡처 & 아카이빙",
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "icon": "📥",
   "cardClass": "capture",
   "workflow": "build-capture-pipeline"
