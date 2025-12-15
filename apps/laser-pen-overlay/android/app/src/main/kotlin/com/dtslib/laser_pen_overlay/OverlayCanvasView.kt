@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -12,10 +11,15 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 
-class OverlayCanvasView(context: Context) : View(context) {
+class OverlayCanvasView(
+    context: Context,
+    private val onStylusNear: () -> Unit,
+    private val onStylusAway: () -> Unit
+) : View(context) {
 
     companion object {
         private const val TAG = "OverlayCanvasView"
+        private const val STYLUS_TIMEOUT_MS = 500L
     }
 
     private val strokes = mutableListOf<StrokeData>()
@@ -26,14 +30,14 @@ class OverlayCanvasView(context: Context) : View(context) {
     private var strokeColor = Color.WHITE
     private val baseStrokeWidth = 6f
     private val maxStrokeWidth = 16f
-    
+
     private val paint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
     }
-    
+
     private val fadeHandler = Handler(Looper.getMainLooper())
     private val fadeRunnable = object : Runnable {
         override fun run() {
@@ -42,18 +46,27 @@ class OverlayCanvasView(context: Context) : View(context) {
             fadeHandler.postDelayed(this, 50)
         }
     }
-    
+
+    // S Pen 타임아웃 핸들러
+    private val stylusTimeoutHandler = Handler(Looper.getMainLooper())
+    private val stylusTimeoutRunnable = Runnable {
+        Log.d(TAG, "Stylus timeout - switching to pass-through mode")
+        onStylusAway()
+    }
+
+    private var isStylusActive = false
+
     init {
         setBackgroundColor(Color.TRANSPARENT)
         fadeHandler.post(fadeRunnable)
     }
-    
+
     data class PathSegment(
         val x1: Float, val y1: Float,
         val x2: Float, val y2: Float,
         val width: Float
     )
-    
+
     data class StrokeData(
         val segments: List<PathSegment>,
         val color: Int,
@@ -67,23 +80,19 @@ class OverlayCanvasView(context: Context) : View(context) {
                 else -> 1f - ((elapsed - 3000) / 500f)
             }
         }
-        
+
         fun isExpired(): Boolean {
             return System.currentTimeMillis() - createdAt > 3500
         }
     }
-    
+
     private var lastX = 0f
     private var lastY = 0f
 
     /**
      * S Pen / Stylus 감지
-     * - TOOL_TYPE_STYLUS (2): S Pen 직접 터치
-     * - TOOL_TYPE_ERASER (4): S Pen 지우개 모드
-     * - SOURCE_STYLUS: 디바이스 소스 체크 (폴백)
      */
     private fun isStylus(event: MotionEvent): Boolean {
-        // 모든 포인터 체크 (멀티터치 대응)
         for (i in 0 until event.pointerCount) {
             val toolType = event.getToolType(i)
             if (toolType == MotionEvent.TOOL_TYPE_STYLUS ||
@@ -91,7 +100,6 @@ class OverlayCanvasView(context: Context) : View(context) {
                 return true
             }
         }
-        // Fallback: SOURCE_STYLUS 체크
         if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
             return true
         }
@@ -99,27 +107,47 @@ class OverlayCanvasView(context: Context) : View(context) {
     }
 
     /**
-     * 터치 분리 핵심 로직:
-     * - S Pen: 이 View에서 처리 (그리기)
-     * - 손가락: return false → FLAG_SLIPPERY에 의해 하위 앱으로 전달
+     * S Pen 호버 이벤트 처리 (화면에 닿기 전)
      */
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        val isStylusEvent = isStylus(event)
-
-        if (!isStylusEvent) {
-            // 손가락 터치 → 하위 앱으로 pass-through
-            // FLAG_SLIPPERY 플래그와 함께 동작하여 하위 앱에서 스크롤 가능
-            Log.v(TAG, "Finger touch detected, passing through: action=${event.actionMasked}")
-            return false
+    override fun onHoverEvent(event: MotionEvent): Boolean {
+        if (isStylus(event)) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE -> {
+                    if (!isStylusActive) {
+                        Log.d(TAG, "S Pen hover detected - enabling touch mode")
+                        isStylusActive = true
+                        onStylusNear()
+                    }
+                    // 타임아웃 리셋
+                    stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+                    stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+                }
+                MotionEvent.ACTION_HOVER_EXIT -> {
+                    Log.d(TAG, "S Pen hover exit")
+                    // 타임아웃 시작
+                    stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+                    stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+                }
+            }
+            return true
         }
-
-        // S Pen 터치 → 이 View에서 처리
-        Log.v(TAG, "Stylus touch detected, handling: action=${event.actionMasked}, pressure=${event.pressure}")
-        return super.dispatchTouchEvent(event)
+        return super.onHoverEvent(event)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // dispatchTouchEvent에서 이미 Stylus만 들어옴
+        // S Pen 터치만 처리
+        if (!isStylus(event)) {
+            Log.v(TAG, "Finger touch ignored")
+            return false
+        }
+
+        // S Pen 활성 상태 유지
+        if (!isStylusActive) {
+            isStylusActive = true
+            onStylusNear()
+        }
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
@@ -130,7 +158,6 @@ class OverlayCanvasView(context: Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                // S Pen 필압 감지 (0.0 ~ 1.0)
                 val pressure = event.pressure.coerceIn(0.1f, 1f)
                 val width = baseStrokeWidth + (maxStrokeWidth - baseStrokeWidth) * pressure
 
@@ -168,15 +195,17 @@ class OverlayCanvasView(context: Context) : View(context) {
                     currentSegments.clear()
                 }
                 invalidate()
+                // 펜을 뗀 후 타임아웃 시작
+                stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
                 return true
             }
         }
         return false
     }
-    
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        
+
         for (stroke in strokes) {
             val opacity = stroke.getOpacity()
             if (opacity > 0) {
@@ -185,52 +214,58 @@ class OverlayCanvasView(context: Context) : View(context) {
                 drawSegments(canvas, stroke.segments, paint)
             }
         }
-        
+
         if (currentSegments.isNotEmpty()) {
             paint.color = strokeColor
             paint.alpha = 255
             drawSegments(canvas, currentSegments, paint)
         }
     }
-    
+
     private fun drawSegments(canvas: Canvas, segments: List<PathSegment>, paint: Paint) {
         for (seg in segments) {
             paint.strokeWidth = seg.width
             canvas.drawLine(seg.x1, seg.y1, seg.x2, seg.y2, paint)
         }
     }
-    
+
     private fun updateFadeAndCleanup() {
         strokes.removeAll { it.isExpired() }
     }
-    
+
     fun clear() {
         strokes.clear()
         undoneStrokes.clear()
         currentSegments.clear()
         invalidate()
     }
-    
+
     fun setStrokeColor(color: Int) {
         strokeColor = color
     }
-    
+
     fun undo() {
         if (strokes.isNotEmpty()) {
             undoneStrokes.add(strokes.removeLast())
             invalidate()
         }
     }
-    
+
     fun redo() {
         if (undoneStrokes.isNotEmpty()) {
             strokes.add(undoneStrokes.removeLast())
             invalidate()
         }
     }
-    
+
+    fun resetStylusState() {
+        isStylusActive = false
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         fadeHandler.removeCallbacks(fadeRunnable)
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
     }
 }

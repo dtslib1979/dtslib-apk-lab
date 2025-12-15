@@ -19,15 +19,24 @@ class FloatingControlBar(
     private val onUndoClick: () -> Unit,
     private val onRedoClick: () -> Unit,
     private val onClearClick: () -> Unit,
-    private val onCloseClick: () -> Unit
+    private val onCloseClick: () -> Unit,
+    private val onDrag: (Int, Int) -> Unit  // 드래그 콜백 (deltaX, deltaY)
 ) : LinearLayout(context) {
 
     companion object {
         const val TAG = "FloatingControlBar"
+        private const val DRAG_THRESHOLD = 10
     }
 
     private val colorBtn: TextView
     private var currentColorIndex = 0
+
+    // 드래그 관련 변수
+    private var isDragging = false
+    private var initialTouchX = 0f
+    private var initialTouchY = 0f
+    private var dragStartX = 0f
+    private var dragStartY = 0f
 
     private fun Int.dp(): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP,
@@ -45,8 +54,12 @@ class FloatingControlBar(
             cornerRadius = 30.dp().toFloat()
         }
 
-        val btnSize = 48.dp()
-        val btnMargin = 6.dp()
+        val btnSize = 44.dp()
+        val btnMargin = 4.dp()
+
+        // 드래그 핸들 (왼쪽)
+        val dragHandle = createDragHandle(btnSize)
+        addButton(dragHandle, btnSize, btnMargin)
 
         // 색상 버튼
         colorBtn = createButton("⚪", btnSize) {
@@ -73,7 +86,7 @@ class FloatingControlBar(
             onClearClick()
         }, btnSize, btnMargin)
 
-        // Close (오버레이 숨기기) - 더 눈에 띄게
+        // Close (오버레이 숨기기)
         val closeBtn = createButton("✕", btnSize) {
             Log.d(TAG, "Close button clicked")
             onCloseClick()
@@ -82,10 +95,57 @@ class FloatingControlBar(
         addButton(closeBtn, btnSize, btnMargin)
     }
 
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createDragHandle(size: Int): TextView {
+        return TextView(context).apply {
+            text = "⋮⋮"
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(Color.GRAY)
+            background = GradientDrawable().apply {
+                setColor(Color.argb(100, 80, 80, 80))
+                cornerRadius = (size / 2).toFloat()
+            }
+
+            setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        isDragging = false
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
+                        dragStartX = event.rawX
+                        dragStartY = event.rawY
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val deltaX = event.rawX - dragStartX
+                        val deltaY = event.rawY - dragStartY
+
+                        if (!isDragging && (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD)) {
+                            isDragging = true
+                        }
+
+                        if (isDragging) {
+                            onDrag(deltaX.toInt(), deltaY.toInt())
+                            dragStartX = event.rawX
+                            dragStartY = event.rawY
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        isDragging = false
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+    }
+
     private fun createButton(text: String, size: Int, onClick: () -> Unit): TextView {
         return TextView(context).apply {
             this.text = text
-            textSize = 18f
+            textSize = 16f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             background = GradientDrawable().apply {
@@ -94,8 +154,7 @@ class FloatingControlBar(
             }
             isClickable = true
             isFocusable = true
-            
-            // 터치 이벤트 직접 처리
+
             setOnTouchListener { v, event ->
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
@@ -127,12 +186,5 @@ class FloatingControlBar(
     fun setColorIndex(index: Int) {
         currentColorIndex = index
         colorBtn.text = OverlayService.COLOR_NAMES[currentColorIndex]
-    }
-    
-    /**
-     * 컨트롤 바는 항상 터치 소비 (finger 포함)
-     */
-    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        return super.dispatchTouchEvent(ev)
     }
 }
