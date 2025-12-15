@@ -9,7 +9,9 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
@@ -46,10 +48,12 @@ class OverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var overlayView: OverlayCanvasView? = null
+    private var hoverSensor: HoverSensorView? = null
     private var controlBar: FloatingControlBar? = null
     private var currentColorIndex = 0
 
     private var canvasParams: WindowManager.LayoutParams? = null
+    private var sensorParams: WindowManager.LayoutParams? = null
     private var barParams: WindowManager.LayoutParams? = null
     private var isTouchEnabled = false
 
@@ -142,19 +146,51 @@ class OverlayService : Service() {
 
         overlayView = OverlayCanvasView(
             context = this,
-            onStylusNear = { enableTouchMode() },
-            onStylusAway = { disableTouchMode() }
+            onStylusNear = { /* 센서에서 처리 */ },
+            onStylusAway = { /* 센서에서 처리 */ }
         )
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
         windowManager?.addView(overlayView, canvasParams)
         isTouchEnabled = false
 
+        // Hover Sensor: FLAG_NOT_TOUCHABLE 없이 항상 호버 감지
+        // 이 레이어가 S Pen 호버를 감지하면 캔버스 터치 모드 활성화
+        sensorParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,  // 터치는 아래로 전달, 호버 감지
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
+
+        hoverSensor = HoverSensorView(
+            context = this,
+            onStylusNear = { enableTouchMode() },
+            onStylusAway = { disableTouchMode() },
+            onStylusTouchEvent = { event ->
+                // 센서가 받은 stylus 터치를 캔버스에 전달
+                overlayView?.dispatchTouchEvent(event) ?: false
+            },
+            onFingerTouchDetected = {
+                // finger 터치 감지 → 센서 일시 비활성화하여 후속 터치가 아래 앱으로 전달되도록
+                disableSensorTemporarily()
+            }
+        )
+        windowManager?.addView(hoverSensor, sensorParams)
+
         // Control bar: 최하단 배치, 드래그 가능
+        // FLAG_SECURE: 화면 녹화/캡처에서 숨김 (삼성 화면녹화처럼 사용자는 보이지만 녹화에는 안 보임)
         barParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_SECURE,  // 화면 녹화에서 숨김
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
@@ -223,6 +259,53 @@ class OverlayService : Service() {
     }
 
     /**
+     * 센서 레이어의 상태 리셋
+     */
+    fun resetSensorState() {
+        hoverSensor?.resetStylusState()
+    }
+
+    private val sensorReenableHandler = Handler(Looper.getMainLooper())
+    private val sensorReenableRunnable = Runnable {
+        enableSensor()
+    }
+
+    /**
+     * finger 터치 감지 시 센서 일시 비활성화
+     * 후속 터치 시퀀스가 아래 앱으로 전달되도록 함
+     */
+    private fun disableSensorTemporarily() {
+        Log.d(TAG, "Disabling sensor temporarily for finger pass-through")
+        sensorParams?.let { params ->
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            try {
+                windowManager?.updateViewLayout(hoverSensor, params)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error disabling sensor: ${e.message}")
+            }
+        }
+        // 500ms 후 센서 재활성화 (다음 S Pen 호버 감지 가능하도록)
+        sensorReenableHandler.removeCallbacks(sensorReenableRunnable)
+        sensorReenableHandler.postDelayed(sensorReenableRunnable, 500L)
+    }
+
+    /**
+     * 센서 재활성화 (호버 감지 가능)
+     */
+    private fun enableSensor() {
+        Log.d(TAG, "Re-enabling sensor for hover detection")
+        sensorParams?.let { params ->
+            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            try {
+                windowManager?.updateViewLayout(hoverSensor, params)
+                hoverSensor?.clearFingerBlock()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error enabling sensor: ${e.message}")
+            }
+        }
+    }
+
+    /**
      * 컨트롤 바 위치 업데이트 (드래그)
      */
     private fun updateControlBarPosition(deltaX: Int, deltaY: Int) {
@@ -239,6 +322,10 @@ class OverlayService : Service() {
 
     private fun hideOverlay() {
         Log.d(TAG, "Hiding overlay")
+
+        // 핸들러 정리
+        sensorReenableHandler.removeCallbacks(sensorReenableRunnable)
+
         try {
             overlayView?.let {
                 windowManager?.removeView(it)
@@ -246,6 +333,15 @@ class OverlayService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error removing overlayView: ${e.message}")
+        }
+
+        try {
+            hoverSensor?.let {
+                windowManager?.removeView(it)
+                hoverSensor = null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error removing hoverSensor: ${e.message}")
         }
 
         try {
@@ -258,6 +354,7 @@ class OverlayService : Service() {
         }
 
         canvasParams = null
+        sensorParams = null
         barParams = null
         isTouchEnabled = false
         isOverlayVisible = false
