@@ -2,8 +2,12 @@ package com.dtslib.laser_pen_overlay
 
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
 import android.view.MotionEvent
+import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -13,6 +17,59 @@ class MainActivity : FlutterActivity() {
     private val OVERLAY_CHANNEL = "com.dtslib.laser_pen_overlay/overlay"
     private var methodChannel: MethodChannel? = null
     private var overlayChannel: MethodChannel? = null
+
+    companion object {
+        private const val REQUEST_OVERLAY_PERMISSION = 1001
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // 앱 시작 시 바로 오버레이 실행
+        if (checkOverlayPermission()) {
+            startOverlayServiceAndShow()
+        } else {
+            requestOverlayPermission()
+        }
+    }
+
+    private fun checkOverlayPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(this)
+        } else {
+            true
+        }
+    }
+
+    private fun requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION)
+            Toast.makeText(this, "오버레이 권한을 허용해주세요", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+            if (checkOverlayPermission()) {
+                startOverlayServiceAndShow()
+            } else {
+                Toast.makeText(this, "오버레이 권한이 필요합니다", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun startOverlayServiceAndShow() {
+        startOverlayService()
+        // 약간의 딜레이 후 오버레이 표시 (서비스 시작 대기)
+        window.decorView.postDelayed({
+            showOverlay()
+        }, 100)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

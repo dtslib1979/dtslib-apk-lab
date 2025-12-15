@@ -184,11 +184,13 @@ class OverlayService : Service() {
         windowManager?.addView(hoverSensor, sensorParams)
 
         // Control bar: 최하단 배치, 드래그 가능
+        // FLAG_SECURE: 화면 녹화/캡처에서 숨김 (삼성 화면녹화처럼 사용자는 보이지만 녹화에는 안 보임)
         barParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_SECURE,  // 화면 녹화에서 숨김
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
