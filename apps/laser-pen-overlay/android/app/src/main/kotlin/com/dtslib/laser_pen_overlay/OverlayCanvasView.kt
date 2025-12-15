@@ -7,17 +7,22 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 
 class OverlayCanvasView(context: Context) : View(context) {
-    
+
+    companion object {
+        private const val TAG = "OverlayCanvasView"
+    }
+
     private val strokes = mutableListOf<StrokeData>()
     private val undoneStrokes = mutableListOf<StrokeData>()
     private var currentStrokeTime: Long = 0
     private var currentSegments = mutableListOf<PathSegment>()
-    
+
     private var strokeColor = Color.WHITE
     private val baseStrokeWidth = 6f
     private val maxStrokeWidth = 16f
@@ -70,15 +75,21 @@ class OverlayCanvasView(context: Context) : View(context) {
     
     private var lastX = 0f
     private var lastY = 0f
-    
+
     /**
-     * 핵심: Stylus만 캡처, Finger는 pass-through
+     * S Pen / Stylus 감지
+     * - TOOL_TYPE_STYLUS (2): S Pen 직접 터치
+     * - TOOL_TYPE_ERASER (4): S Pen 지우개 모드
+     * - SOURCE_STYLUS: 디바이스 소스 체크 (폴백)
      */
     private fun isStylus(event: MotionEvent): Boolean {
-        val toolType = event.getToolType(0)
-        if (toolType == MotionEvent.TOOL_TYPE_STYLUS ||
-            toolType == MotionEvent.TOOL_TYPE_ERASER) {
-            return true
+        // 모든 포인터 체크 (멀티터치 대응)
+        for (i in 0 until event.pointerCount) {
+            val toolType = event.getToolType(i)
+            if (toolType == MotionEvent.TOOL_TYPE_STYLUS ||
+                toolType == MotionEvent.TOOL_TYPE_ERASER) {
+                return true
+            }
         }
         // Fallback: SOURCE_STYLUS 체크
         if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
@@ -86,19 +97,30 @@ class OverlayCanvasView(context: Context) : View(context) {
         }
         return false
     }
-    
+
+    /**
+     * 터치 분리 핵심 로직:
+     * - S Pen: 이 View에서 처리 (그리기)
+     * - 손가락: return false → FLAG_SLIPPERY에 의해 하위 앱으로 전달
+     */
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        // Finger → pass-through (하위 앱으로)
-        if (!isStylus(event)) {
+        val isStylusEvent = isStylus(event)
+
+        if (!isStylusEvent) {
+            // 손가락 터치 → 하위 앱으로 pass-through
+            // FLAG_SLIPPERY 플래그와 함께 동작하여 하위 앱에서 스크롤 가능
+            Log.v(TAG, "Finger touch detected, passing through: action=${event.actionMasked}")
             return false
         }
-        // Stylus → 이 View에서 처리
+
+        // S Pen 터치 → 이 View에서 처리
+        Log.v(TAG, "Stylus touch detected, handling: action=${event.actionMasked}, pressure=${event.pressure}")
         return super.dispatchTouchEvent(event)
     }
-    
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         // dispatchTouchEvent에서 이미 Stylus만 들어옴
-        when (event.action) {
+        when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
                 lastY = event.y
@@ -108,15 +130,29 @@ class OverlayCanvasView(context: Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
+                // S Pen 필압 감지 (0.0 ~ 1.0)
                 val pressure = event.pressure.coerceIn(0.1f, 1f)
                 val width = baseStrokeWidth + (maxStrokeWidth - baseStrokeWidth) * pressure
-                
+
+                // 히스토리 이벤트 처리 (부드러운 선)
+                for (h in 0 until event.historySize) {
+                    val hPressure = event.getHistoricalPressure(h).coerceIn(0.1f, 1f)
+                    val hWidth = baseStrokeWidth + (maxStrokeWidth - baseStrokeWidth) * hPressure
+                    currentSegments.add(PathSegment(
+                        lastX, lastY,
+                        event.getHistoricalX(h), event.getHistoricalY(h),
+                        hWidth
+                    ))
+                    lastX = event.getHistoricalX(h)
+                    lastY = event.getHistoricalY(h)
+                }
+
                 currentSegments.add(PathSegment(
                     lastX, lastY,
                     event.x, event.y,
                     width
                 ))
-                
+
                 lastX = event.x
                 lastY = event.y
                 invalidate()

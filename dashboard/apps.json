@@ -3,7 +3,7 @@
     "id": "laser-pen-overlay",
     "name": "Laser Pen Overlay",
     "desc": "S Pen 웹 오버레이 판서",
-    "version": "v2.1.0",
+    "version": "v2.4.0",
     "icon": "🖊️",
     "cardClass": "laser",
     "workflow": "build-laser-pen",

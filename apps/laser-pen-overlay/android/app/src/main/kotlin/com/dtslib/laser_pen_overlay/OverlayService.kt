@@ -17,7 +17,7 @@ import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 
 class OverlayService : Service() {
-    
+
     companion object {
         const val TAG = "OverlayService"
         const val CHANNEL_ID = "laser_pen_overlay"
@@ -30,10 +30,15 @@ class OverlayService : Service() {
         const val ACTION_UNDO = "com.dtslib.laser_pen_overlay.UNDO"
         const val ACTION_REDO = "com.dtslib.laser_pen_overlay.REDO"
         const val ACTION_STOP = "com.dtslib.laser_pen_overlay.STOP"
-        
+
+        // Hidden flag for touch pass-through (allows finger touch to slip to apps below)
+        private const val FLAG_SLIPPERY = 0x20000000
+        // Hidden flag for touch modal behavior
+        private const val FLAG_NOT_TOUCH_MODAL = 0x00000020
+
         var instance: OverlayService? = null
         var isOverlayVisible = false
-        
+
         val COLORS = listOf(
             Color.WHITE,
             Color.YELLOW,
@@ -121,8 +126,9 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
         
-        // Canvas overlay: 터치 통과 가능하게 설정
-        // FLAG_NOT_TOUCHABLE 제거 → View.dispatchTouchEvent에서 분기
+        // Canvas overlay: S Pen만 캡처, 손가락 터치는 하위 앱으로 통과
+        // FLAG_SLIPPERY: 손가락 터치가 이 윈도우에서 시작해도 하위로 "미끄러짐"
+        // FLAG_NOT_TOUCH_MODAL: 오버레이 외부 터치를 하위로 전달
         val canvasParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -130,7 +136,8 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+            FLAG_NOT_TOUCH_MODAL or
+            FLAG_SLIPPERY,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
