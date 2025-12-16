@@ -214,6 +214,28 @@ class OverlayService : Service() {
     fun undo() = overlayView?.undo()
     fun redo() = overlayView?.redo()
 
+    /**
+     * 터치 통과 모드 설정
+     * true: FLAG_NOT_TOUCHABLE 추가 (손가락 터치 통과)
+     * false: FLAG_NOT_TOUCHABLE 제거 (터치 수신)
+     */
+    fun setPassthroughMode(enabled: Boolean) {
+        canvasParams?.let { params ->
+            if (enabled) {
+                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                log("🔓 패스스루 모드 ON")
+            } else {
+                params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                log("🔒 패스스루 모드 OFF")
+            }
+            try {
+                windowManager?.updateViewLayout(overlayView, params)
+            } catch (e: Exception) {
+                log("패스스루 모드 변경 실패: ${e.message}")
+            }
+        }
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "Laser Pen", NotificationManager.IMPORTANCE_LOW)

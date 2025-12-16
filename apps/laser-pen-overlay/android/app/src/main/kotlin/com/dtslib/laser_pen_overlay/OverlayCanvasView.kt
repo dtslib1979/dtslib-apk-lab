@@ -188,22 +188,36 @@ class OverlayCanvasView(
 
     /**
      * 손가락 터치 처리 - TouchInjectionService로 전달
+     * 주입 전 FLAG_NOT_TOUCHABLE 설정하여 주입된 제스처가 다시 오버레이로 오지 않게 함
      */
     private fun handleFingerTouch(event: MotionEvent): Boolean {
         val injectionService = TouchInjectionService.instance
+        val overlayService = OverlayService.instance
 
         if (injectionService == null) {
             Log.w(TAG, "⚠️ TouchInjectionService 없음 - 손가락 터치 무시됨")
-            // 서비스 없으면 터치 통과시키려 시도 (false 반환)
             return false
         }
 
         Log.d(TAG, "👆 손가락: action=${event.actionMasked}, (${event.x}, ${event.y}) → 주입")
 
+        // 주입 전: 오버레이를 터치 통과 상태로 변경
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            overlayService?.setPassthroughMode(true)
+        }
+
         // 터치 이벤트를 Accessibility Service로 전달
         injectionService.injectTouchEvent(event)
 
-        // true 반환하여 이벤트 소비 (중복 처리 방지)
+        // 터치 종료 시: 오버레이 다시 터치 수신 상태로
+        if (event.actionMasked == MotionEvent.ACTION_UP ||
+            event.actionMasked == MotionEvent.ACTION_CANCEL) {
+            // 약간의 딜레이 후 복원 (제스처 완료 대기)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                overlayService?.setPassthroughMode(false)
+            }, 100)
+        }
+
         return true
     }
 
