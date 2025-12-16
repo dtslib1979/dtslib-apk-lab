@@ -128,6 +128,9 @@ class OverlayService : Service() {
         super.onDestroy()
     }
 
+    private var hoverSensor: HoverSensorView? = null
+    private var sensorParams: WindowManager.LayoutParams? = null
+
     private fun showOverlay() {
         if (overlayView != null) {
             Log.w(TAG, "오버레이 이미 표시 중")
@@ -143,8 +146,7 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        // 캔버스: 기본적으로 터치 비활성 (FLAG_NOT_TOUCHABLE)
-        // 호버는 이 플래그와 무관하게 수신됨!
+        // 1. 캔버스 레이어 (하단) - 기본 터치 비활성
         canvasParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -158,16 +160,9 @@ class OverlayService : Service() {
             gravity = Gravity.TOP or Gravity.START
         }
 
-        // 캔버스 뷰 생성 - S Pen 상태 변경 콜백 연결
         overlayView = OverlayCanvasView(
             context = this,
-            onStylusStateChanged = { isNear ->
-                if (isNear) {
-                    enableTouchMode()
-                } else {
-                    disableTouchMode()
-                }
-            }
+            onStylusStateChanged = { /* 센서에서 처리 */ }
         )
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
 
@@ -177,6 +172,43 @@ class OverlayService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "캔버스 뷰 추가 실패: ${e.message}")
             return
+        }
+
+        // 2. 호버 센서 레이어 (상단) - FLAG_NOT_TOUCHABLE 없음! 호버 감지용
+        sensorParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
+
+        hoverSensor = HoverSensorView(
+            context = this,
+            onStylusNear = {
+                Log.i(TAG, ">>> 센서: S Pen 감지! 터치 모드 활성화")
+                enableTouchMode()
+                enableSensorPassThrough()
+            },
+            onStylusAway = {
+                Log.i(TAG, ">>> 센서: S Pen 떠남! 터치 모드 비활성화")
+                disableTouchMode()
+            },
+            onFingerDetected = {
+                Log.i(TAG, ">>> 센서: 손가락 감지! 센서 패스스루")
+                enableSensorPassThrough()
+            }
+        )
+
+        try {
+            windowManager?.addView(hoverSensor, sensorParams)
+            Log.i(TAG, "호버 센서 추가됨")
+        } catch (e: Exception) {
+            Log.e(TAG, "호버 센서 추가 실패: ${e.message}")
         }
 
         isTouchEnabled = false
@@ -271,6 +303,43 @@ class OverlayService : Service() {
                 Log.e(TAG, "터치 모드 비활성화 실패: ${e.message}")
             }
         }
+
+        // 센서도 다시 터치 가능하게 (호버 감지용)
+        disableSensorPassThrough()
+    }
+
+    /**
+     * 센서 레이어 터치 통과 활성화 (손가락 터치가 아래로 가도록)
+     */
+    private fun enableSensorPassThrough() {
+        sensorParams?.let { params ->
+            if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) == 0) {
+                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                try {
+                    windowManager?.updateViewLayout(hoverSensor, params)
+                    Log.i(TAG, "센서 패스스루 활성화")
+                } catch (e: Exception) {
+                    Log.e(TAG, "센서 패스스루 활성화 실패: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 센서 레이어 터치 통과 비활성화 (호버 감지 모드로 복귀)
+     */
+    private fun disableSensorPassThrough() {
+        sensorParams?.let { params ->
+            if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) != 0) {
+                params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                try {
+                    windowManager?.updateViewLayout(hoverSensor, params)
+                    Log.i(TAG, "센서 호버 감지 모드 복귀")
+                } catch (e: Exception) {
+                    Log.e(TAG, "센서 모드 변경 실패: ${e.message}")
+                }
+            }
+        }
     }
 
     private fun updateControlBarPosition(deltaX: Int, deltaY: Int) {
@@ -298,6 +367,15 @@ class OverlayService : Service() {
         }
 
         try {
+            hoverSensor?.let {
+                windowManager?.removeView(it)
+                hoverSensor = null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "센서 제거 실패: ${e.message}")
+        }
+
+        try {
             controlBar?.let {
                 windowManager?.removeView(it)
                 controlBar = null
@@ -307,6 +385,7 @@ class OverlayService : Service() {
         }
 
         canvasParams = null
+        sensorParams = null
         barParams = null
         isTouchEnabled = false
         isOverlayVisible = false

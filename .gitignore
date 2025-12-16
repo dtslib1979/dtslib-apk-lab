@@ -85,3 +85,5 @@ coverage/
 /pubspec.yaml
 /analysis_options.yaml
 /pubspec.lock
+.vercel
+.env*.local
