@@ -5,26 +5,30 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import android.util.TypedValue
+import android.view.Display
 import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 
 /**
- * v15: Accessibility Service 기반 S Pen / 손가락 분리
+ * v19: 화면 녹화 시 컨트롤바 자동 숨김
  *
  * 핵심 원리:
- * - FLAG_NOT_TOUCHABLE 사용 안 함 (모든 터치 수신)
  * - S Pen → 캔버스에 그리기
  * - 손가락 → TouchInjectionService로 아래 앱에 주입
+ * - 화면 녹화 감지 → 컨트롤바 숨김
  */
 class OverlayService : Service() {
 
@@ -50,6 +54,7 @@ class OverlayService : Service() {
     }
 
     private var windowManager: WindowManager? = null
+    private var displayManager: DisplayManager? = null
     private var overlayView: OverlayCanvasView? = null
     private var controlBar: FloatingControlBar? = null
     private var currentColorIndex = 0
@@ -61,6 +66,33 @@ class OverlayService : Service() {
 
     // 현재 입력 모드 (알림 표시용)
     @Volatile private var currentInputIsStylus = false
+
+    // 화면 녹화 감지
+    @Volatile private var isRecording = false
+    private var controlBarWasVisible = true
+
+    // 화면 녹화 감지 리스너
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {
+            checkForScreenRecording()
+        }
+
+        override fun onDisplayRemoved(displayId: Int) {
+            checkForScreenRecording()
+        }
+
+        override fun onDisplayChanged(displayId: Int) {
+            checkForScreenRecording()
+        }
+    }
+
+    // 주기적 녹화 체크 (백업용)
+    private val recordingCheckRunnable = object : Runnable {
+        override fun run() {
+            checkForScreenRecording()
+            handler.postDelayed(this, 1000) // 1초마다 체크
+        }
+    }
 
     private fun Int.dp(): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP, this.toFloat(), resources.displayMetrics
@@ -74,8 +106,85 @@ class OverlayService : Service() {
         super.onCreate()
         instance = this
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         createNotificationChannel()
-        log("서비스 생성 - Accessibility 모드")
+
+        // 화면 녹화 감지 리스너 등록
+        displayManager?.registerDisplayListener(displayListener, handler)
+        handler.post(recordingCheckRunnable)
+
+        log("서비스 생성 - Accessibility 모드 + 녹화 감지")
+    }
+
+    /**
+     * 화면 녹화 감지
+     * - 가상 디스플레이 존재 여부 확인
+     * - 삼성 스크린 레코더 실행 여부 확인
+     */
+    private fun checkForScreenRecording() {
+        val wasRecording = isRecording
+        isRecording = isScreenRecordingActive()
+
+        if (isRecording != wasRecording) {
+            handler.post {
+                if (isRecording) {
+                    log("🔴 화면 녹화 감지 - 컨트롤바 숨김")
+                    hideControlBar()
+                } else {
+                    log("⚪ 화면 녹화 종료 - 컨트롤바 표시")
+                    showControlBar()
+                }
+            }
+        }
+    }
+
+    private fun isScreenRecordingActive(): Boolean {
+        // 방법 1: 가상 디스플레이 체크 (화면 녹화는 가상 디스플레이 생성)
+        displayManager?.displays?.forEach { display ->
+            // 가상 디스플레이 플래그 체크
+            if (display.displayId != Display.DEFAULT_DISPLAY) {
+                val flags = display.flags
+                // FLAG_PRIVATE (1 << 2) = 4, FLAG_PRESENTATION (1 << 1) = 2
+                if ((flags and Display.FLAG_PRIVATE) != 0 ||
+                    display.name?.contains("recording", ignoreCase = true) == true ||
+                    display.name?.contains("Virtual", ignoreCase = true) == true) {
+                    return true
+                }
+            }
+        }
+
+        // 방법 2: 삼성 스크린 레코더 앱 실행 체크
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val runningApps = am.runningAppProcesses ?: return false
+            for (processInfo in runningApps) {
+                if (processInfo.processName.contains("screenrecorder", ignoreCase = true) ||
+                    processInfo.processName.contains("screen.recorder", ignoreCase = true)) {
+                    return true
+                }
+            }
+        } catch (e: Exception) {
+            log("녹화 앱 체크 실패: ${e.message}")
+        }
+
+        return false
+    }
+
+    private fun hideControlBar() {
+        controlBar?.let {
+            if (it.visibility == View.VISIBLE) {
+                controlBarWasVisible = true
+                it.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun showControlBar() {
+        controlBar?.let {
+            if (controlBarWasVisible && it.visibility == View.GONE) {
+                it.visibility = View.VISIBLE
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -100,6 +209,10 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        // 화면 녹화 감지 해제
+        displayManager?.unregisterDisplayListener(displayListener)
+        handler.removeCallbacks(recordingCheckRunnable)
+
         hideOverlay()
         instance = null
         super.onDestroy()
