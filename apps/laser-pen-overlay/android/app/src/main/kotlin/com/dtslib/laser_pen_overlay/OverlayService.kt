@@ -15,19 +15,18 @@ import android.os.Looper
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.MotionEvent
-import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 
 /**
- * 완전 재설계된 오버레이 서비스
+ * v14: 주기적 Peek 방식 S Pen 감지
  *
  * 핵심 원리:
- * - S Pen은 항상 호버 → 터치 순서 (디지타이저 특성)
- * - 호버 감지로 FLAG_NOT_TOUCHABLE 토글
- * - 호버 감지 실패 대비: 터치에서도 stylus 체크
+ * - 기본: FLAG_NOT_TOUCHABLE (손가락 터치 통과)
+ * - 100ms마다 10ms간 FLAG 해제하여 S Pen 호버 감지
+ * - S Pen 감지 시 FLAG 해제 유지 → 그리기 가능
+ * - S Pen 떠나면 FLAG 복원 → 손가락 통과
  */
 class OverlayService : Service() {
 
@@ -63,6 +62,27 @@ class OverlayService : Service() {
 
     // S Pen 상태
     @Volatile private var isStylusMode = false
+    @Volatile private var isPeeking = false
+
+    // Peek 타이머 (S Pen 감지용)
+    private val peekRunnable = object : Runnable {
+        override fun run() {
+            if (!isStylusMode && !isPeeking && overlayView != null) {
+                startPeek()
+            }
+            handler.postDelayed(this, 100) // 100ms마다 peek
+        }
+    }
+
+    // Peek 종료 타이머
+    private val peekEndRunnable = Runnable {
+        if (!isStylusMode) {
+            endPeek()
+        }
+        isPeeking = false
+    }
+
+    // S Pen 타임아웃
     private val stylusTimeout = Runnable {
         log("S Pen 타임아웃 → 손가락 모드")
         setStylusMode(false)
@@ -74,8 +94,10 @@ class OverlayService : Service() {
 
     private fun log(msg: String) {
         Log.i(TAG, msg)
-        // Toast로도 표시 (디버깅용)
-        // handler.post { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun toast(msg: String) {
+        handler.post { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
     }
 
     override fun onCreate() {
@@ -121,24 +143,29 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         else WindowManager.LayoutParams.TYPE_PHONE
 
-        // 캔버스: 기본적으로 터치 비활성 (손가락 통과)
+        // 캔버스: 기본 FLAG_NOT_TOUCHABLE (손가락 통과)
         canvasParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,  // 기본: 터치 통과
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
 
-        overlayView = OverlayCanvasView(this) { /* unused */ }
-        overlayView?.setStrokeColor(COLORS[currentColorIndex])
-
-        // 호버 리스너 설정 (FLAG_NOT_TOUCHABLE이어도 호버는 받음)
-        overlayView?.setOnHoverListener { _, event ->
-            handleHoverEvent(event)
+        // OverlayCanvasView 콜백 연결
+        overlayView = OverlayCanvasView(this) { stylusNear ->
+            if (stylusNear) {
+                log("Canvas: S Pen 감지!")
+                toast("🖊️ S Pen!")
+                setStylusMode(true)
+            } else {
+                log("Canvas: S Pen 떠남")
+                setStylusMode(false)
+            }
         }
+        overlayView?.setStrokeColor(COLORS[currentColorIndex])
 
         windowManager?.addView(overlayView, canvasParams)
         log("캔버스 추가 (터치 비활성)")
@@ -168,47 +195,41 @@ class OverlayService : Service() {
         windowManager?.addView(controlBar, barParams)
 
         isOverlayVisible = true
+
+        // Peek 타이머 시작
+        handler.postDelayed(peekRunnable, 500)
+        log("Peek 타이머 시작")
     }
 
     /**
-     * 호버 이벤트 처리 - S Pen 감지의 핵심!
+     * Peek 시작: 잠깐 FLAG_NOT_TOUCHABLE 해제하여 호버 감지
      */
-    private fun handleHoverEvent(event: MotionEvent): Boolean {
-        val isStylus = isStylus(event)
-
-        when (event.actionMasked) {
-            MotionEvent.ACTION_HOVER_ENTER -> {
-                if (isStylus) {
-                    log("✏️ S Pen 호버 진입!")
-                    setStylusMode(true)
-                }
-            }
-            MotionEvent.ACTION_HOVER_MOVE -> {
-                if (isStylus && !isStylusMode) {
-                    log("✏️ S Pen 호버 이동 (재감지)")
-                    setStylusMode(true)
-                }
-                resetStylusTimeout()
-            }
-            MotionEvent.ACTION_HOVER_EXIT -> {
-                if (isStylus) {
-                    log("✏️ S Pen 호버 퇴장")
-                    startStylusTimeout()
-                }
+    private fun startPeek() {
+        isPeeking = true
+        canvasParams?.let { params ->
+            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            try {
+                windowManager?.updateViewLayout(overlayView, params)
+            } catch (e: Exception) {
+                log("Peek 시작 실패: ${e.message}")
             }
         }
-        return isStylus
+        // 15ms 후 peek 종료
+        handler.postDelayed(peekEndRunnable, 15)
     }
 
-    private fun isStylus(event: MotionEvent): Boolean {
-        for (i in 0 until event.pointerCount) {
-            val toolType = event.getToolType(i)
-            if (toolType == MotionEvent.TOOL_TYPE_STYLUS ||
-                toolType == MotionEvent.TOOL_TYPE_ERASER) {
-                return true
+    /**
+     * Peek 종료: FLAG_NOT_TOUCHABLE 복원
+     */
+    private fun endPeek() {
+        canvasParams?.let { params ->
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            try {
+                windowManager?.updateViewLayout(overlayView, params)
+            } catch (e: Exception) {
+                log("Peek 종료 실패: ${e.message}")
             }
         }
-        return false
     }
 
     /**
@@ -218,15 +239,17 @@ class OverlayService : Service() {
         if (isStylusMode == enabled) return
         isStylusMode = enabled
 
+        handler.removeCallbacks(stylusTimeout)
+
         canvasParams?.let { params ->
             if (enabled) {
                 // S Pen 모드: 터치 활성화
                 params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-                log("🖊️ 터치 활성화 (S Pen 그리기 가능)")
+                log("🖊️ S Pen 모드 ON - 그리기 가능")
             } else {
                 // 손가락 모드: 터치 비활성화 (통과)
                 params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                log("👆 터치 비활성화 (손가락 통과)")
+                log("👆 손가락 모드 - 터치 통과")
             }
             try {
                 windowManager?.updateViewLayout(overlayView, params)
@@ -235,16 +258,11 @@ class OverlayService : Service() {
                 log("플래그 변경 실패: ${e.message}")
             }
         }
-    }
 
-    private fun resetStylusTimeout() {
-        handler.removeCallbacks(stylusTimeout)
-        handler.postDelayed(stylusTimeout, 500)
-    }
-
-    private fun startStylusTimeout() {
-        handler.removeCallbacks(stylusTimeout)
-        handler.postDelayed(stylusTimeout, 500)
+        if (enabled) {
+            // S Pen 타임아웃 시작 (500ms 후 손가락 모드로)
+            handler.postDelayed(stylusTimeout, 500)
+        }
     }
 
     private fun moveControlBar(dx: Int, dy: Int) {
@@ -256,6 +274,8 @@ class OverlayService : Service() {
     }
 
     private fun hideOverlay() {
+        handler.removeCallbacks(peekRunnable)
+        handler.removeCallbacks(peekEndRunnable)
         handler.removeCallbacks(stylusTimeout)
         try { overlayView?.let { windowManager?.removeView(it) } } catch (_: Exception) {}
         try { controlBar?.let { windowManager?.removeView(it) } } catch (_: Exception) {}
@@ -264,6 +284,7 @@ class OverlayService : Service() {
         canvasParams = null
         barParams = null
         isStylusMode = false
+        isPeeking = false
         isOverlayVisible = false
     }
 
