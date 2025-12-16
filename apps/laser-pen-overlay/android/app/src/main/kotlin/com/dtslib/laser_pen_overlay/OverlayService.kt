@@ -23,12 +23,12 @@ import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 
 /**
- * v19: 화면 녹화 시 컨트롤바 자동 숨김
+ * v20: 컨트롤바 녹화 제외 (FLAG_SECURE)
  *
  * 핵심 원리:
  * - S Pen → 캔버스에 그리기
  * - 손가락 → TouchInjectionService로 아래 앱에 주입
- * - 화면 녹화 감지 → 컨트롤바 숨김
+ * - 컨트롤바 FLAG_SECURE → 화면에는 보이지만 녹화/스크린샷에서 제외
  */
 class OverlayService : Service() {
 
@@ -284,12 +284,13 @@ class OverlayService : Service() {
         windowManager?.addView(overlayView, canvasParams)
         log("캔버스 추가 (모든 터치 수신)")
 
-        // 컨트롤 바
+        // 컨트롤 바 - FLAG_SECURE로 녹화/스크린샷에서 제외
         barParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_SECURE,  // 녹화에서 안 보임!
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
