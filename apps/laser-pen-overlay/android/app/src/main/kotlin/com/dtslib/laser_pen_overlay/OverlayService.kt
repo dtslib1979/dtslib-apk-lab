@@ -100,7 +100,19 @@ class OverlayService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
-            else -> startForeground(NOTIFICATION_ID, createNotification())
+            else -> {
+                // Android 15+: 오버레이를 먼저 표시한 후 Foreground Service 시작
+                // 이렇게 해야 "visible overlay window" 요구사항 충족
+                if (Build.VERSION.SDK_INT >= 35) {
+                    Log.d(TAG, "Android 15+: Showing overlay before startForeground")
+                    showOverlay()  // 오버레이 먼저!
+                }
+                startForeground(NOTIFICATION_ID, createNotification())
+                if (Build.VERSION.SDK_INT < 35) {
+                    // Android 14 이하에서는 기존 방식 유지
+                    showOverlay()
+                }
+            }
         }
         return START_STICKY
     }
