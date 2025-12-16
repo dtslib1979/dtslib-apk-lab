@@ -1,5 +1,7 @@
 package com.dtslib.laser_pen_overlay
 
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -7,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.MotionEvent
+import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -20,18 +23,52 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val REQUEST_OVERLAY_PERMISSION = 1001
+        private const val REQUEST_ACCESSIBILITY_PERMISSION = 1002
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        checkAndRequestPermissions()
+    }
 
-        // 앱 시작 시 바로 오버레이 실행
-        if (checkOverlayPermission()) {
-            startOverlayServiceAndShow()
-        } else {
-            requestOverlayPermission()
+    override fun onResume() {
+        super.onResume()
+        // 설정에서 돌아올 때 권한 다시 체크
+        updatePermissionStatus()
+    }
+
+    private fun checkAndRequestPermissions() {
+        when {
+            !checkOverlayPermission() -> {
+                requestOverlayPermission()
+            }
+            !isAccessibilityServiceEnabled() -> {
+                showAccessibilityPrompt()
+            }
+            else -> {
+                startOverlayServiceAndShow()
+            }
         }
     }
+
+    private fun updatePermissionStatus() {
+        val overlayOk = checkOverlayPermission()
+        val accessibilityOk = isAccessibilityServiceEnabled()
+
+        if (overlayOk && accessibilityOk) {
+            // 모든 권한 OK - 서비스 시작
+            if (OverlayService.instance == null) {
+                startOverlayServiceAndShow()
+            }
+        } else if (overlayOk && !accessibilityOk) {
+            // 오버레이 OK, 접근성 필요
+            Toast.makeText(this, "⚠️ 접근성 권한 필요 - 손가락 스크롤 작동 안 함", Toast.LENGTH_LONG).show()
+            // 접근성 없어도 S Pen 그리기는 동작
+            startOverlayServiceAndShow()
+        }
+    }
+
+    // ===== 오버레이 권한 =====
 
     private fun checkOverlayPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -52,20 +89,74 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // ===== 접근성 권한 =====
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+
+        for (service in enabledServices) {
+            val serviceId = service.resolveInfo.serviceInfo
+            if (serviceId.packageName == packageName &&
+                serviceId.name == TouchInjectionService::class.java.name) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun showAccessibilityPrompt() {
+        Toast.makeText(
+            this,
+            "손가락 터치 전달을 위해 접근성 서비스를 켜주세요\n\n설정 → 접근성 → Laser Pen 터치 전달 → 켜기",
+            Toast.LENGTH_LONG
+        ).show()
+
+        // 접근성 설정 화면으로 이동
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        startActivityForResult(intent, REQUEST_ACCESSIBILITY_PERMISSION)
+    }
+
+    private fun openAccessibilitySettings() {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        startActivity(intent)
+    }
+
+    // ===== Activity 결과 처리 =====
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_OVERLAY_PERMISSION) {
-            if (checkOverlayPermission()) {
-                startOverlayServiceAndShow()
-            } else {
-                Toast.makeText(this, "오버레이 권한이 필요합니다", Toast.LENGTH_SHORT).show()
+
+        when (requestCode) {
+            REQUEST_OVERLAY_PERMISSION -> {
+                if (checkOverlayPermission()) {
+                    // 오버레이 권한 획득, 접근성 체크
+                    if (!isAccessibilityServiceEnabled()) {
+                        showAccessibilityPrompt()
+                    } else {
+                        startOverlayServiceAndShow()
+                    }
+                } else {
+                    Toast.makeText(this, "오버레이 권한이 필요합니다", Toast.LENGTH_SHORT).show()
+                }
+            }
+            REQUEST_ACCESSIBILITY_PERMISSION -> {
+                if (isAccessibilityServiceEnabled()) {
+                    Toast.makeText(this, "✅ 접근성 서비스 활성화됨", Toast.LENGTH_SHORT).show()
+                    startOverlayServiceAndShow()
+                } else {
+                    Toast.makeText(this, "⚠️ 접근성 미활성화 - S Pen만 동작", Toast.LENGTH_LONG).show()
+                    // 접근성 없어도 S Pen 그리기는 동작
+                    startOverlayServiceAndShow()
+                }
             }
         }
     }
 
+    // ===== 서비스 제어 =====
+
     private fun startOverlayServiceAndShow() {
         startOverlayService()
-        // 약간의 딜레이 후 오버레이 표시 (서비스 시작 대기)
         window.decorView.postDelayed({
             showOverlay()
         }, 100)
@@ -73,13 +164,13 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
+
         // 기존 터치 채널
         methodChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL
         )
-        
+
         methodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getInputMode" -> {
@@ -88,13 +179,13 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
-        
+
         // 오버레이 서비스 제어 채널
         overlayChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             OVERLAY_CHANNEL
         )
-        
+
         overlayChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "startService" -> {
@@ -115,6 +206,13 @@ class MainActivity : FlutterActivity() {
                 }
                 "isOverlayVisible" -> {
                     result.success(OverlayService.isOverlayVisible)
+                }
+                "isAccessibilityEnabled" -> {
+                    result.success(isAccessibilityServiceEnabled())
+                }
+                "openAccessibilitySettings" -> {
+                    openAccessibilitySettings()
+                    result.success(true)
                 }
                 "setColor" -> {
                     val colorName = call.argument<String>("color") ?: "white"
@@ -143,7 +241,7 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
-    
+
     private fun startOverlayService() {
         val intent = Intent(this, OverlayService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -152,21 +250,21 @@ class MainActivity : FlutterActivity() {
             startService(intent)
         }
     }
-    
+
     private fun stopOverlayService() {
         val intent = Intent(this, OverlayService::class.java).apply {
             action = OverlayService.ACTION_STOP
         }
         startService(intent)
     }
-    
+
     private fun showOverlay() {
         val intent = Intent(this, OverlayService::class.java).apply {
             action = OverlayService.ACTION_SHOW
         }
         startService(intent)
     }
-    
+
     private fun hideOverlay() {
         val intent = Intent(this, OverlayService::class.java).apply {
             action = OverlayService.ACTION_HIDE
@@ -176,9 +274,9 @@ class MainActivity : FlutterActivity() {
 
     override fun dispatchTouchEvent(event: MotionEvent?): Boolean {
         if (event == null) return super.dispatchTouchEvent(event)
-        
+
         val toolType = event.getToolType(0)
-        
+
         return when (toolType) {
             MotionEvent.TOOL_TYPE_STYLUS,
             MotionEvent.TOOL_TYPE_ERASER -> {
@@ -200,7 +298,7 @@ class MainActivity : FlutterActivity() {
             MotionEvent.ACTION_CANCEL -> "cancel"
             else -> return
         }
-        
+
         val data = mapOf(
             "action" to action,
             "x" to event.x.toDouble(),
@@ -208,7 +306,7 @@ class MainActivity : FlutterActivity() {
             "pressure" to event.pressure.toDouble(),
             "toolType" to event.getToolType(0)
         )
-        
+
         methodChannel?.invokeMethod("onStylusTouch", data)
     }
 }

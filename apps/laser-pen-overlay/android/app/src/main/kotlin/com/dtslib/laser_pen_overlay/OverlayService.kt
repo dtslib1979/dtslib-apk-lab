@@ -16,17 +16,15 @@ import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 
 /**
- * v14: 주기적 Peek 방식 S Pen 감지
+ * v15: Accessibility Service 기반 S Pen / 손가락 분리
  *
  * 핵심 원리:
- * - 기본: FLAG_NOT_TOUCHABLE (손가락 터치 통과)
- * - 100ms마다 10ms간 FLAG 해제하여 S Pen 호버 감지
- * - S Pen 감지 시 FLAG 해제 유지 → 그리기 가능
- * - S Pen 떠나면 FLAG 복원 → 손가락 통과
+ * - FLAG_NOT_TOUCHABLE 사용 안 함 (모든 터치 수신)
+ * - S Pen → 캔버스에 그리기
+ * - 손가락 → TouchInjectionService로 아래 앱에 주입
  */
 class OverlayService : Service() {
 
@@ -34,6 +32,7 @@ class OverlayService : Service() {
         const val TAG = "OverlayService"
         const val CHANNEL_ID = "laser_pen_overlay"
         const val NOTIFICATION_ID = 1001
+
         const val ACTION_SHOW = "com.dtslib.laser_pen_overlay.SHOW"
         const val ACTION_HIDE = "com.dtslib.laser_pen_overlay.HIDE"
         const val ACTION_TOGGLE = "com.dtslib.laser_pen_overlay.TOGGLE"
@@ -60,33 +59,8 @@ class OverlayService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
 
-    // S Pen 상태
-    @Volatile private var isStylusMode = false
-    @Volatile private var isPeeking = false
-
-    // Peek 타이머 (S Pen 감지용)
-    private val peekRunnable = object : Runnable {
-        override fun run() {
-            if (!isStylusMode && !isPeeking && overlayView != null) {
-                startPeek()
-            }
-            handler.postDelayed(this, 100) // 100ms마다 peek
-        }
-    }
-
-    // Peek 종료 타이머
-    private val peekEndRunnable = Runnable {
-        if (!isStylusMode) {
-            endPeek()
-        }
-        isPeeking = false
-    }
-
-    // S Pen 타임아웃
-    private val stylusTimeout = Runnable {
-        log("S Pen 타임아웃 → 손가락 모드")
-        setStylusMode(false)
-    }
+    // 현재 입력 모드 (알림 표시용)
+    @Volatile private var currentInputIsStylus = false
 
     private fun Int.dp(): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP, this.toFloat(), resources.displayMetrics
@@ -96,16 +70,12 @@ class OverlayService : Service() {
         Log.i(TAG, msg)
     }
 
-    private fun toast(msg: String) {
-        handler.post { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
-    }
-
     override fun onCreate() {
         super.onCreate()
         instance = this
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
-        log("서비스 생성")
+        log("서비스 생성 - Accessibility 모드")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -137,38 +107,40 @@ class OverlayService : Service() {
 
     private fun showOverlay() {
         if (overlayView != null) return
+
+        // Accessibility Service 체크
+        if (!TouchInjectionService.isRunning()) {
+            log("⚠️ TouchInjectionService 미실행 - 손가락 터치 주입 불가")
+        } else {
+            log("✅ TouchInjectionService 활성화됨")
+        }
+
         log("오버레이 표시")
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         else WindowManager.LayoutParams.TYPE_PHONE
 
-        // 캔버스: 기본 FLAG_NOT_TOUCHABLE (손가락 통과)
+        // 캔버스: FLAG_NOT_TOUCHABLE 없음! 모든 터치 수신
         canvasParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            // FLAG_NOT_TOUCHABLE 제거됨!
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
 
-        // OverlayCanvasView 콜백 연결
-        overlayView = OverlayCanvasView(this) { stylusNear ->
-            if (stylusNear) {
-                log("Canvas: S Pen 감지!")
-                toast("🖊️ S Pen!")
-                setStylusMode(true)
-            } else {
-                log("Canvas: S Pen 떠남")
-                setStylusMode(false)
-            }
+        overlayView = OverlayCanvasView(this) { isStylus ->
+            currentInputIsStylus = isStylus
+            log(if (isStylus) "✏️ S Pen 입력" else "👆 손가락 입력")
+            updateNotification()
         }
         overlayView?.setStrokeColor(COLORS[currentColorIndex])
 
         windowManager?.addView(overlayView, canvasParams)
-        log("캔버스 추가 (터치 비활성)")
+        log("캔버스 추가 (모든 터치 수신)")
 
         // 컨트롤 바
         barParams = WindowManager.LayoutParams(
@@ -195,74 +167,6 @@ class OverlayService : Service() {
         windowManager?.addView(controlBar, barParams)
 
         isOverlayVisible = true
-
-        // Peek 타이머 시작
-        handler.postDelayed(peekRunnable, 500)
-        log("Peek 타이머 시작")
-    }
-
-    /**
-     * Peek 시작: 잠깐 FLAG_NOT_TOUCHABLE 해제하여 호버 감지
-     */
-    private fun startPeek() {
-        isPeeking = true
-        canvasParams?.let { params ->
-            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-            try {
-                windowManager?.updateViewLayout(overlayView, params)
-            } catch (e: Exception) {
-                log("Peek 시작 실패: ${e.message}")
-            }
-        }
-        // 15ms 후 peek 종료
-        handler.postDelayed(peekEndRunnable, 15)
-    }
-
-    /**
-     * Peek 종료: FLAG_NOT_TOUCHABLE 복원
-     */
-    private fun endPeek() {
-        canvasParams?.let { params ->
-            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            try {
-                windowManager?.updateViewLayout(overlayView, params)
-            } catch (e: Exception) {
-                log("Peek 종료 실패: ${e.message}")
-            }
-        }
-    }
-
-    /**
-     * S Pen 모드 전환
-     */
-    private fun setStylusMode(enabled: Boolean) {
-        if (isStylusMode == enabled) return
-        isStylusMode = enabled
-
-        handler.removeCallbacks(stylusTimeout)
-
-        canvasParams?.let { params ->
-            if (enabled) {
-                // S Pen 모드: 터치 활성화
-                params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-                log("🖊️ S Pen 모드 ON - 그리기 가능")
-            } else {
-                // 손가락 모드: 터치 비활성화 (통과)
-                params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                log("👆 손가락 모드 - 터치 통과")
-            }
-            try {
-                windowManager?.updateViewLayout(overlayView, params)
-                updateNotification()
-            } catch (e: Exception) {
-                log("플래그 변경 실패: ${e.message}")
-            }
-        }
-
-        if (enabled) {
-            // S Pen 타임아웃 시작 (500ms 후 손가락 모드로)
-            handler.postDelayed(stylusTimeout, 500)
-        }
     }
 
     private fun moveControlBar(dx: Int, dy: Int) {
@@ -274,17 +178,12 @@ class OverlayService : Service() {
     }
 
     private fun hideOverlay() {
-        handler.removeCallbacks(peekRunnable)
-        handler.removeCallbacks(peekEndRunnable)
-        handler.removeCallbacks(stylusTimeout)
         try { overlayView?.let { windowManager?.removeView(it) } } catch (_: Exception) {}
         try { controlBar?.let { windowManager?.removeView(it) } } catch (_: Exception) {}
         overlayView = null
         controlBar = null
         canvasParams = null
         barParams = null
-        isStylusMode = false
-        isPeeking = false
         isOverlayVisible = false
     }
 
@@ -327,12 +226,13 @@ class OverlayService : Service() {
         val mainPending = PendingIntent.getActivity(this, 0,
             Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
 
-        val modeText = if (isStylusMode) "🖊️ S Pen" else "👆 손가락통과"
+        val accessibilityStatus = if (TouchInjectionService.isRunning()) "✅" else "⚠️"
+        val inputMode = if (currentInputIsStylus) "✏️" else "👆"
         val colorEmoji = COLOR_NAMES[currentColorIndex]
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Laser Pen")
-            .setContentText("$modeText | $colorEmoji")
+            .setContentTitle("Laser Pen $accessibilityStatus")
+            .setContentText("$inputMode | $colorEmoji | ${if (isOverlayVisible) "ON" else "OFF"}")
             .setSmallIcon(android.R.drawable.ic_menu_edit)
             .setContentIntent(mainPending)
             .addAction(0, if (isOverlayVisible) "OFF" else "ON",

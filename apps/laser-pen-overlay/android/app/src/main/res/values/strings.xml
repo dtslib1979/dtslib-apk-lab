@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Laser Pen</string>
+    <string name="accessibility_service_description">S Pen으로 화면에 그리는 동안 손가락 터치를 아래 앱으로 전달합니다. 이 기능은 S Pen과 손가락 입력을 분리하기 위해 필요합니다.</string>
+</resources>
