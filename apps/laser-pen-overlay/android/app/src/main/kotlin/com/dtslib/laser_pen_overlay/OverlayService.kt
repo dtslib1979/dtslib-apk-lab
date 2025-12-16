@@ -23,12 +23,14 @@ import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 
 /**
- * v20: 컨트롤바 녹화 제외 (FLAG_SECURE)
+ * v18 Final: S Pen/손가락 분리 완성
  *
  * 핵심 원리:
  * - S Pen → 캔버스에 그리기
  * - 손가락 → TouchInjectionService로 아래 앱에 주입
- * - 컨트롤바 FLAG_SECURE → 화면에는 보이지만 녹화/스크린샷에서 제외
+ *
+ * 참고: FLAG_SECURE는 화면 전체 녹화를 막으므로 사용 불가
+ * (삼성 UI가 녹화에서 제외되는 건 시스템 권한)
  */
 class OverlayService : Service() {
 
@@ -284,13 +286,12 @@ class OverlayService : Service() {
         windowManager?.addView(overlayView, canvasParams)
         log("캔버스 추가 (모든 터치 수신)")
 
-        // 컨트롤 바 - FLAG_SECURE로 녹화/스크린샷에서 제외
+        // 컨트롤 바
         barParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_SECURE,  // 녹화에서 안 보임!
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
