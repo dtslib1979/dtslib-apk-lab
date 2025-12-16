@@ -9,15 +9,21 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 
+/**
+ * 오버레이 서비스 (단순화된 버전)
+ *
+ * 핵심 변경:
+ * - HoverSensorView 제거 (단일 레이어로 통합)
+ * - OverlayCanvasView가 직접 호버/터치 처리
+ * - FLAG_NOT_TOUCHABLE 동적 토글로 S Pen/손가락 분리
+ */
 class OverlayService : Service() {
 
     companion object {
@@ -36,31 +42,23 @@ class OverlayService : Service() {
         var instance: OverlayService? = null
         var isOverlayVisible = false
 
-        val COLORS = listOf(
-            Color.WHITE,
-            Color.YELLOW,
-            Color.BLACK,
-            Color.RED,
-            Color.CYAN
-        )
+        val COLORS = listOf(Color.WHITE, Color.YELLOW, Color.BLACK, Color.RED, Color.CYAN)
         val COLOR_NAMES = listOf("⚪", "🟡", "⚫", "🔴", "🔵")
     }
 
     private var windowManager: WindowManager? = null
     private var overlayView: OverlayCanvasView? = null
-    private var hoverSensor: HoverSensorView? = null
     private var controlBar: FloatingControlBar? = null
     private var currentColorIndex = 0
 
     private var canvasParams: WindowManager.LayoutParams? = null
-    private var sensorParams: WindowManager.LayoutParams? = null
     private var barParams: WindowManager.LayoutParams? = null
+
+    @Volatile
     private var isTouchEnabled = false
 
     private fun Int.dp(): Int = TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP,
-        this.toFloat(),
-        resources.displayMetrics
+        TypedValue.COMPLEX_UNIT_DIP, this.toFloat(), resources.displayMetrics
     ).toInt()
 
     override fun onCreate() {
@@ -68,11 +66,11 @@ class OverlayService : Service() {
         instance = this
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
-        Log.d(TAG, "Service created")
+        Log.i(TAG, "=== OverlayService 생성됨 ===")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand: action=${intent?.action}")
+        Log.i(TAG, "onStartCommand: action=${intent?.action}")
 
         when (intent?.action) {
             ACTION_SHOW -> {
@@ -95,21 +93,25 @@ class OverlayService : Service() {
             ACTION_UNDO -> overlayView?.undo()
             ACTION_REDO -> overlayView?.redo()
             ACTION_STOP -> {
-                Log.d(TAG, "ACTION_STOP received")
+                Log.i(TAG, "ACTION_STOP - 서비스 종료")
                 hideOverlay()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
             else -> {
-                // Android 15+: 오버레이를 먼저 표시한 후 Foreground Service 시작
-                // 이렇게 해야 "visible overlay window" 요구사항 충족
+                // 서비스 시작
+                Log.i(TAG, "서비스 시작 (Android SDK: ${Build.VERSION.SDK_INT})")
+
+                // Android 15+: 오버레이를 먼저 표시해야 함
                 if (Build.VERSION.SDK_INT >= 35) {
-                    Log.d(TAG, "Android 15+: Showing overlay before startForeground")
-                    showOverlay()  // 오버레이 먼저!
+                    Log.i(TAG, "Android 15+: 오버레이 먼저 표시")
+                    showOverlay()
                 }
+
                 startForeground(NOTIFICATION_ID, createNotification())
+
+                // Android 14 이하: 포그라운드 시작 후 오버레이
                 if (Build.VERSION.SDK_INT < 35) {
-                    // Android 14 이하에서는 기존 방식 유지
                     showOverlay()
                 }
             }
@@ -120,7 +122,7 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        Log.d(TAG, "Service destroyed")
+        Log.i(TAG, "=== OverlayService 소멸됨 ===")
         hideOverlay()
         instance = null
         super.onDestroy()
@@ -128,11 +130,11 @@ class OverlayService : Service() {
 
     private fun showOverlay() {
         if (overlayView != null) {
-            Log.d(TAG, "Overlay already visible")
+            Log.w(TAG, "오버레이 이미 표시 중")
             return
         }
 
-        Log.d(TAG, "Showing overlay")
+        Log.i(TAG, ">>> 오버레이 표시 시작")
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -141,73 +143,55 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        // Canvas overlay: 기본적으로 터치 통과 (FLAG_NOT_TOUCHABLE)
-        // S Pen 호버 감지시 터치 활성화
+        // 캔버스: 기본적으로 터치 비활성 (FLAG_NOT_TOUCHABLE)
+        // 호버는 이 플래그와 무관하게 수신됨!
         canvasParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,  // 기본: 터치 통과
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
         }
 
+        // 캔버스 뷰 생성 - S Pen 상태 변경 콜백 연결
         overlayView = OverlayCanvasView(
             context = this,
-            onStylusNear = { /* 센서에서 처리 */ },
-            onStylusAway = { /* 센서에서 처리 */ }
-        )
-        overlayView?.setStrokeColor(COLORS[currentColorIndex])
-        windowManager?.addView(overlayView, canvasParams)
-        isTouchEnabled = false
-
-        // Hover Sensor: FLAG_NOT_TOUCHABLE로 설정하여 터치는 절대 받지 않음
-        // 중요: FLAG_NOT_TOUCHABLE은 터치만 차단, 호버 이벤트는 여전히 수신 가능!
-        // 이렇게 하면 손가락 터치가 센서를 거치지 않고 바로 아래 앱으로 전달됨
-        sensorParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,  // 터치 완전 차단 (호버만 감지)
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-        }
-
-        hoverSensor = HoverSensorView(
-            context = this,
-            onStylusNear = { enableTouchMode() },
-            onStylusAway = { disableTouchMode() },
-            onStylusTouchEvent = { event ->
-                // 센서는 FLAG_NOT_TOUCHABLE이므로 터치 이벤트를 받지 않음
-                // 이 콜백은 호환성을 위해 유지하지만 실제로는 호출되지 않음
-                overlayView?.dispatchTouchEvent(event) ?: false
-            },
-            onFingerTouchDetected = {
-                // 더 이상 필요 없음 - 센서가 터치를 받지 않으므로
+            onStylusStateChanged = { isNear ->
+                if (isNear) {
+                    enableTouchMode()
+                } else {
+                    disableTouchMode()
+                }
             }
         )
-        windowManager?.addView(hoverSensor, sensorParams)
+        overlayView?.setStrokeColor(COLORS[currentColorIndex])
 
-        // Control bar: 최하단 배치, 드래그 가능
-        // FLAG_SECURE: 화면 녹화/캡처에서 숨김 (삼성 화면녹화처럼 사용자는 보이지만 녹화에는 안 보임)
+        try {
+            windowManager?.addView(overlayView, canvasParams)
+            Log.i(TAG, "캔버스 뷰 추가됨")
+        } catch (e: Exception) {
+            Log.e(TAG, "캔버스 뷰 추가 실패: ${e.message}")
+            return
+        }
+
+        isTouchEnabled = false
+
+        // 컨트롤 바
         barParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_SECURE,  // 화면 녹화에서 숨김
+                WindowManager.LayoutParams.FLAG_SECURE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = 16.dp()  // 최하단에서 약간 위
+            y = 16.dp()
         }
 
         controlBar = FloatingControlBar(
@@ -220,7 +204,7 @@ class OverlayService : Service() {
             onRedoClick = { overlayView?.redo() },
             onClearClick = { overlayView?.clear() },
             onCloseClick = {
-                Log.d(TAG, "Close button clicked")
+                Log.i(TAG, "닫기 버튼 클릭")
                 closeOverlay()
             },
             onDrag = { deltaX, deltaY ->
@@ -228,26 +212,38 @@ class OverlayService : Service() {
             }
         )
         controlBar?.setColorIndex(currentColorIndex)
-        windowManager?.addView(controlBar, barParams)
+
+        try {
+            windowManager?.addView(controlBar, barParams)
+            Log.i(TAG, "컨트롤 바 추가됨")
+        } catch (e: Exception) {
+            Log.e(TAG, "컨트롤 바 추가 실패: ${e.message}")
+        }
 
         isOverlayVisible = true
-        Log.d(TAG, "Overlay shown successfully")
+        Log.i(TAG, ">>> 오버레이 표시 완료 (터치 비활성 상태)")
     }
 
     /**
-     * S Pen 감지시 터치 모드 활성화
+     * S Pen 감지 → 터치 모드 활성화
      */
     private fun enableTouchMode() {
-        if (isTouchEnabled) return
-        Log.d(TAG, "Enabling touch mode for S Pen")
+        if (isTouchEnabled) {
+            Log.d(TAG, "터치 모드 이미 활성")
+            return
+        }
+
+        Log.i(TAG, ">>> 터치 모드 활성화 (S Pen 그리기 가능)")
 
         canvasParams?.let { params ->
+            // FLAG_NOT_TOUCHABLE 제거
             params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
             try {
                 windowManager?.updateViewLayout(overlayView, params)
                 isTouchEnabled = true
+                Log.i(TAG, "플래그 업데이트 완료: 터치 활성")
             } catch (e: Exception) {
-                Log.e(TAG, "Error enabling touch mode: ${e.message}")
+                Log.e(TAG, "터치 모드 활성화 실패: ${e.message}")
             }
         }
     }
@@ -256,48 +252,41 @@ class OverlayService : Service() {
      * S Pen 떠남 → 터치 모드 비활성화 (손가락 터치 통과)
      */
     private fun disableTouchMode() {
-        if (!isTouchEnabled) return
-        Log.d(TAG, "Disabling touch mode - finger can now scroll")
+        if (!isTouchEnabled) {
+            Log.d(TAG, "터치 모드 이미 비활성")
+            return
+        }
+
+        Log.i(TAG, ">>> 터치 모드 비활성화 (손가락 터치 통과)")
 
         canvasParams?.let { params ->
+            // FLAG_NOT_TOUCHABLE 추가
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             try {
                 windowManager?.updateViewLayout(overlayView, params)
                 isTouchEnabled = false
                 overlayView?.resetStylusState()
+                Log.i(TAG, "플래그 업데이트 완료: 터치 비활성")
             } catch (e: Exception) {
-                Log.e(TAG, "Error disabling touch mode: ${e.message}")
+                Log.e(TAG, "터치 모드 비활성화 실패: ${e.message}")
             }
         }
     }
 
-    /**
-     * 센서 레이어의 상태 리셋
-     */
-    fun resetSensorState() {
-        hoverSensor?.resetStylusState()
-    }
-
-    // 센서는 이제 항상 FLAG_NOT_TOUCHABLE이므로 enable/disable 로직 불필요
-    // 호버 이벤트는 FLAG_NOT_TOUCHABLE과 무관하게 수신됨
-
-    /**
-     * 컨트롤 바 위치 업데이트 (드래그)
-     */
     private fun updateControlBarPosition(deltaX: Int, deltaY: Int) {
         barParams?.let { params ->
             params.x += deltaX
-            params.y -= deltaY  // y좌표는 반전 (Gravity.BOTTOM 기준)
+            params.y -= deltaY
             try {
                 windowManager?.updateViewLayout(controlBar, params)
             } catch (e: Exception) {
-                Log.e(TAG, "Error updating control bar position: ${e.message}")
+                Log.e(TAG, "컨트롤 바 위치 업데이트 실패: ${e.message}")
             }
         }
     }
 
     private fun hideOverlay() {
-        Log.d(TAG, "Hiding overlay")
+        Log.i(TAG, ">>> 오버레이 숨김")
 
         try {
             overlayView?.let {
@@ -305,16 +294,7 @@ class OverlayService : Service() {
                 overlayView = null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error removing overlayView: ${e.message}")
-        }
-
-        try {
-            hoverSensor?.let {
-                windowManager?.removeView(it)
-                hoverSensor = null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error removing hoverSensor: ${e.message}")
+            Log.e(TAG, "캔버스 제거 실패: ${e.message}")
         }
 
         try {
@@ -323,11 +303,10 @@ class OverlayService : Service() {
                 controlBar = null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error removing controlBar: ${e.message}")
+            Log.e(TAG, "컨트롤 바 제거 실패: ${e.message}")
         }
 
         canvasParams = null
-        sensorParams = null
         barParams = null
         isTouchEnabled = false
         isOverlayVisible = false
@@ -370,7 +349,7 @@ class OverlayService : Service() {
                 "Laser Pen Overlay",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "오버레이 판서 활성화 중"
+                description = "S Pen 오버레이 판서 서비스"
                 setShowBadge(false)
             }
             val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -384,32 +363,22 @@ class OverlayService : Service() {
             this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE
         )
 
-        val toggleIntent = Intent(this, OverlayService::class.java).apply {
-            action = ACTION_TOGGLE
-        }
+        val toggleIntent = Intent(this, OverlayService::class.java).apply { action = ACTION_TOGGLE }
         val togglePendingIntent = PendingIntent.getService(
-            this, 1, toggleIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            this, 1, toggleIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val colorIntent = Intent(this, OverlayService::class.java).apply {
-            action = ACTION_COLOR
-        }
+        val colorIntent = Intent(this, OverlayService::class.java).apply { action = ACTION_COLOR }
         val colorPendingIntent = PendingIntent.getService(
-            this, 2, colorIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            this, 2, colorIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val clearIntent = Intent(this, OverlayService::class.java).apply {
-            action = ACTION_CLEAR
-        }
+        val clearIntent = Intent(this, OverlayService::class.java).apply { action = ACTION_CLEAR }
         val clearPendingIntent = PendingIntent.getService(
             this, 3, clearIntent, PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stopIntent = Intent(this, OverlayService::class.java).apply {
-            action = ACTION_STOP
-        }
+        val stopIntent = Intent(this, OverlayService::class.java).apply { action = ACTION_STOP }
         val stopPendingIntent = PendingIntent.getService(
             this, 4, stopIntent, PendingIntent.FLAG_IMMUTABLE
         )
@@ -420,7 +389,7 @@ class OverlayService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Laser Pen")
-            .setContentText("$statusEmoji $colorEmoji")
+            .setContentText("$statusEmoji $colorEmoji | S Pen=그리기, 손가락=터치통과")
             .setSmallIcon(android.R.drawable.ic_menu_edit)
             .setContentIntent(mainPendingIntent)
             .addAction(0, toggleText, togglePendingIntent)

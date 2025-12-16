@@ -11,15 +11,22 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 
+/**
+ * 통합 오버레이 캔버스 뷰
+ *
+ * 핵심 로직:
+ * 1. 호버 이벤트로 S Pen 감지 → onStylusStateChanged(true) 호출
+ * 2. S Pen 떠남 감지 → onStylusStateChanged(false) 호출
+ * 3. 서비스에서 FLAG_NOT_TOUCHABLE 토글로 손가락/펜 분리
+ */
 class OverlayCanvasView(
     context: Context,
-    private val onStylusNear: () -> Unit,
-    private val onStylusAway: () -> Unit
+    private val onStylusStateChanged: (Boolean) -> Unit
 ) : View(context) {
 
     companion object {
-        private const val TAG = "OverlayCanvasView"
-        private const val STYLUS_TIMEOUT_MS = 500L
+        private const val TAG = "OverlayCanvas"
+        private const val STYLUS_TIMEOUT_MS = 300L  // 짧게 설정
     }
 
     private val strokes = mutableListOf<StrokeData>()
@@ -47,18 +54,23 @@ class OverlayCanvasView(
         }
     }
 
-    // S Pen 타임아웃 핸들러
     private val stylusTimeoutHandler = Handler(Looper.getMainLooper())
     private val stylusTimeoutRunnable = Runnable {
-        Log.d(TAG, "Stylus timeout - switching to pass-through mode")
-        onStylusAway()
+        Log.i(TAG, ">>> S Pen TIMEOUT - 손가락 터치 모드로 전환")
+        isStylusNear = false
+        onStylusStateChanged(false)
     }
 
-    private var isStylusActive = false
+    @Volatile
+    private var isStylusNear = false
+
+    private var lastX = 0f
+    private var lastY = 0f
 
     init {
         setBackgroundColor(Color.TRANSPARENT)
         fadeHandler.post(fadeRunnable)
+        Log.i(TAG, "OverlayCanvasView 생성됨")
     }
 
     data class PathSegment(
@@ -81,52 +93,55 @@ class OverlayCanvasView(
             }
         }
 
-        fun isExpired(): Boolean {
-            return System.currentTimeMillis() - createdAt > 3500
-        }
+        fun isExpired() = System.currentTimeMillis() - createdAt > 3500
     }
 
-    private var lastX = 0f
-    private var lastY = 0f
-
     /**
-     * S Pen / Stylus 감지
+     * S Pen / Stylus 감지 (삼성 S Pen 포함)
      */
     private fun isStylus(event: MotionEvent): Boolean {
+        // 방법 1: toolType 체크
         for (i in 0 until event.pointerCount) {
-            val toolType = event.getToolType(i)
-            if (toolType == MotionEvent.TOOL_TYPE_STYLUS ||
-                toolType == MotionEvent.TOOL_TYPE_ERASER) {
-                return true
+            when (event.getToolType(i)) {
+                MotionEvent.TOOL_TYPE_STYLUS,
+                MotionEvent.TOOL_TYPE_ERASER -> return true
             }
         }
+        // 방법 2: source 체크 (구형 기기 대응)
         if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
             return true
+        }
+        // 방법 3: 삼성 S Pen은 pressure와 함께 오는 경우가 많음
+        if (event.pressure > 0 && event.pressure != 1.0f) {
+            // 추가 검증 필요하면 여기서
         }
         return false
     }
 
     /**
-     * S Pen 호버 이벤트 처리 (화면에 닿기 전)
+     * 호버 이벤트 - S Pen 감지의 핵심!
+     * S Pen이 화면 가까이 오면 호출됨 (터치 전)
      */
     override fun onHoverEvent(event: MotionEvent): Boolean {
-        if (isStylus(event)) {
+        val stylus = isStylus(event)
+        Log.d(TAG, "onHoverEvent: action=${event.actionMasked}, isStylus=$stylus, x=${event.x}, y=${event.y}")
+
+        if (stylus) {
             when (event.actionMasked) {
-                MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE -> {
-                    if (!isStylusActive) {
-                        Log.d(TAG, "S Pen hover detected - enabling touch mode")
-                        isStylusActive = true
-                        onStylusNear()
+                MotionEvent.ACTION_HOVER_ENTER -> {
+                    Log.i(TAG, ">>> S Pen HOVER ENTER - 터치 모드 활성화")
+                    activateStylus()
+                }
+                MotionEvent.ACTION_HOVER_MOVE -> {
+                    if (!isStylusNear) {
+                        Log.i(TAG, ">>> S Pen HOVER MOVE (재활성화)")
+                        activateStylus()
                     }
-                    // 타임아웃 리셋
-                    stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
-                    stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+                    resetTimeout()
                 }
                 MotionEvent.ACTION_HOVER_EXIT -> {
-                    Log.d(TAG, "S Pen hover exit")
-                    // 타임아웃 시작
-                    stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
-                    stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+                    Log.i(TAG, ">>> S Pen HOVER EXIT - 타임아웃 시작")
+                    startTimeout()
                 }
             }
             return true
@@ -134,21 +149,44 @@ class OverlayCanvasView(
         return super.onHoverEvent(event)
     }
 
+    /**
+     * 제네릭 모션 이벤트 (일부 기기에서 호버를 여기로 보냄)
+     */
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_HOVER_ENTER ||
+            event.actionMasked == MotionEvent.ACTION_HOVER_MOVE) {
+            if (isStylus(event)) {
+                Log.d(TAG, "onGenericMotionEvent: S Pen hover detected")
+                if (!isStylusNear) {
+                    activateStylus()
+                }
+                resetTimeout()
+                return true
+            }
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
+    /**
+     * 터치 이벤트 - S Pen 그리기 처리
+     * FLAG_NOT_TOUCHABLE이 해제된 상태에서만 호출됨
+     */
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // S Pen 터치만 처리 - 손가락 터치는 아래 앱으로 전달
-        if (!isStylus(event)) {
-            Log.d(TAG, "Finger touch detected - NOT consuming, passing to app below")
-            return false  // false 리턴 → 아래 앱으로 이벤트 전달
+        val stylus = isStylus(event)
+        Log.d(TAG, "onTouchEvent: action=${event.actionMasked}, isStylus=$stylus, pressure=${event.pressure}")
+
+        // S Pen이 아닌 터치는 무시 (FLAG_NOT_TOUCHABLE이 해제된 상태에서 손가락이 올 수 있음)
+        if (!stylus) {
+            Log.w(TAG, "손가락 터치 감지 - 이벤트 무시 (false 반환)")
+            return false
         }
 
-        Log.d(TAG, "S Pen touch: action=${event.actionMasked}, pressure=${event.pressure}")
-
-        // S Pen 활성 상태 유지
-        if (!isStylusActive) {
-            isStylusActive = true
-            onStylusNear()
+        // S Pen 상태 유지
+        if (!isStylusNear) {
+            Log.i(TAG, "S Pen 터치로 활성화")
+            activateStylus()
         }
-        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+        resetTimeout()
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -157,13 +195,13 @@ class OverlayCanvasView(
                 currentSegments.clear()
                 currentStrokeTime = System.currentTimeMillis()
                 undoneStrokes.clear()
+                Log.d(TAG, "그리기 시작: ($lastX, $lastY)")
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 val pressure = event.pressure.coerceIn(0.1f, 1f)
                 val width = baseStrokeWidth + (maxStrokeWidth - baseStrokeWidth) * pressure
 
-                // 히스토리 이벤트 처리 (부드러운 선)
                 for (h in 0 until event.historySize) {
                     val hPressure = event.getHistoricalPressure(h).coerceIn(0.1f, 1f)
                     val hWidth = baseStrokeWidth + (maxStrokeWidth - baseStrokeWidth) * hPressure
@@ -176,12 +214,7 @@ class OverlayCanvasView(
                     lastY = event.getHistoricalY(h)
                 }
 
-                currentSegments.add(PathSegment(
-                    lastX, lastY,
-                    event.x, event.y,
-                    width
-                ))
-
+                currentSegments.add(PathSegment(lastX, lastY, event.x, event.y, width))
                 lastX = event.x
                 lastY = event.y
                 invalidate()
@@ -189,20 +222,32 @@ class OverlayCanvasView(
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (currentSegments.isNotEmpty()) {
-                    strokes.add(StrokeData(
-                        currentSegments.toList(),
-                        strokeColor,
-                        currentStrokeTime
-                    ))
+                    strokes.add(StrokeData(currentSegments.toList(), strokeColor, currentStrokeTime))
                     currentSegments.clear()
+                    Log.d(TAG, "그리기 완료: ${strokes.size}개 스트로크")
                 }
                 invalidate()
-                // 펜을 뗀 후 타임아웃 시작
-                stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+                startTimeout()
                 return true
             }
         }
-        return false
+        return true
+    }
+
+    private fun activateStylus() {
+        isStylusNear = true
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+        onStylusStateChanged(true)
+    }
+
+    private fun resetTimeout() {
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+        stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
+    }
+
+    private fun startTimeout() {
+        stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
+        stylusTimeoutHandler.postDelayed(stylusTimeoutRunnable, STYLUS_TIMEOUT_MS)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -213,18 +258,18 @@ class OverlayCanvasView(
             if (opacity > 0) {
                 paint.color = stroke.color
                 paint.alpha = (opacity * 255).toInt()
-                drawSegments(canvas, stroke.segments, paint)
+                drawSegments(canvas, stroke.segments)
             }
         }
 
         if (currentSegments.isNotEmpty()) {
             paint.color = strokeColor
             paint.alpha = 255
-            drawSegments(canvas, currentSegments, paint)
+            drawSegments(canvas, currentSegments)
         }
     }
 
-    private fun drawSegments(canvas: Canvas, segments: List<PathSegment>, paint: Paint) {
+    private fun drawSegments(canvas: Canvas, segments: List<PathSegment>) {
         for (seg in segments) {
             paint.strokeWidth = seg.width
             canvas.drawLine(seg.x1, seg.y1, seg.x2, seg.y2, paint)
@@ -261,9 +306,11 @@ class OverlayCanvasView(
     }
 
     fun resetStylusState() {
-        isStylusActive = false
+        isStylusNear = false
         stylusTimeoutHandler.removeCallbacks(stylusTimeoutRunnable)
     }
+
+    fun isStylusCurrentlyNear() = isStylusNear
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
