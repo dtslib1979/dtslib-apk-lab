@@ -49,50 +49,138 @@ class FloatingControlBar(
         gravity = Gravity.CENTER
         setPadding(16.dp(), 8.dp(), 16.dp(), 8.dp())
 
+        // 극단적 투명 - 거의 안 보임 (녹화용)
         background = GradientDrawable().apply {
-            setColor(Color.argb(220, 30, 30, 30))
+            setColor(Color.argb(8, 30, 30, 30))  // 거의 투명
             cornerRadius = 30.dp().toFloat()
         }
 
         val btnSize = 44.dp()
         val btnMargin = 4.dp()
 
-        // 드래그 핸들 (왼쪽)
-        val dragHandle = createDragHandle(btnSize)
+        // 드래그 핸들 (왼쪽) - 극단 투명
+        val dragHandle = createGhostHandle(btnSize)
         addButton(dragHandle, btnSize, btnMargin)
 
-        // 색상 버튼
-        colorBtn = createButton("⚪", btnSize) {
+        // 색상 버튼 - 극단 투명
+        colorBtn = createGhostButton("⚪", btnSize) {
             Log.d(TAG, "Color button clicked")
             onColorClick()
         }
         addButton(colorBtn, btnSize, btnMargin)
 
         // Undo
-        addButton(createButton("◀", btnSize) {
+        addButton(createGhostButton("◀", btnSize) {
             Log.d(TAG, "Undo button clicked")
             onUndoClick()
         }, btnSize, btnMargin)
 
         // Redo
-        addButton(createButton("▶", btnSize) {
+        addButton(createGhostButton("▶", btnSize) {
             Log.d(TAG, "Redo button clicked")
             onRedoClick()
         }, btnSize, btnMargin)
 
         // Clear
-        addButton(createButton("🧹", btnSize) {
+        addButton(createGhostButton("🧹", btnSize) {
             Log.d(TAG, "Clear button clicked")
             onClearClick()
         }, btnSize, btnMargin)
 
         // Close (오버레이 숨기기)
-        val closeBtn = createButton("✕", btnSize) {
+        val closeBtn = createGhostButton("✕", btnSize) {
             Log.d(TAG, "Close button clicked")
             onCloseClick()
         }
-        closeBtn.setTextColor(Color.RED)
+        closeBtn.setTextColor(Color.argb(12, 255, 0, 0))  // 극단 투명 빨강
         addButton(closeBtn, btnSize, btnMargin)
+    }
+
+    // 극단 투명 드래그 핸들
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createGhostHandle(size: Int): TextView {
+        return TextView(context).apply {
+            text = "⋮⋮"
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(Color.argb(15, 255, 255, 255))  // 극단 투명
+            background = GradientDrawable().apply {
+                setColor(Color.argb(5, 80, 80, 80))  // 거의 안 보임
+                cornerRadius = (size / 2).toFloat()
+            }
+
+            setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        isDragging = false
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
+                        dragStartX = event.rawX
+                        dragStartY = event.rawY
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val deltaX = event.rawX - dragStartX
+                        val deltaY = event.rawY - dragStartY
+
+                        if (!isDragging && (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD)) {
+                            isDragging = true
+                        }
+
+                        if (isDragging) {
+                            onDrag(deltaX.toInt(), deltaY.toInt())
+                            dragStartX = event.rawX
+                            dragStartY = event.rawY
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        isDragging = false
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+    }
+
+    // 극단 투명 버튼
+    private fun createGhostButton(text: String, size: Int, onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            this.text = text
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(Color.argb(12, 255, 255, 255))  // 극단 투명
+            background = GradientDrawable().apply {
+                setColor(Color.argb(5, 60, 60, 60))  // 거의 안 보임
+                cornerRadius = (size / 2).toFloat()
+            }
+            isClickable = true
+            isFocusable = true
+
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        // 터치 시 잠깐 보이게
+                        v.alpha = 0.5f
+                        (v as TextView).setTextColor(Color.argb(180, 255, 255, 255))
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.alpha = 1.0f
+                        (v as TextView).setTextColor(Color.argb(12, 255, 255, 255))
+                        onClick()
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.alpha = 1.0f
+                        (v as TextView).setTextColor(Color.argb(12, 255, 255, 255))
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
