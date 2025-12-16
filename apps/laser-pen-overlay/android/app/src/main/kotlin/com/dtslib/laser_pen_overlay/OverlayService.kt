@@ -201,6 +201,10 @@ class OverlayService : Service() {
             onFingerDetected = {
                 Log.i(TAG, ">>> 센서: 손가락 감지! 센서 패스스루")
                 enableSensorPassThrough()
+            },
+            onStylusTouch = { event ->
+                // S Pen 터치를 캔버스로 직접 전달
+                overlayView?.dispatchTouchEvent(event)
             }
         )
 

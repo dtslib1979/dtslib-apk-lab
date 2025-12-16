@@ -24,7 +24,8 @@ class HoverSensorView(
     context: Context,
     private val onStylusNear: () -> Unit,
     private val onStylusAway: () -> Unit,
-    private val onFingerDetected: () -> Unit
+    private val onFingerDetected: () -> Unit,
+    private val onStylusTouch: ((MotionEvent) -> Unit)? = null
 ) : View(context) {
 
     companion object {
@@ -106,21 +107,22 @@ class HoverSensorView(
     }
 
     /**
-     * 터치 이벤트 - 손가락 감지 시 패스스루 요청
+     * 터치 이벤트 - S Pen은 캔버스로 전달, 손가락은 패스스루
      */
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val stylus = isStylus(event)
         Log.d(TAG, "onTouchEvent: isStylus=$stylus, action=${event.actionMasked}")
 
         if (stylus) {
-            // S Pen 터치 - 활성 상태 유지
+            // S Pen 터치 - 캔버스로 전달
+            Log.i(TAG, ">>> S Pen 터치! 캔버스로 전달")
             if (!isStylusActive) {
-                Log.i(TAG, "S Pen 터치로 활성화")
                 activateStylus()
             }
             resetTimeout()
-            // 터치는 캔버스에서 처리하도록 소비하지 않음
-            return false
+            // 캔버스에 터치 이벤트 직접 전달
+            onStylusTouch?.invoke(event)
+            return true  // 소비 (캔버스에서 처리)
         }
 
         // 손가락 터치 - 패스스루 요청
