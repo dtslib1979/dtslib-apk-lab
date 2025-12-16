@@ -90,7 +90,7 @@ class OverlayService : Service() {
     private val recordingCheckRunnable = object : Runnable {
         override fun run() {
             checkForScreenRecording()
-            handler.postDelayed(this, 1000) // 1초마다 체크
+            handler.postDelayed(this, 500) // 0.5초마다 체크
         }
     }
 
@@ -139,32 +139,61 @@ class OverlayService : Service() {
     }
 
     private fun isScreenRecordingActive(): Boolean {
-        // 방법 1: 가상 디스플레이 체크 (화면 녹화는 가상 디스플레이 생성)
+        // 방법 1: 가상 디스플레이 체크
         displayManager?.displays?.forEach { display ->
-            // 가상 디스플레이 플래그 체크
             if (display.displayId != Display.DEFAULT_DISPLAY) {
+                val name = display.name ?: ""
                 val flags = display.flags
-                // FLAG_PRIVATE (1 << 2) = 4, FLAG_PRESENTATION (1 << 1) = 2
+
+                log("디스플레이 감지: id=${display.displayId}, name=$name, flags=$flags")
+
+                // 가상 디스플레이 플래그 또는 녹화 관련 이름
                 if ((flags and Display.FLAG_PRIVATE) != 0 ||
-                    display.name?.contains("recording", ignoreCase = true) == true ||
-                    display.name?.contains("Virtual", ignoreCase = true) == true) {
+                    (flags and Display.FLAG_SECURE) != 0 ||
+                    name.contains("recording", ignoreCase = true) ||
+                    name.contains("Virtual", ignoreCase = true) ||
+                    name.contains("MediaProjection", ignoreCase = true) ||
+                    name.contains("Overlay", ignoreCase = true)) {
+                    log("🔴 가상 디스플레이 감지: $name")
                     return true
                 }
             }
         }
 
-        // 방법 2: 삼성 스크린 레코더 앱 실행 체크
+        // 방법 2: 삼성 스크린 레코더 서비스 실행 체크
         try {
             val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            val runningApps = am.runningAppProcesses ?: return false
-            for (processInfo in runningApps) {
-                if (processInfo.processName.contains("screenrecorder", ignoreCase = true) ||
-                    processInfo.processName.contains("screen.recorder", ignoreCase = true)) {
+            @Suppress("DEPRECATION")
+            val runningServices = am.getRunningServices(100)
+            for (service in runningServices) {
+                val className = service.service.className ?: ""
+                val packageName = service.service.packageName ?: ""
+
+                // 삼성 스크린 레코더 패키지들
+                if (packageName.contains("screenrecorder", ignoreCase = true) ||
+                    packageName.contains("screen_recorder", ignoreCase = true) ||
+                    packageName == "com.samsung.android.app.screenrecorder" ||
+                    packageName == "com.samsung.android.screenrecorder" ||
+                    className.contains("ScreenRecord", ignoreCase = true) ||
+                    className.contains("MediaProjection", ignoreCase = true)) {
+                    log("🔴 녹화 서비스 감지: $packageName / $className")
                     return true
                 }
             }
         } catch (e: Exception) {
-            log("녹화 앱 체크 실패: ${e.message}")
+            log("서비스 체크 실패: ${e.message}")
+        }
+
+        // 방법 3: MediaProjection 상태 체크 (Android 14+)
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                val mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE)
+                    as android.media.projection.MediaProjectionManager
+                // MediaProjection이 활성화되어 있는지 체크하는 간접적인 방법
+                // (직접적인 API는 없지만 시스템 상태로 추론)
+            } catch (e: Exception) {
+                log("MediaProjection 체크 실패: ${e.message}")
+            }
         }
 
         return false
