@@ -1,96 +1,156 @@
-# Parksy Capture Pipeline v1.0
+# Parksy Capture
 
-> Personal use only. No distribution.
+**Lossless Conversation Capture for Web-based LLMs (Mobile-first)**
 
-## Overview
+---
 
-Android Share Intent를 통해 텍스트를 캡처하고, 로컬 저장 + GitHub 아카이빙을 수행하는 개인용 데이터 파이프라인.
+## Why Parksy Capture Exists
 
-## Features (MVP v1)
+On desktop, this problem doesn't exist.
 
-1. **Share Intent 수신** — `text/plain` MIME type
-2. **Local 저장** — `Download/parksy-logs/ParksyLog_YYYYMMDD_HHmmss.md`
-3. **Cloud 저장** — Cloudflare Worker → GitHub Repository
-4. **Toast Feedback** — 성공/실패 알림
-5. **Auto-finish** — Activity 즉시 종료
+You can select everything.
+You can copy everything.
+You can save it, upload it, or archive it however you want.
 
-## Architecture
+On mobile, especially Android, it does.
 
-```
-Android Share Intent
-       ↓
-   ShareActivity.kt
-       ↓
-   ┌───────┴───────┐
-   ↓               ↓
-Local            Cloud
-MediaStore       POST → Worker → GitHub
-(MUST succeed)   (MAY fail)
-```
+---
 
-## Fail-safe Strategy
+## The Real Problem
 
-| Local | Cloud | Feedback |
-|-------|-------|----------|
-| ✅ | ✅ | "Saved Local & Cloud 🚀" |
-| ✅ | ❌ | "Saved Local Only ✅" |
-| ❌ | - | "Error! Save Failed ❌" |
+- LLM mobile apps **do not allow full conversation export**
+- Many users switch to **mobile web browsers** to select entire conversations
+- But even in browsers:
+  - Copying long conversations **fails silently**
+  - Text gets **truncated due to clipboard size limits**
+  - You lose parts of the conversation without warning
 
-## Setup
+This makes **long LLM conversations effectively non-exportable on mobile**.
 
-### 1. Deploy Cloudflare Worker
+Most people give up.
+They screenshot, summarize, or abandon the data.
 
-```bash
-cd apps/capture-pipeline/worker
-npm install -g wrangler
-wrangler login
-wrangler secret put GITHUB_TOKEN   # GitHub PAT (repo scope)
-wrangler secret put API_KEY        # Any secret string
-wrangler deploy
-```
+Parksy Capture was built by someone who didn't.
 
-Worker URL 예시: `https://parksy-capture-worker.<your-subdomain>.workers.dev`
+---
 
-### 2. Update App Config
+## What Parksy Capture Does
 
-`lib/main.dart`에서 Worker URL 설정:
-```dart
-static const workerUrl = 'https://parksy-capture-worker.YOUR_SUBDOMAIN.workers.dev';
-```
+**Parksy Capture bypasses the clipboard entirely.**
 
-### 3. Build & Install APK
+Instead of relying on copy-paste, it uses Android's **Share Intent**, which is not constrained by clipboard memory limits.
 
-GitHub Actions가 자동으로 빌드합니다.
+### Workflow
 
-## Constitution Compliance
+1. Select the full conversation in a mobile web browser
+   (ChatGPT, Claude, Gemini, etc.)
+2. Tap **Share**
+3. Choose **Parksy Capture**
+4. The conversation is saved **exactly as selected**:
+   - 📱 Locally as a `.txt` or `.md` file
+   - ☁️ Automatically archived to a **private GitHub repository**
 
-- §2.2: Debug APK Only ✅
-- §2.4: GitHub Actions CI/CD ✅
-- §4.4: No Dialog (Auto-save) ✅
-- §1.1 Amendment: GitHub Archive 예외 허용
+No trimming.
+No summarization.
+No data loss.
 
-## How to Install
+---
 
-1. Go to [Actions](../../actions) tab
-2. Select "Build Capture Pipeline" workflow
-3. Download `capture-pipeline-debug` artifact
-4. Install APK on Galaxy device
+## Key Features
 
-## Repositories
+- **Lossless conversation capture**
+- **Clipboard-free architecture**
+- **Share → File → Archive** in one step
+- **Local + Cloud (GitHub) backup**
+- Optimized for **web-based LLM usage on mobile**
+- **Zero-UI workflow** (no app interaction required)
 
-| Repo | Purpose |
-|------|---------|
-| `dtslib-apk-lab` | App source code |
-| `parksy-logs` | Archive storage (private) |
+---
 
-## Known Limitations
+## What Makes This Different
 
-- Android 11+ (API 30+) required
-- Samsung OneUI tested only
-- Network timeout: 5 seconds
+There are apps that:
+- Save shared text to a file
+- Manage clipboards
+- Store notes
+- Act as LLM frontends
 
-## Troubleshooting
+There are **no apps** that intentionally target the intersection of:
 
-- **Permission denied**: Enable "Install unknown apps" for your file manager
-- **Network error**: Check internet connection, app will still save locally
-- **Cloud save fails**: Check Worker deployment and API_KEY
+- Clipboard limit bypass
+- Full LLM conversation preservation
+- File-based archiving
+- Future ML / RAG reuse
+
+**Parksy Capture is built specifically for that intersection.**
+
+---
+
+## Competitive Landscape (Summary)
+
+| Category | Existing Solutions | Limitations |
+|--------|-------------------|-------------|
+| Text file savers | Save to File, Text File Creator | Local-only, no structured archiving, no GitHub |
+| Clipboard managers | Clipboard Manager, Clipper | Still limited by clipboard memory |
+| Note apps | Google Keep, Obsidian Share | Saves notes, not raw data files |
+| LLM apps | ChatGPT, Claude | No full conversation export on mobile |
+
+---
+
+## Core Technical Insight (USP)
+
+> **Android Share Intents are not bound by clipboard memory limits.**
+
+This is a technical blind spot most users (and many developers) never exploit.
+
+Parksy Capture is built entirely around this insight.
+
+---
+
+## What Parksy Capture Is NOT
+
+- ❌ Not an AI app
+- ❌ Not a summarizer
+- ❌ Not a note-taking service
+- ❌ Not a consumer productivity app
+- ❌ Not a commercial SaaS
+
+This is a **workflow utility for heavy LLM users**.
+
+---
+
+## Who This Is For
+
+- Developers
+- Writers
+- Researchers
+- Prompt engineers
+- Anyone who treats **LLM conversations as data assets**
+
+If you've ever thought:
+> "I need this entire conversation later."
+
+This tool is for you.
+
+---
+
+## One-Line Definition
+
+> **When copy-paste fails, capture the entire conversation as a file.**
+
+---
+
+## Status
+
+- Private-first utility
+- Built for personal workflows
+- Public repository for those who understand the problem
+- Designed for long-term archiving and future machine-learning pipelines
+
+---
+
+## Philosophy
+
+Most people consume LLM output.
+
+Parksy Capture is for people who **collect it**.
