@@ -1,15 +1,5 @@
 [
   {
-    "id": "laser-pen-overlay",
-    "name": "Laser Pen Overlay",
-    "desc": "S Pen 그리기 + 손가락 스크롤 분리 (Wacom 스타일)",
-    "version": "v25.12",
-    "icon": "🖊️",
-    "cardClass": "laser",
-    "workflow": "build-laser-pen",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip"
-  },
-  {
     "id": "aiva-trimmer",
     "name": "AIVA Trimmer",
     "desc": "AIVA 음악 2분 트리밍",
@@ -28,5 +18,15 @@
     "cardClass": "capture",
     "workflow": "build-capture-pipeline",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip"
+  },
+  {
+    "id": "laser-pen-overlay",
+    "name": "Laser Pen Overlay",
+    "desc": "S Pen 그리기 + 손가락 스크롤 분리 (Wacom 스타일)",
+    "version": "v25.12",
+    "icon": "🖊️",
+    "cardClass": "laser",
+    "workflow": "build-laser-pen",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip"
   }
 ]
