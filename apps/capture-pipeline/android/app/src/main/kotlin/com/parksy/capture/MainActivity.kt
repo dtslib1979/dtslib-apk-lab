@@ -26,10 +26,19 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_SEND) {
-            if ("text/plain" == intent.type) {
-                sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+        when (intent?.action) {
+            Intent.ACTION_SEND -> {
+                if ("text/plain" == intent.type) {
+                    sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+                }
             }
+            Intent.ACTION_PROCESS_TEXT -> {
+                sharedText = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
+            }
+        }
+        // Fallback: try clipData if still null
+        if (sharedText.isNullOrEmpty()) {
+            sharedText = intent?.clipData?.getItemAt(0)?.coerceToText(this)?.toString()
         }
     }
 
