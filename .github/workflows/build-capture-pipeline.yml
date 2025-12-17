@@ -37,9 +37,25 @@ jobs:
       - name: Build Debug APK
         run: flutter build apk --debug
 
-      - name: Upload APK
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Prepare dist folder
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-debug.apk dist/ParksyCapture-debug.apk
+          cp build/app/outputs/flutter-apk/app-release.apk dist/ParksyCapture-release.apk
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: capture-pipeline-debug
-          path: apps/capture-pipeline/build/app/outputs/flutter-apk/app-debug.apk
+          name: ParksyCapture-debug
+          path: apps/capture-pipeline/dist/ParksyCapture-debug.apk
+          retention-days: 30
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ParksyCapture-release
+          path: apps/capture-pipeline/dist/ParksyCapture-release.apk
           retention-days: 30
