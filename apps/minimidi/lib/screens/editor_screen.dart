@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../audio/pcm_converter.dart';
 import '../audio/yin_detector.dart';
 import '../audio/pitch_post.dart';
+import '../audio/midi_refiner.dart';
 import '../midi/midi_writer.dart';
 
 class EditorScreen extends StatefulWidget {
@@ -31,6 +32,12 @@ class _EditorScreenState extends State<EditorScreen> {
   // MIDI preview state
   List<NoteEvent>? _midiPreview;
   String? _midiStatus;
+
+  // Stage 2B options
+  bool _stage2bEnabled = true; // Default ON
+  bool _keySafeEnabled = false; // Default OFF
+  int _detectedKeyRoot = 0;
+  ScaleType _detectedScale = ScaleType.major;
 
   @override
   void initState() {
@@ -63,7 +70,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _outPt = _inPt! + Duration(seconds: _preset);
         if (_outPt! > _dur) _outPt = _dur;
       }
-      _midiPreview = null; // Reset preview when marks change
+      _midiPreview = null;
     });
   }
 
@@ -74,7 +81,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _inPt = _outPt! - Duration(seconds: _preset);
         if (_inPt!.isNegative) _inPt = Duration.zero;
       }
-      _midiPreview = null; // Reset preview when marks change
+      _midiPreview = null;
     });
   }
 
@@ -85,7 +92,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _outPt = _inPt! + Duration(seconds: s);
         if (_outPt! > _dur) _outPt = _dur;
       }
-      _midiPreview = null; // Reset preview when marks change
+      _midiPreview = null;
     });
   }
 
@@ -107,7 +114,6 @@ class _EditorScreenState extends State<EditorScreen> {
     final out = '${dir.path}/${ts}_${src}_IN${inS}_OUT$outS.wav';
     final dur = (_outPt! - _inPt!).inMilliseconds / 1000.0;
 
-    // fade 10ms in/out to avoid clicks
     final cmd = '-y -ss ${_inPt!.inMilliseconds / 1000} '
         '-i "${widget.path}" '
         '-t $dur '
@@ -128,7 +134,6 @@ class _EditorScreenState extends State<EditorScreen> {
     await Share.shareXFiles([XFile(out)]);
   }
 
-  /// Export selected region to MIDI
   Future<void> _exportMidi() async {
     if (_inPt == null || _outPt == null) return;
     setState(() {
@@ -168,13 +173,37 @@ class _EditorScreenState extends State<EditorScreen> {
       // Step 3: YIN pitch detection
       final pitchFrames = YinDetector.detectPitch(samples);
 
-      setState(() => _midiStatus = 'Post-processing...');
+      setState(() => _midiStatus = 'Stage 2A: Post-processing...');
 
-      // Step 4: Post-processing (4 rules)
-      final notes = PitchPostProcessor.process(pitchFrames);
+      // Step 4: Stage 2A Post-processing (4 rules)
+      var notes = PitchPostProcessor.process(pitchFrames);
 
       if (notes.isEmpty) {
         throw Exception('No melody detected in the selected region');
+      }
+
+      // Step 5: Stage 2B Refinement (if enabled)
+      if (_stage2bEnabled) {
+        setState(() => _midiStatus = 'Stage 2B: Refining...');
+
+        // Detect key if key-safe is enabled
+        if (_keySafeEnabled) {
+          final detected = MidiRefiner.detectKey(notes);
+          _detectedKeyRoot = detected.$1;
+          _detectedScale = detected.$2;
+        }
+
+        final options = RefineOptions(
+          densityControl: true,
+          rhythmSnap: true,
+          snapResolution: SnapResolution.sixteenth,
+          lengthNormalization: true,
+          keySafe: _keySafeEnabled,
+          keyRoot: _detectedKeyRoot,
+          keyScale: _detectedScale,
+        );
+
+        notes = MidiRefiner.refine(notes, options);
       }
 
       setState(() {
@@ -182,8 +211,9 @@ class _EditorScreenState extends State<EditorScreen> {
         _midiStatus = 'Writing MIDI...';
       });
 
-      // Step 5: Write MIDI file
-      final midiPath = '${dir.path}/${ts}_${src}_IN${inS}_OUT$outS.mid';
+      // Step 6: Write MIDI file
+      final suffix = _stage2bEnabled ? '_2B' : '_2A';
+      final midiPath = '${dir.path}/${ts}_${src}_IN${inS}_OUT$outS$suffix.mid';
       final result = await MidiWriter.writeToFile(notes, midiPath);
 
       if (result == null) {
@@ -196,9 +226,11 @@ class _EditorScreenState extends State<EditorScreen> {
       });
 
       if (!mounted) return;
+
+      final stageLabel = _stage2bEnabled ? '2B' : '2A';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('MIDI: ${notes.length} notes exported'),
+          content: Text('MIDI ($stageLabel): ${notes.length} notes exported'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -234,7 +266,7 @@ class _EditorScreenState extends State<EditorScreen> {
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
@@ -296,6 +328,11 @@ class _EditorScreenState extends State<EditorScreen> {
               }).toList(),
             ),
 
+            const SizedBox(height: 16),
+
+            // Stage 2B Options Card
+            _buildOptionsCard(),
+
             // MIDI Preview
             if (_midiPreview != null) ...[
               const SizedBox(height: 16),
@@ -315,7 +352,7 @@ class _EditorScreenState extends State<EditorScreen> {
               ),
             ],
 
-            const Spacer(),
+            const SizedBox(height: 24),
 
             // Export buttons
             if (_exporting || _exportingMidi)
@@ -347,9 +384,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       onPressed:
                           (_inPt != null && _outPt != null) ? _exportMidi : null,
                       icon: const Icon(Icons.piano, size: 24),
-                      label: const Text(
-                        'Export MIDI',
-                        style: TextStyle(fontSize: 18),
+                      label: Text(
+                        _stage2bEnabled ? 'Export MIDI (2B)' : 'Export MIDI (2A)',
+                        style: const TextStyle(fontSize: 18),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
@@ -362,6 +399,84 @@ class _EditorScreenState extends State<EditorScreen> {
             const SizedBox(height: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildOptionsCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stage 2B Toggle
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Stage 2B: DAW-Ready',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Grid snap, density control, overlap fix',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _stage2bEnabled,
+                onChanged: (v) => setState(() {
+                  _stage2bEnabled = v;
+                  _midiPreview = null;
+                }),
+                activeColor: Colors.deepPurple,
+              ),
+            ],
+          ),
+
+          // Key-Safe Toggle (only visible when 2B is enabled)
+          if (_stage2bEnabled) ...[
+            const Divider(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Key-Safe',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        _keySafeEnabled && _midiPreview != null
+                            ? 'Auto-detected: ${NoteNames.keyName(_detectedKeyRoot, _detectedScale)}'
+                            : 'Snap to Major/Minor scale',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _keySafeEnabled,
+                  onChanged: (v) => setState(() {
+                    _keySafeEnabled = v;
+                    _midiPreview = null;
+                  }),
+                  activeColor: Colors.amber,
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -414,7 +529,7 @@ class _EditorScreenState extends State<EditorScreen> {
               const Icon(Icons.piano, size: 18, color: Colors.deepPurple),
               const SizedBox(width: 8),
               Text(
-                'MIDI Preview',
+                'MIDI Preview ${_stage2bEnabled ? "(2B)" : "(2A)"}',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.deepPurple[200],
@@ -426,8 +541,9 @@ class _EditorScreenState extends State<EditorScreen> {
           Text('Notes: $noteCount'),
           Text(
               'Range: ${MidiWriter.midiNoteName(midiRange[0])} - ${MidiWriter.midiNoteName(midiRange[1])}'),
+          if (_keySafeEnabled && _stage2bEnabled)
+            Text('Key: ${NoteNames.keyName(_detectedKeyRoot, _detectedScale)}'),
           const SizedBox(height: 8),
-          // Simple note visualization
           SizedBox(
             height: 40,
             child: CustomPaint(
@@ -445,7 +561,6 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 }
 
-/// Simple painter to visualize MIDI notes
 class _NotesPainter extends CustomPainter {
   final List<NoteEvent> notes;
   final int midiMin;
