@@ -31,15 +31,10 @@ class ShareHandler extends StatefulWidget {
 class _ShareHandlerState extends State<ShareHandler> {
   static const platform = MethodChannel('com.parksy.capture/share');
   
-  // Build-time injection via --dart-define
-  static const workerUrl = String.fromEnvironment(
-    'WORKER_URL',
-    defaultValue: '',
-  );
-  static const apiKey = String.fromEnvironment(
-    'CAPTURE_API_KEY',
-    defaultValue: '',
-  );
+  // Build-time injection via --dart-define (NO hardcoded values)
+  static const workerUrl = String.fromEnvironment('PARKSY_WORKER_URL', defaultValue: '');
+  static const apiKey = String.fromEnvironment('PARKSY_API_KEY', defaultValue: '');
+  static final cloudEnabled = workerUrl.isNotEmpty && apiKey.isNotEmpty;
   
   @override
   void initState() {
@@ -59,21 +54,23 @@ class _ShareHandlerState extends State<ShareHandler> {
       // Step 1: Local save (MUST succeed)
       final localOk = await _saveLocal(text);
       if (!localOk) {
-        _showToast('Error! Save Failed ❌');
+        _showToast('Save Failed ❌');
         _finish();
         return;
       }
       
-      // Step 2: Cloud save (MAY fail, skip if not configured)
-      bool cloudOk = false;
-      if (workerUrl.isNotEmpty && apiKey.isNotEmpty) {
-        cloudOk = await _saveCloud(text);
+      // Step 2: Cloud save (skip if not configured)
+      if (!cloudEnabled) {
+        _showToast('Saved locally ✅');
+        _finish();
+        return;
       }
       
+      final cloudOk = await _saveCloud(text);
       if (cloudOk) {
         _showToast('Saved Local & Cloud 🚀');
       } else {
-        _showToast('Saved Local ✅');
+        _showToast('Saved locally ✅ (cloud failed)');
       }
       
       _finish();
