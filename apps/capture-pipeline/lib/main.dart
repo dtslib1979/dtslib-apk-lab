@@ -31,9 +31,15 @@ class ShareHandler extends StatefulWidget {
 class _ShareHandlerState extends State<ShareHandler> {
   static const platform = MethodChannel('com.parksy.capture/share');
   
-  // TODO: Worker 배포 후 URL 설정
-  static const workerUrl = 'https://parksy-capture-worker.workers.dev';
-  static const apiKey = 'CHANGE_ME'; // Worker에 설정한 API_KEY
+  // Build-time injection via --dart-define
+  static const workerUrl = String.fromEnvironment(
+    'WORKER_URL',
+    defaultValue: '',
+  );
+  static const apiKey = String.fromEnvironment(
+    'CAPTURE_API_KEY',
+    defaultValue: '',
+  );
   
   @override
   void initState() {
@@ -58,13 +64,16 @@ class _ShareHandlerState extends State<ShareHandler> {
         return;
       }
       
-      // Step 2: Cloud save (MAY fail)
-      final cloudOk = await _saveCloud(text);
+      // Step 2: Cloud save (MAY fail, skip if not configured)
+      bool cloudOk = false;
+      if (workerUrl.isNotEmpty && apiKey.isNotEmpty) {
+        cloudOk = await _saveCloud(text);
+      }
       
       if (cloudOk) {
         _showToast('Saved Local & Cloud 🚀');
       } else {
-        _showToast('Saved Local Only ✅');
+        _showToast('Saved Local ✅');
       }
       
       _finish();
