@@ -158,7 +158,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<_OnboardingPage> _pages = [
     _OnboardingPage(
-      icon: Icons.content_copy_off,
+      icon: Icons.block,
       title: 'Clipboard Fails on Mobile',
       description: 'Long LLM conversations get truncated when you copy them.\nClipboard has memory limits.',
       color: Color(0xFFF85149),
