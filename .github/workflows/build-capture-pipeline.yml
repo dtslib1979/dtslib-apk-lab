@@ -18,6 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Secret leak guard
+        run: |
+          cd ../..
+          if grep -rE "CHANGE_ME|ghp_|apiKey\s*=\s*'[^']|workerUrl\s*=\s*'http" --include="*.dart" --include="*.kt" --include="*.js" apps/capture-pipeline/; then
+            echo "::error::Secret-like string found in source code!"
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets detected"
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -37,8 +46,8 @@ jobs:
       - name: Build Debug APK
         run: |
           flutter build apk --debug \
-            --dart-define=WORKER_URL=${{ secrets.CAPTURE_WORKER_URL }} \
-            --dart-define=CAPTURE_API_KEY=${{ secrets.CAPTURE_API_KEY }}
+            --dart-define=PARKSY_WORKER_URL=${{ secrets.PARKSY_WORKER_URL }} \
+            --dart-define=PARKSY_API_KEY=${{ secrets.PARKSY_API_KEY }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
