@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.dtslib.aiva_trimmer"
+    namespace "com.dtslib.minimidi"
     compileSdk 34
     ndkVersion "26.1.10909125"
 
@@ -41,7 +41,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.dtslib.aiva_trimmer"
+        applicationId "com.dtslib.minimidi"
         minSdk 24
         targetSdk 34
         versionCode flutterVersionCode.toInteger()

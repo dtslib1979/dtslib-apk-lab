@@ -1,13 +1,13 @@
 [
   {
-    "id": "aiva-trimmer",
-    "name": "AIVA Trimmer",
-    "desc": "AIVA 음악 2분 트리밍",
-    "version": "v1.0.1",
-    "icon": "✂️",
-    "cardClass": "aiva",
-    "workflow": "build-aiva-trimmer",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip"
+    "id": "minimidi",
+    "name": "MiniMidi",
+    "desc": "오디오 → 멜로디 MIDI 변환",
+    "version": "v2.0.0",
+    "icon": "🎹",
+    "cardClass": "minimidi",
+    "workflow": "build-minimidi",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-minimidi/main/minimidi-debug.zip"
   },
   {
     "id": "capture-pipeline",

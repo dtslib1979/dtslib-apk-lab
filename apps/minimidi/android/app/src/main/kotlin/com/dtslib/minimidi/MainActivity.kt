@@ -1,4 +1,4 @@
-package com.dtslib.aiva_trimmer
+package com.dtslib.minimidi
 
 import io.flutter.embedding.android.FlutterActivity
 

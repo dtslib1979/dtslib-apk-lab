@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 
 void main() {
-  runApp(const AivaTrimmerApp());
+  runApp(const MiniMidiApp());
 }
 
-class AivaTrimmerApp extends StatelessWidget {
-  const AivaTrimmerApp({super.key});
+class MiniMidiApp extends StatelessWidget {
+  const MiniMidiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AIVA Trimmer',
+      title: 'MiniMidi',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.deepPurple,
