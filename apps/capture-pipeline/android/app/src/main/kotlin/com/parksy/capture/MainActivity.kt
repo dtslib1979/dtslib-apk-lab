@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -14,6 +15,7 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.parksy.capture/share"
     private var sharedText: String? = null
+    private var isShareIntent: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,14 +32,19 @@ class MainActivity : FlutterActivity() {
             Intent.ACTION_SEND -> {
                 if ("text/plain" == intent.type) {
                     sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+                    isShareIntent = true
                 }
             }
             Intent.ACTION_PROCESS_TEXT -> {
                 sharedText = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
+                isShareIntent = true
+            }
+            else -> {
+                isShareIntent = false
             }
         }
         // Fallback: try clipData if still null
-        if (sharedText.isNullOrEmpty()) {
+        if (isShareIntent && sharedText.isNullOrEmpty()) {
             sharedText = intent?.clipData?.getItemAt(0)?.coerceToText(this)?.toString()
         }
     }
@@ -48,6 +55,9 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "isShareIntent" -> {
+                        result.success(isShareIntent)
+                    }
                     "getSharedText" -> {
                         result.success(sharedText)
                     }
@@ -57,9 +67,79 @@ class MainActivity : FlutterActivity() {
                         val success = saveFile(filename, content)
                         result.success(success)
                     }
+                    "getLogFiles" -> {
+                        val files = getLogFiles()
+                        result.success(files)
+                    }
+                    "readLogFile" -> {
+                        val filename = call.argument<String>("filename") ?: ""
+                        val content = readLogFile(filename)
+                        result.success(content)
+                    }
+                    "shareText" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        val title = call.argument<String>("title") ?: "Share"
+                        shareText(text, title)
+                        result.success(true)
+                    }
+                    "deleteLogFile" -> {
+                        val filename = call.argument<String>("filename") ?: ""
+                        val success = deleteLogFile(filename)
+                        result.success(success)
+                    }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun getLogsDir(): File {
+        return File(
+            Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS
+            ), "parksy-logs"
+        )
+    }
+
+    private fun getLogFiles(): List<Map<String, Any>> {
+        val dir = getLogsDir()
+        if (!dir.exists()) return emptyList()
+        
+        return dir.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(".md") }
+            ?.sortedByDescending { it.lastModified() }
+            ?.map { file ->
+                mapOf(
+                    "name" to file.name,
+                    "size" to file.length(),
+                    "modified" to file.lastModified()
+                )
+            } ?: emptyList()
+    }
+
+    private fun readLogFile(filename: String): String? {
+        return try {
+            val file = File(getLogsDir(), filename)
+            if (file.exists()) file.readText() else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun deleteLogFile(filename: String): Boolean {
+        return try {
+            val file = File(getLogsDir(), filename)
+            if (file.exists()) file.delete() else false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun shareText(text: String, title: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(intent, title))
     }
 
     private fun saveFile(filename: String, content: String): Boolean {
@@ -83,11 +163,7 @@ class MainActivity : FlutterActivity() {
                 } ?: false
             } else {
                 // Android 9 이하: 직접 파일 저장
-                val dir = File(
-                    Environment.getExternalStoragePublicDirectory(
-                        Environment.DIRECTORY_DOWNLOADS
-                    ), "parksy-logs"
-                )
+                val dir = getLogsDir()
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, filename)
                 file.writeText(content)
