@@ -1,11 +1,9 @@
 package com.parksy.capture
 
-import android.content.ContentValues
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -13,80 +11,62 @@ import java.io.File
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.parksy.capture/share"
-    private var sharedText: String? = null
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        handleIntent(intent)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        handleIntent(intent)
-    }
-
-    private fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_SEND) {
-            if ("text/plain" == intent.type) {
-                sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
-            }
-        }
-    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "getSharedText" -> {
-                        result.success(sharedText)
+                    "openDownloads" -> {
+                        openDownloadsFolder()
+                        result.success(true)
                     }
-                    "saveToDownloads" -> {
-                        val filename = call.argument<String>("filename") ?: ""
-                        val content = call.argument<String>("content") ?: ""
-                        val success = saveFile(filename, content)
-                        result.success(success)
+                    "shareText" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        shareText(text)
+                        result.success(true)
                     }
                     else -> result.notImplemented()
                 }
             }
     }
 
-    private fun saveFile(filename: String, content: String): Boolean {
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Android 10+ : MediaStore API
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, filename)
-                    put(MediaStore.Downloads.MIME_TYPE, "text/markdown")
-                    put(MediaStore.Downloads.RELATIVE_PATH, 
-                        Environment.DIRECTORY_DOWNLOADS + "/parksy-logs")
-                }
-                val uri = contentResolver.insert(
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
-                )
-                uri?.let {
-                    contentResolver.openOutputStream(it)?.use { os ->
-                        os.write(content.toByteArray())
-                    }
-                    true
-                } ?: false
-            } else {
-                // Android 9 이하: 직접 파일 저장
-                val dir = File(
-                    Environment.getExternalStoragePublicDirectory(
-                        Environment.DIRECTORY_DOWNLOADS
-                    ), "parksy-logs"
-                )
-                if (!dir.exists()) dir.mkdirs()
-                val file = File(dir, filename)
-                file.writeText(content)
-                true
+    private fun openDownloadsFolder() {
+        try {
+            // Try to open file manager to Downloads/parksy-logs
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                val path = Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_DOWNLOADS
+                ).path + "/parksy-logs"
+                setDataAndType(android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary:Download%2Fparksy-logs"), "vnd.android.document/directory")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
+            startActivity(intent)
         } catch (e: Exception) {
-            e.printStackTrace()
-            false
+            // Fallback: open Downloads folder
+            try {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary:Download"), "vnd.android.document/directory")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(intent)
+            } catch (e2: Exception) {
+                // Last fallback: open any file manager
+                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    type = "*/*"
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(Intent.createChooser(intent, "Open Downloads"))
+            }
         }
+    }
+
+    private fun shareText(text: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(intent, "Share via"))
     }
 }

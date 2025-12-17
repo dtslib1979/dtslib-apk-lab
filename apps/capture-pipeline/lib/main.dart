@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
-import 'dart:convert';
 
 void main() {
   runApp(const CaptureApp());
@@ -15,132 +12,240 @@ class CaptureApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Parksy Capture',
-      theme: ThemeData.dark(),
-      home: const ShareHandler(),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF1A1A1A),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF4CAF50),
+          secondary: Color(0xFF81C784),
+        ),
+      ),
+      home: const HelpScreen(),
     );
   }
 }
 
-class ShareHandler extends StatefulWidget {
-  const ShareHandler({super.key});
-
-  @override
-  State<ShareHandler> createState() => _ShareHandlerState();
-}
-
-class _ShareHandlerState extends State<ShareHandler> {
-  static const platform = MethodChannel('com.parksy.capture/share');
-  
-  // TODO: Worker 배포 후 URL 설정
-  static const workerUrl = 'https://parksy-capture-worker.workers.dev';
-  static const apiKey = 'CHANGE_ME'; // Worker에 설정한 API_KEY
-  
-  @override
-  void initState() {
-    super.initState();
-    _handleShare();
-  }
-
-  Future<void> _handleShare() async {
-    try {
-      final text = await platform.invokeMethod<String>('getSharedText');
-      if (text == null || text.isEmpty) {
-        _showToast('No text received');
-        _finish();
-        return;
-      }
-      
-      // Step 1: Local save (MUST succeed)
-      final localOk = await _saveLocal(text);
-      if (!localOk) {
-        _showToast('Error! Save Failed ❌');
-        _finish();
-        return;
-      }
-      
-      // Step 2: Cloud save (MAY fail)
-      final cloudOk = await _saveCloud(text);
-      
-      if (cloudOk) {
-        _showToast('Saved Local & Cloud 🚀');
-      } else {
-        _showToast('Saved Local Only ✅');
-      }
-      
-      _finish();
-    } catch (e) {
-      _showToast('Error: $e');
-      _finish();
-    }
-  }
-
-  Future<bool> _saveLocal(String text) async {
-    try {
-      final ts = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final fname = 'ParksyLog_$ts.md';
-      final content = _toMarkdown(text);
-      
-      final result = await platform.invokeMethod<bool>(
-        'saveToDownloads',
-        {'filename': fname, 'content': content},
-      );
-      return result ?? false;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  Future<bool> _saveCloud(String text) async {
-    try {
-      final ts = DateTime.now().toIso8601String();
-      final res = await http.post(
-        Uri.parse(workerUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': apiKey,
-        },
-        body: jsonEncode({
-          'text': text,
-          'source': 'android',
-          'ts': ts,
-        }),
-      ).timeout(const Duration(seconds: 5));
-      
-      return res.statusCode == 200 || res.statusCode == 201;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  String _toMarkdown(String text) {
-    final ts = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
-    return '''---
-date: $ts
-source: android-share
----
-
-$text
-''';
-  }
-
-  void _showToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
-    );
-  }
-
-  void _finish() {
-    Future.delayed(const Duration(seconds: 2), () {
-      SystemNavigator.pop();
-    });
-  }
+class HelpScreen extends StatelessWidget {
+  const HelpScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 32),
+
+              // Title
+              const Text(
+                'Parksy Capture',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'How to use',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[400],
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              // Instructions
+              _buildStep('1', 'In any app or web page, highlight text'),
+              const SizedBox(height: 16),
+              _buildStep('2', 'Tap Share'),
+              const SizedBox(height: 16),
+              _buildStep('3', 'Choose "Parksy Capture"'),
+              const SizedBox(height: 16),
+              _buildStep('4', 'Text is saved to Downloads\n(and GitHub if configured)'),
+
+              const SizedBox(height: 40),
+
+              // Warning
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Do NOT use page link share.\nAlways select text first.',
+                        style: TextStyle(
+                          color: Colors.orange[200],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.folder_open,
+                      label: 'Open Downloads',
+                      onTap: () => _openDownloads(context),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.share,
+                      label: 'Test Share',
+                      onTap: () => _shareTestText(context),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Version
+              Center(
+                child: Text(
+                  'v2.0.0 • Clipboard-free capture',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _buildStep(String number, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0xFF4CAF50).withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: const TextStyle(
+                color: Color(0xFF4CAF50),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openDownloads(BuildContext context) {
+    // Android Intent to open Downloads folder
+    const platform = MethodChannel('com.parksy.capture/share');
+    platform.invokeMethod('openDownloads').catchError((e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Open Downloads/parksy-logs manually')),
+      );
+    });
+  }
+
+  void _shareTestText(BuildContext context) {
+    final testText = '''This is a test capture from Parksy Capture.
+
+If you see this file saved in Downloads/parksy-logs, the app is working correctly.
+
+Timestamp: ${DateTime.now().toIso8601String()}
+''';
+
+    Share.share(testText, context);
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withOpacity(0.05),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white70, size: 24),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class Share {
+  static void share(String text, BuildContext context) {
+    const platform = MethodChannel('com.parksy.capture/share');
+    platform.invokeMethod('shareText', {'text': text}).catchError((e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Share failed')),
+      );
+    });
   }
 }
