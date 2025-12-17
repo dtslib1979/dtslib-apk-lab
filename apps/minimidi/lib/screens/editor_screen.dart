@@ -9,6 +9,7 @@ import '../audio/yin_detector.dart';
 import '../audio/pitch_post.dart';
 import '../audio/midi_refiner.dart';
 import '../midi/midi_writer.dart';
+import '../midi/midi_audit_player.dart';
 
 class EditorScreen extends StatefulWidget {
   final String path;
@@ -33,16 +34,42 @@ class _EditorScreenState extends State<EditorScreen> {
   List<NoteEvent>? _midiPreview;
   String? _midiStatus;
 
+  // Stage 2A/2B notes for audit
+  List<NoteEvent>? _notes2A;
+  List<NoteEvent>? _notes2B;
+
   // Stage 2B options
-  bool _stage2bEnabled = true; // Default ON
-  bool _keySafeEnabled = false; // Default OFF
+  bool _stage2bEnabled = true;
+  bool _keySafeEnabled = false;
   int _detectedKeyRoot = 0;
   ScaleType _detectedScale = ScaleType.major;
+
+  // Stage 2C: MIDI Audit Player
+  final MidiAuditPlayer _auditPlayer = MidiAuditPlayer();
+  bool _auditPlaying = false;
+  bool _audit2B = true; // true = 2B, false = 2A
+  bool _auditLoop = false;
+  double _auditPos = 0;
+  double _auditDur = 0;
 
   @override
   void initState() {
     super.initState();
     _init();
+    _setupAuditListeners();
+  }
+
+  void _setupAuditListeners() {
+    _auditPlayer.positionStream.listen((pos) {
+      if (mounted) setState(() => _auditPos = pos);
+    });
+    _auditPlayer.stateStream.listen((state) {
+      if (mounted) {
+        setState(() {
+          _auditPlaying = state == PlayerState.playing;
+        });
+      }
+    });
   }
 
   Future<void> _init() async {
@@ -60,6 +87,7 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   void dispose() {
     _player.dispose();
+    _auditPlayer.dispose();
     super.dispose();
   }
 
@@ -70,7 +98,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _outPt = _inPt! + Duration(seconds: _preset);
         if (_outPt! > _dur) _outPt = _dur;
       }
-      _midiPreview = null;
+      _clearMidiData();
     });
   }
 
@@ -81,8 +109,15 @@ class _EditorScreenState extends State<EditorScreen> {
         _inPt = _outPt! - Duration(seconds: _preset);
         if (_inPt!.isNegative) _inPt = Duration.zero;
       }
-      _midiPreview = null;
+      _clearMidiData();
     });
+  }
+
+  void _clearMidiData() {
+    _midiPreview = null;
+    _notes2A = null;
+    _notes2B = null;
+    _auditPlayer.stop();
   }
 
   void _setPreset(int s) {
@@ -92,13 +127,19 @@ class _EditorScreenState extends State<EditorScreen> {
         _outPt = _inPt! + Duration(seconds: s);
         if (_outPt! > _dur) _outPt = _dur;
       }
-      _midiPreview = null;
+      _clearMidiData();
     });
   }
 
   String _fmt(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  String _fmtSec(double sec) {
+    final m = (sec ~/ 60).toString().padLeft(2, '0');
+    final s = (sec % 60).toInt().toString().padLeft(2, '0');
     return '$m:$s';
   }
 
@@ -148,7 +189,6 @@ class _EditorScreenState extends State<EditorScreen> {
       final inS = _inPt!.inSeconds;
       final outS = _outPt!.inSeconds;
 
-      // Step 1: Extract trimmed audio to temp WAV
       final tempWav = '${dir.path}/temp_trim.wav';
       final dur = (_outPt! - _inPt!).inMilliseconds / 1000.0;
 
@@ -162,7 +202,6 @@ class _EditorScreenState extends State<EditorScreen> {
 
       setState(() => _midiStatus = 'Converting to PCM...');
 
-      // Step 2: Convert to mono PCM
       final samples = await PcmConverter.convertToMonoPcm(tempWav);
       if (samples == null) {
         throw Exception('Failed to convert audio to PCM');
@@ -170,48 +209,50 @@ class _EditorScreenState extends State<EditorScreen> {
 
       setState(() => _midiStatus = 'Detecting pitch (YIN)...');
 
-      // Step 3: YIN pitch detection
       final pitchFrames = YinDetector.detectPitch(samples);
 
       setState(() => _midiStatus = 'Stage 2A: Post-processing...');
 
-      // Step 4: Stage 2A Post-processing (4 rules)
-      var notes = PitchPostProcessor.process(pitchFrames);
+      // Stage 2A
+      final notes2A = PitchPostProcessor.process(pitchFrames);
 
-      if (notes.isEmpty) {
+      if (notes2A.isEmpty) {
         throw Exception('No melody detected in the selected region');
       }
 
-      // Step 5: Stage 2B Refinement (if enabled)
-      if (_stage2bEnabled) {
-        setState(() => _midiStatus = 'Stage 2B: Refining...');
+      _notes2A = notes2A;
 
-        // Detect key if key-safe is enabled
-        if (_keySafeEnabled) {
-          final detected = MidiRefiner.detectKey(notes);
-          _detectedKeyRoot = detected.$1;
-          _detectedScale = detected.$2;
-        }
+      // Stage 2B
+      setState(() => _midiStatus = 'Stage 2B: Refining...');
 
-        final options = RefineOptions(
-          densityControl: true,
-          rhythmSnap: true,
-          snapResolution: SnapResolution.sixteenth,
-          lengthNormalization: true,
-          keySafe: _keySafeEnabled,
-          keyRoot: _detectedKeyRoot,
-          keyScale: _detectedScale,
-        );
-
-        notes = MidiRefiner.refine(notes, options);
+      if (_keySafeEnabled) {
+        final detected = MidiRefiner.detectKey(notes2A);
+        _detectedKeyRoot = detected.$1;
+        _detectedScale = detected.$2;
       }
 
-      setState(() {
-        _midiPreview = notes;
-        _midiStatus = 'Writing MIDI...';
-      });
+      final options = RefineOptions(
+        densityControl: true,
+        rhythmSnap: true,
+        snapResolution: SnapResolution.sixteenth,
+        lengthNormalization: true,
+        keySafe: _keySafeEnabled,
+        keyRoot: _detectedKeyRoot,
+        keyScale: _detectedScale,
+      );
 
-      // Step 6: Write MIDI file
+      final notes2B = MidiRefiner.refine(notes2A, options);
+      _notes2B = notes2B;
+
+      // Set preview based on current toggle
+      final notes = _stage2bEnabled ? notes2B : notes2A;
+      _midiPreview = notes;
+
+      // Load into audit player
+      _loadAuditNotes();
+
+      setState(() => _midiStatus = 'Writing MIDI...');
+
       final suffix = _stage2bEnabled ? '_2B' : '_2A';
       final midiPath = '${dir.path}/${ts}_${src}_IN${inS}_OUT$outS$suffix.mid';
       final result = await MidiWriter.writeToFile(notes, midiPath);
@@ -252,6 +293,24 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  void _loadAuditNotes() {
+    final notes = _audit2B ? _notes2B : _notes2A;
+    if (notes != null && notes.isNotEmpty) {
+      _auditPlayer.loadNotes(notes);
+      _auditPlayer.setLoop(_auditLoop);
+      _auditDur = _auditPlayer.totalDuration;
+    }
+  }
+
+  void _toggleAuditVersion() {
+    _auditPlayer.stop();
+    setState(() {
+      _audit2B = !_audit2B;
+      _midiPreview = _audit2B ? _notes2B : _notes2A;
+    });
+    _loadAuditNotes();
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = widget.path.split('/').last;
@@ -261,10 +320,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          name,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(name, overflow: TextOverflow.ellipsis),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -311,10 +367,7 @@ class _EditorScreenState extends State<EditorScreen> {
             const SizedBox(height: 12),
             // Clip duration
             if (_inPt != null && _outPt != null)
-              Text(
-                'Clip: ${_fmt(clipDur)}',
-                style: const TextStyle(fontSize: 18),
-              ),
+              Text('Clip: ${_fmt(clipDur)}', style: const TextStyle(fontSize: 18)),
             const SizedBox(height: 12),
             // Preset chips
             Wrap(
@@ -333,10 +386,12 @@ class _EditorScreenState extends State<EditorScreen> {
             // Stage 2B Options Card
             _buildOptionsCard(),
 
-            // MIDI Preview
+            // MIDI Preview + Audit Player
             if (_midiPreview != null) ...[
               const SizedBox(height: 16),
               _buildMidiPreview(),
+              const SizedBox(height: 12),
+              _buildAuditPlayer(),
             ],
 
             // Status message
@@ -345,9 +400,7 @@ class _EditorScreenState extends State<EditorScreen> {
               Text(
                 _midiStatus!,
                 style: TextStyle(
-                  color: _midiStatus!.startsWith('Error')
-                      ? Colors.red
-                      : Colors.grey,
+                  color: _midiStatus!.startsWith('Error') ? Colors.red : Colors.grey,
                 ),
               ),
             ],
@@ -360,29 +413,22 @@ class _EditorScreenState extends State<EditorScreen> {
             else
               Column(
                 children: [
-                  // WAV Export button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed:
-                          (_inPt != null && _outPt != null) ? _export : null,
+                      onPressed: (_inPt != null && _outPt != null) ? _export : null,
                       icon: const Icon(Icons.audio_file, size: 24),
-                      label: const Text(
-                        'Export WAV',
-                        style: TextStyle(fontSize: 18),
-                      ),
+                      label: const Text('Export WAV', style: TextStyle(fontSize: 18)),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // MIDI Export button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed:
-                          (_inPt != null && _outPt != null) ? _exportMidi : null,
+                      onPressed: (_inPt != null && _outPt != null) ? _exportMidi : null,
                       icon: const Icon(Icons.piano, size: 24),
                       label: Text(
                         _stage2bEnabled ? 'Export MIDI (2B)' : 'Export MIDI (2A)',
@@ -403,6 +449,134 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  /// Stage 2C: MIDI Audit Player UI
+  Widget _buildAuditPlayer() {
+    final hasNotes = (_notes2A != null && _notes2A!.isNotEmpty) ||
+        (_notes2B != null && _notes2B!.isNotEmpty);
+
+    if (!hasNotes) return const SizedBox();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.teal.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.teal.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              const Icon(Icons.headphones, size: 18, color: Colors.teal),
+              const SizedBox(width: 8),
+              Text(
+                'MIDI Audit',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal[200]),
+              ),
+              const Spacer(),
+              // 2A/2B Toggle
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildAuditToggleButton('2A', !_audit2B),
+                    _buildAuditToggleButton('2B', _audit2B),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Position display
+          Text(
+            '${_fmtSec(_auditPos)} / ${_fmtSec(_auditDur)}',
+            style: const TextStyle(fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+
+          // Progress bar
+          LinearProgressIndicator(
+            value: _auditDur > 0 ? (_auditPos / _auditDur).clamp(0, 1) : 0,
+            backgroundColor: Colors.grey[800],
+            valueColor: const AlwaysStoppedAnimation(Colors.teal),
+          ),
+          const SizedBox(height: 12),
+
+          // Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Loop toggle
+              IconButton(
+                icon: Icon(
+                  Icons.repeat,
+                  color: _auditLoop ? Colors.teal : Colors.grey,
+                ),
+                onPressed: () {
+                  setState(() => _auditLoop = !_auditLoop);
+                  _auditPlayer.setLoop(_auditLoop);
+                },
+                tooltip: 'Loop',
+              ),
+              const SizedBox(width: 8),
+              // Stop
+              IconButton(
+                icon: const Icon(Icons.stop),
+                onPressed: _auditPlayer.stop,
+                tooltip: 'Stop',
+              ),
+              // Play/Pause
+              IconButton(
+                iconSize: 48,
+                icon: Icon(
+                  _auditPlaying ? Icons.pause_circle : Icons.play_circle,
+                  color: Colors.teal,
+                ),
+                onPressed: () {
+                  if (_auditPlaying) {
+                    _auditPlayer.pause();
+                  } else {
+                    _auditPlayer.play();
+                  }
+                },
+              ),
+              // Placeholder for symmetry
+              const SizedBox(width: 48),
+              const SizedBox(width: 8),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAuditToggleButton(String label, bool selected) {
+    return GestureDetector(
+      onTap: selected ? null : _toggleAuditVersion,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? Colors.teal : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.grey,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildOptionsCard() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -414,21 +588,15 @@ class _EditorScreenState extends State<EditorScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Stage 2B Toggle
           Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Stage 2B: DAW-Ready',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'Grid snap, density control, overlap fix',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                    ),
+                    const Text('Stage 2B: DAW-Ready', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('Grid snap, density control, overlap fix',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[400])),
                   ],
                 ),
               ),
@@ -436,14 +604,12 @@ class _EditorScreenState extends State<EditorScreen> {
                 value: _stage2bEnabled,
                 onChanged: (v) => setState(() {
                   _stage2bEnabled = v;
-                  _midiPreview = null;
+                  _clearMidiData();
                 }),
                 activeColor: Colors.deepPurple,
               ),
             ],
           ),
-
-          // Key-Safe Toggle (only visible when 2B is enabled)
           if (_stage2bEnabled) ...[
             const Divider(height: 16),
             Row(
@@ -452,10 +618,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Key-Safe',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      const Text('Key-Safe', style: TextStyle(fontWeight: FontWeight.bold)),
                       Text(
                         _keySafeEnabled && _midiPreview != null
                             ? 'Auto-detected: ${NoteNames.keyName(_detectedKeyRoot, _detectedScale)}'
@@ -469,7 +632,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   value: _keySafeEnabled,
                   onChanged: (v) => setState(() {
                     _keySafeEnabled = v;
-                    _midiPreview = null;
+                    _clearMidiData();
                   }),
                   activeColor: Colors.amber,
                 ),
@@ -529,19 +692,15 @@ class _EditorScreenState extends State<EditorScreen> {
               const Icon(Icons.piano, size: 18, color: Colors.deepPurple),
               const SizedBox(width: 8),
               Text(
-                'MIDI Preview ${_stage2bEnabled ? "(2B)" : "(2A)"}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple[200],
-                ),
+                'MIDI Preview ${_audit2B ? "(2B)" : "(2A)"}',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple[200]),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text('Notes: $noteCount'),
-          Text(
-              'Range: ${MidiWriter.midiNoteName(midiRange[0])} - ${MidiWriter.midiNoteName(midiRange[1])}'),
-          if (_keySafeEnabled && _stage2bEnabled)
+          Text('Range: ${MidiWriter.midiNoteName(midiRange[0])} - ${MidiWriter.midiNoteName(midiRange[1])}'),
+          if (_keySafeEnabled && _audit2B)
             Text('Key: ${NoteNames.keyName(_detectedKeyRoot, _detectedScale)}'),
           const SizedBox(height: 8),
           SizedBox(
@@ -566,11 +725,7 @@ class _NotesPainter extends CustomPainter {
   final int midiMin;
   final int midiMax;
 
-  _NotesPainter({
-    required this.notes,
-    required this.midiMin,
-    required this.midiMax,
-  });
+  _NotesPainter({required this.notes, required this.midiMin, required this.midiMax});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -586,9 +741,7 @@ class _NotesPainter extends CustomPainter {
     for (final note in notes) {
       final x = (note.startTime / totalDuration) * size.width;
       final w = (note.duration / totalDuration) * size.width;
-      final y = size.height -
-          ((note.midiNote - midiMin) / midiSpan) * size.height -
-          4;
+      final y = size.height - ((note.midiNote - midiMin) / midiSpan) * size.height - 4;
 
       canvas.drawRRect(
         RRect.fromRectAndRadius(
@@ -601,6 +754,5 @@ class _NotesPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _NotesPainter oldDelegate) =>
-      notes != oldDelegate.notes;
+  bool shouldRepaint(covariant _NotesPainter oldDelegate) => notes != oldDelegate.notes;
 }

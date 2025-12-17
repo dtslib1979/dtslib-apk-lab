@@ -1,7 +1,7 @@
 name: minimidi
 description: Melody skeleton MIDI exporter - audio to MIDI converter for personal use
 publish_to: 'none'
-version: 2.1.0+4
+version: 2.2.0+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -15,6 +15,7 @@ dependencies:
   path_provider: ^2.1.1
   share_plus: ^7.2.1
   intl: ^0.19.0
+  dart_melty_soundfont: ^2.0.1
 
 dev_dependencies:
   flutter_test:

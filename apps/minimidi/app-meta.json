@@ -1,8 +1,8 @@
 {
   "id": "minimidi",
   "name": "MiniMidi",
-  "desc": "오디오 → DAW-Ready MIDI 변환",
-  "version": "v2.1.0",
+  "desc": "오디오 → DAW-Ready MIDI + Audit",
+  "version": "v2.2.0",
   "icon": "🎹",
   "cardClass": "minimidi",
   "workflow": "build-minimidi"

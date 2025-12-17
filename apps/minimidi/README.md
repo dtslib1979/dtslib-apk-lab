@@ -7,7 +7,7 @@
 ## 파이프라인
 
 ```
-[오디오 파일] → [트리밍] → [Mono PCM] → [YIN Pitch] → [2A] → [2B] → [MIDI]
+[오디오 파일] → [트리밍] → [Mono PCM] → [YIN Pitch] → [2A] → [2B] → [Audit] → [MIDI]
 ```
 
 ## 기능
@@ -35,17 +35,26 @@
 - **Note Length Normalization**: overlap 금지, 다음 노트 시작 - 10ms
 - **Key-Safe** (Optional): Major/Minor 스케일로 자동 스냅
 
+### Stage 2C: MIDI Audit Player
+- **청취 검증용** (편집 기능 없음)
+- Play / Pause / Stop 컨트롤
+- 2A / 2B 토글 비교 청취
+- Loop 재생 옵션
+- Simple piano sound (sine wave synthesis)
+
 ## UI 옵션
 
 | 옵션 | 기본값 | 설명 |
 |------|--------|------|
 | Stage 2B | ON | DAW-ready 후처리 적용 |
 | Key-Safe | OFF | 스케일 스냅 (자동 키 감지) |
+| Audit Loop | OFF | MIDI 반복 재생 |
 
 ## 제약 조건
 
 - **오프라인 전용**: ML 없음, 클라우드 없음
 - **단일 멜로디 트랙**: 폴리포니 미지원
+- **Audit only**: MIDI 편집 기능 없음
 
 ## 설치
 
@@ -62,3 +71,4 @@
 - just_audio
 - file_picker
 - share_plus
+- dart_melty_soundfont
