@@ -4,26 +4,18 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
 import android.view.accessibility.AccessibilityEvent
 
 /**
  * 손가락 터치를 아래 앱으로 주입하는 Accessibility Service
- * v21: 실시간 스트리밍 제스처로 레이턴시 최소화
- *
- * 핵심 기능:
- * 1. OverlayCanvasView에서 손가락 터치 이벤트 수신
- * 2. dispatchGesture()로 해당 터치를 시스템에 주입
- * 3. willContinue=true로 실시간 스트리밍 (API 26+)
+ * v24: 안정적인 제스처 주입 (원래 방식)
  */
 class TouchInjectionService : AccessibilityService() {
 
     companion object {
         private const val TAG = "TouchInjection"
-        private const val STROKE_SEGMENT_DURATION = 16L  // ~60fps
 
         @Volatile
         var instance: TouchInjectionService? = null
@@ -32,12 +24,15 @@ class TouchInjectionService : AccessibilityService() {
         fun isRunning(): Boolean = instance != null
     }
 
-    // 스트리밍 제스처 상태
-    private var isGestureActive = false
-    private var lastX = 0f
-    private var lastY = 0f
-    private var strokeId = 0
-    private val handler = Handler(Looper.getMainLooper())
+    // 제스처 상태
+    private data class GestureState(
+        val path: Path,
+        var lastX: Float,
+        var lastY: Float,
+        val startTime: Long
+    )
+
+    private var currentGesture: GestureState? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -60,14 +55,13 @@ class TouchInjectionService : AccessibilityService() {
 
     override fun onDestroy() {
         instance = null
-        isGestureActive = false
+        currentGesture = null
         Log.i(TAG, "TouchInjectionService 종료")
         super.onDestroy()
     }
 
     /**
-     * 손가락 터치 이벤트를 시스템에 즉시 주입
-     * 실시간 스트리밍 방식으로 레이턴시 최소화
+     * 손가락 터치 이벤트를 시스템에 주입
      */
     fun injectTouchEvent(event: MotionEvent): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
@@ -75,75 +69,61 @@ class TouchInjectionService : AccessibilityService() {
             return false
         }
 
-        val x = event.x
-        val y = event.y
-
-        when (event.actionMasked) {
+        return when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                // 즉시 시작점 주입
-                dispatchSinglePoint(x, y, isStart = true, isEnd = false)
-                lastX = x
-                lastY = y
-                isGestureActive = true
-                strokeId++
+                startGesture(event.x, event.y)
+                true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (isGestureActive) {
-                    // 이동 거리가 충분할 때만 주입 (성능 최적화)
-                    val dx = x - lastX
-                    val dy = y - lastY
-                    if (dx * dx + dy * dy > 16) {  // 4px 이상 이동
-                        dispatchSinglePoint(x, y, isStart = false, isEnd = false)
-                        lastX = x
-                        lastY = y
-                    }
-                }
+                continueGesture(event.x, event.y)
+                true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (isGestureActive) {
-                    dispatchSinglePoint(x, y, isStart = false, isEnd = true)
-                    isGestureActive = false
-                }
+                endGesture(event.x, event.y)
+                true
             }
+            else -> false
         }
-        return true
     }
 
-    /**
-     * 단일 포인트를 즉시 주입
-     */
-    private fun dispatchSinglePoint(x: Float, y: Float, isStart: Boolean, isEnd: Boolean) {
-        val path = Path().apply {
-            moveTo(if (isStart) x else lastX, if (isStart) y else lastY)
-            lineTo(x, y)
+    private fun startGesture(x: Float, y: Float) {
+        val path = Path().apply { moveTo(x, y) }
+        currentGesture = GestureState(path, x, y, System.currentTimeMillis())
+        Log.d(TAG, "제스처 시작: ($x, $y)")
+    }
+
+    private fun continueGesture(x: Float, y: Float) {
+        currentGesture?.let { gesture ->
+            gesture.path.lineTo(x, y)
+            gesture.lastX = x
+            gesture.lastY = y
         }
+    }
+
+    private fun endGesture(x: Float, y: Float) {
+        val gesture = currentGesture ?: return
+        currentGesture = null
+
+        gesture.path.lineTo(x, y)
+
+        val duration = (System.currentTimeMillis() - gesture.startTime).coerceIn(50, 1000)
 
         try {
-            val strokeDescription = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isEnd) {
-                // API 26+: willContinue로 연속 제스처
-                GestureDescription.StrokeDescription(
-                    path,
-                    0,
-                    STROKE_SEGMENT_DURATION,
-                    true  // willContinue - 더 많은 포인트가 올 것임
-                )
-            } else {
-                // API 24-25 또는 마지막 포인트
-                GestureDescription.StrokeDescription(
-                    path,
-                    0,
-                    if (isStart && isEnd) 50L else STROKE_SEGMENT_DURATION
-                )
-            }
+            val strokeDescription = GestureDescription.StrokeDescription(gesture.path, 0, duration)
+            val gestureDescription = GestureDescription.Builder().addStroke(strokeDescription).build()
 
-            val gestureDescription = GestureDescription.Builder()
-                .addStroke(strokeDescription)
-                .build()
+            dispatchGesture(gestureDescription, object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                    Log.d(TAG, "✅ 제스처 주입 성공")
+                }
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                    Log.w(TAG, "⚠️ 제스처 주입 취소됨")
+                }
+            }, null)
 
-            dispatchGesture(gestureDescription, null, null)
-
+            Log.d(TAG, "제스처 디스패치: duration=${duration}ms")
         } catch (e: Exception) {
-            Log.e(TAG, "포인트 주입 실패: ${e.message}")
+            Log.e(TAG, "제스처 디스패치 실패: ${e.message}")
         }
     }
 
