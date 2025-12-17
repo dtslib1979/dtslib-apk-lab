@@ -1,154 +1,92 @@
 # Parksy Capture — Setup Guide
 
-Personal-use LLM conversation capture pipeline.
-Bypasses Android clipboard limits via Share Intent.
+LLM 대화 캡처 앱. Share Intent로 클립보드 제한 우회.
 
 ---
 
-## What This Does
+## What It Does
 
-1. **Share text** from any app (Chrome, Claude, ChatGPT)
-2. **Local save** → `Downloads/parksy-logs/ParksyLog_YYYYMMDD_HHmmss.md`
-3. **Cloud archive** → `dtslib1979/parksy-logs/logs/YYYY/MM/DD/*.md` (optional)
+1. 앱에서 텍스트 Share → Parksy Capture
+2. **로컬 저장** → `Downloads/parksy-logs/*.md` (항상)
+3. **클라우드 아카이브** → `parksy-logs` repo (설정 시)
 
 ---
 
-## Prerequisites
-
-### 1. GitHub Repository
-- Create private repo: `parksy-logs`
-- This stores cloud-archived conversations
-
-### 2. Cloudflare Worker
-- Worker name: `parksy-capture-worker`
-- Deployed via GitHub Actions
-
-### 3. GitHub Secrets (Repository Settings → Secrets)
+## Required Secrets (GitHub Repo Settings)
 
 | Secret Name | Description |
-|------------|-------------|
-| `CAPTURE_WORKER_URL` | `https://parksy-capture-worker.<account>.workers.dev` |
-| `CAPTURE_API_KEY` | Random string for app → worker auth |
-| `CAPTURE_GITHUB_TOKEN` | GitHub PAT with `repo` scope for parksy-logs |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token |
-| `CF_ACCOUNT_ID` | Cloudflare account ID |
+|-------------|-------------|
+| `PARKSY_WORKER_URL` | Cloudflare Worker URL |
+| `PARKSY_API_KEY` | App ↔ Worker 인증 토큰 |
+| `CAPTURE_GITHUB_TOKEN` | GitHub PAT (`repo` scope) |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API 토큰 |
+| `CF_ACCOUNT_ID` | Cloudflare 계정 ID |
 
 ---
 
-## Build APK
+## Deploy Worker
 
-### Option A: GitHub Actions (Recommended)
-1. Push to main → auto-builds
-2. Download from Actions → Artifacts
-
-### Option B: Local Build
 ```bash
-cd apps/capture-pipeline
+cd apps/capture-pipeline/worker
+wrangler login
+wrangler secret put API_KEY        # PARKSY_API_KEY와 동일 값
+wrangler secret put GITHUB_TOKEN   # CAPTURE_GITHUB_TOKEN 값
+wrangler deploy
+```
+
+Worker URL: `https://parksy-capture-worker.<account>.workers.dev`
+
+---
+
+## CI Build (How It Works)
+
+```yaml
 flutter build apk --debug \
-  --dart-define=WORKER_URL=https://your-worker.workers.dev \
-  --dart-define=CAPTURE_API_KEY=your-api-key
+  --dart-define=PARKSY_WORKER_URL=${{ secrets.PARKSY_WORKER_URL }} \
+  --dart-define=PARKSY_API_KEY=${{ secrets.PARKSY_API_KEY }}
 ```
 
----
-
-## Install & Test
-
-### 1. Install APK
-- Download from GitHub Actions artifact
-- `adb install app-debug.apk` or direct install
-
-### 2. Grant Permissions
-- First share will request storage permission
-- Allow "Parksy Capture" to save files
-
-### 3. Smoke Test
-
-**Test 1: Chrome Share**
-1. Open Chrome → select text
-2. Tap Share → Parksy Capture
-3. Wait for toast: "Saved Local ✅" or "Saved Local & Cloud 🚀"
-4. Check `Downloads/parksy-logs/` for file
-
-**Test 2: Text Selection (PROCESS_TEXT)**
-1. Long-press text in any app
-2. Tap "..." → Parksy Capture
-3. Verify toast + file saved
-
-**Test 3: Cloud Archive**
-1. After successful share with cloud
-2. Check `parksy-logs` repo → `logs/YYYY/MM/DD/`
-3. Verify markdown file exists
+- Secrets는 빌드 시점에만 주입됨
+- APK에 하드코딩된 URL/Key 없음
+- Secret leak guard가 빌드 전 검사
 
 ---
 
-## Architecture
+## Phone Test Checklist
 
-```
-┌─────────────┐     Share      ┌────────────────┐
-│  Any App    │───Intent───────▶│ Parksy Capture │
-│ (Chrome...)  │               │    (Android)    │
-└─────────────┘               └────────┬───────┘
-                                       │
-                    ┌──────────────────┼──────────────────┐
-                    ▼                  │                  ▼
-           ┌───────────────┐           │         ┌───────────────┐
-           │  LOCAL SAVE   │           │         │  CLOUD SAVE   │
-           │  Downloads/   │           │         │  CF Worker →  │
-           │  parksy-logs/ │           │         │  GitHub API   │
-           └───────────────┘           │         └───────────────┘
-                                       ▼
-                              ┌─────────────────┐
-                              │  Toast + Exit   │
-                              │    (2 sec)      │
-                              └─────────────────┘
-```
+### Test 1: Chrome Share
+1. Chrome에서 텍스트 선택
+2. Share → Parksy Capture
+3. Toast 확인: "Saved locally ✅" 또는 "Saved Local & Cloud 🚀"
+4. `Downloads/parksy-logs/` 확인
 
----
+### Test 2: Samsung Notes / 다른 앱
+1. 텍스트 길게 눌러 선택
+2. ... → Parksy Capture
+3. Toast + 파일 저장 확인
 
-## File Format
-
-```markdown
----
-date: 2025-12-17 20:04:02
-source: android-share
----
-
-[Your captured text here]
-```
+### Test 3: Cloud (설정 완료 시)
+1. Share 후 "Saved Local & Cloud 🚀" 확인
+2. `parksy-logs` repo → `logs/YYYY/MM/` 확인
 
 ---
 
 ## Troubleshooting
 
-### "Saved Local Only" (no cloud)
-- Check Worker URL configured in build
-- Check CAPTURE_API_KEY matches Worker secret
-- Check Worker deployed successfully
-
-### "Save Failed"
-- Grant storage permission to app
-- Check Android 10+ scoped storage compatibility
-
-### No file in Downloads
-- Check `Downloads/parksy-logs/` folder
-- File naming: `ParksyLog_YYYYMMDD_HHmmss.md`
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| "Saved locally ✅" (cloud 없음) | Secrets 미설정 | Repo Secrets 설정 후 재빌드 |
+| "Save Failed ❌" | 권한 미부여 | 앱에 저장소 권한 허용 |
+| APK 설치 안됨 | Debug 서명 문제 | `adb install -r app-debug.apk` |
 
 ---
 
-## Security Notes
+## File Structure
 
-- **No secrets in APK**: All keys injected at build time
-- **Worker-only GitHub access**: App never touches GitHub directly
-- **Local-first**: Cloud failure doesn't block local save
-- **Private repo**: `parksy-logs` should be private
-
----
-
-## Related Files
-
-| File | Purpose |
-|------|---------|
-| `lib/main.dart` | Flutter UI + share handler |
-| `android/.../MainActivity.kt` | Native share intent + file save |
-| `worker/src/worker.js` | Cloudflare Worker → GitHub |
-| `worker/wrangler.toml` | Worker config (repo targets) |
+```
+apps/capture-pipeline/
+├── lib/main.dart           # Flutter UI + Share handler
+├── android/.../MainActivity.kt  # Native file save
+├── worker/src/worker.js    # Cloudflare Worker
+└── docs/SETUP.md           # This file
+```
