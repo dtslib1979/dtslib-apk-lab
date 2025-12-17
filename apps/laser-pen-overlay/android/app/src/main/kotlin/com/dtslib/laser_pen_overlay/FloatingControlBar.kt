@@ -96,16 +96,16 @@ class FloatingControlBar(
         addButton(closeBtn, btnSize, btnMargin)
     }
 
-    // 극단 투명 드래그 핸들
+    // 핸들만 살짝 보이게 (나머지는 극단 투명)
     @SuppressLint("ClickableViewAccessibility")
     private fun createGhostHandle(size: Int): TextView {
         return TextView(context).apply {
-            text = "⋮⋮"
-            textSize = 16f
+            text = "⋮"
+            textSize = 14f
             gravity = Gravity.CENTER
-            setTextColor(Color.argb(15, 255, 255, 255))  // 극단 투명
+            setTextColor(Color.argb(50, 255, 255, 255))  // 살짝 보임
             background = GradientDrawable().apply {
-                setColor(Color.argb(5, 80, 80, 80))  // 거의 안 보임
+                setColor(Color.argb(25, 100, 100, 100))  // 희미하게
                 cornerRadius = (size / 2).toFloat()
             }
 
