@@ -4,15 +4,65 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Stylus pen body - main shape (diagonal) -->
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M72,26 L82,36 L42,76 L32,66 Z"/>
+
+    <!-- Stylus pen body - dark side (shadow) -->
+    <path
+        android:fillColor="#BDBDBD"
+        android:pathData="M77,31 L82,36 L42,76 L37,71 Z"/>
+
+    <!-- Pen grip area (silver band) -->
+    <path
+        android:fillColor="#9E9E9E"
+        android:pathData="M62,36 L68,30 L72,34 L66,40 Z"/>
+
+    <!-- Pen tip holder (black) -->
+    <path
+        android:fillColor="#424242"
+        android:pathData="M38,70 L32,66 L28,70 L34,76 Z"/>
+
+    <!-- Pen tip (metallic) -->
+    <path
+        android:fillColor="#757575"
+        android:pathData="M34,76 L28,70 L24,74 L30,80 Z"/>
+
+    <!-- Laser glow outer (red transparent) -->
+    <path
+        android:fillColor="#40FF1744"
+        android:pathData="M30,80 C20,90 14,90 14,90 C14,90 14,84 24,74 Z"/>
+
+    <!-- Laser glow middle -->
+    <path
+        android:fillColor="#80FF5252"
+        android:pathData="M28,78 C22,84 18,86 18,86 C18,86 20,82 26,76 Z"/>
+
+    <!-- Laser tip point (bright red) -->
+    <path
+        android:fillColor="#FF1744"
+        android:pathData="M26,78 L24,80 L22,78 L24,76 Z"/>
+
+    <!-- Sparkle 1 -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,24 L54,84 M54,24 L44,34 M54,24 L64,34"
-        android:strokeWidth="4"
-        android:strokeColor="#FFFFFF"/>
+        android:pathData="M18,84 L20,82 L18,80 L16,82 Z"/>
+
+    <!-- Sparkle 2 -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M34,54 C34,54 44,44 54,54 C64,64 74,54 74,54"
-        android:strokeWidth="3"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round"/>
+        android:fillColor="#80FFFFFF"
+        android:pathData="M22,88 L23,87 L22,86 L21,87 Z"/>
+
+    <!-- Pen button (side button) -->
+    <path
+        android:fillColor="#616161"
+        android:pathData="M56,42 L60,38 L62,40 L58,44 Z"/>
+
+    <!-- Top end cap -->
+    <path
+        android:fillColor="#BDBDBD"
+        android:pathData="M72,26 L78,26 L82,30 L82,36 L78,32 Z"/>
+
 </vector>
