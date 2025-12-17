@@ -35,11 +35,16 @@ class _ShareHandlerState extends State<ShareHandler> {
   static const workerUrl = String.fromEnvironment('PARKSY_WORKER_URL', defaultValue: '');
   static const apiKey = String.fromEnvironment('PARKSY_API_KEY', defaultValue: '');
   static final cloudEnabled = workerUrl.isNotEmpty && apiKey.isNotEmpty;
+
+  String _statusMessage = 'Processing...';
   
   @override
   void initState() {
     super.initState();
-    _handleShare();
+    // Fix: context가 준비된 후 실행되도록 지연
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleShare();
+    });
   }
 
   Future<void> _handleShare() async {
@@ -49,6 +54,11 @@ class _ShareHandlerState extends State<ShareHandler> {
         _showToast('No text received');
         _finish();
         return;
+      }
+      
+      // 대용량 텍스트 처리 (100KB 이상 경고)
+      if (text.length > 100000) {
+        debugPrint('Warning: Large text received (${text.length} chars)');
       }
       
       // Step 1: Local save (MUST succeed)
@@ -75,6 +85,7 @@ class _ShareHandlerState extends State<ShareHandler> {
       
       _finish();
     } catch (e) {
+      debugPrint('Share handler error: $e');
       _showToast('Error: $e');
       _finish();
     }
@@ -92,6 +103,7 @@ class _ShareHandlerState extends State<ShareHandler> {
       );
       return result ?? false;
     } catch (e) {
+      debugPrint('Local save error: $e');
       return false;
     }
   }
@@ -114,6 +126,7 @@ class _ShareHandlerState extends State<ShareHandler> {
       
       return res.statusCode == 200 || res.statusCode == 201;
     } catch (e) {
+      debugPrint('Cloud save error: $e');
       return false;
     }
   }
@@ -130,6 +143,13 @@ $text
   }
 
   void _showToast(String msg) {
+    // Fix: mounted 체크로 위젯이 아직 트리에 있는지 확인
+    if (!mounted) return;
+    
+    setState(() {
+      _statusMessage = msg;
+    });
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
     );
@@ -137,15 +157,24 @@ $text
 
   void _finish() {
     Future.delayed(const Duration(seconds: 2), () {
-      SystemNavigator.pop();
+      if (mounted) {
+        SystemNavigator.pop();
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
-        child: CircularProgressIndicator(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(_statusMessage),
+          ],
+        ),
       ),
     );
   }
