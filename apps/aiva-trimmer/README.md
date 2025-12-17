@@ -15,6 +15,12 @@ AIVA 음악을 2분으로 트리밍하는 앱.
 
 ## 설치
 
+### 빠른 다운로드 (로그인 불필요)
+
+👉 [**aiva-trimmer-debug.apk**](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip)
+
+### GitHub Actions에서 직접
+
 1. [Actions](../../../actions) 탭 → `Build AIVA Trimmer` 워크플로우
 2. 최신 성공 빌드 클릭
 3. **Artifacts** → `aiva-trimmer-debug` 다운로드
