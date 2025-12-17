@@ -40,19 +40,27 @@ Parksy Capture was built by someone who didn't.
 
 Instead of relying on copy-paste, it uses Android's **Share Intent**, which is not constrained by clipboard memory limits.
 
-### Workflow
+### Workflow: Capture
 
 1. Select the full conversation in a mobile web browser
    (ChatGPT, Claude, Gemini, etc.)
 2. Tap **Share**
 3. Choose **Parksy Capture**
 4. The conversation is saved **exactly as selected**:
-   - 📱 Locally as a `.txt` or `.md` file
-   - ☁️ Automatically archived to a **private GitHub repository**
+   - 📱 Locally as a `.md` file in `Downloads/parksy-logs/`
+   - ☁️ Automatically archived to a **private GitHub repository** (if configured)
 
 No trimming.
 No summarization.
 No data loss.
+
+### Workflow: Re-upload (v2.1.0+)
+
+1. Open **Parksy Capture** app directly
+2. Browse saved logs list
+3. Tap a log to view content
+4. Tap **"Upload to LLM"** to share to another app
+5. Continue your conversation in ChatGPT, Claude, etc.
 
 ---
 
@@ -62,8 +70,17 @@ No data loss.
 - **Clipboard-free architecture**
 - **Share → File → Archive** in one step
 - **Local + Cloud (GitHub) backup**
+- **Log browser with re-share capability** (v2.1.0+)
 - Optimized for **web-based LLM usage on mobile**
-- **Zero-UI workflow** (no app interaction required)
+
+---
+
+## App Modes
+
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| **Capture Mode** | Share from other app | Auto-save and exit |
+| **Browse Mode** | Open app directly | Show log list, view, share |
 
 ---
 
@@ -80,6 +97,7 @@ There are **no apps** that intentionally target the intersection of:
 - Clipboard limit bypass
 - Full LLM conversation preservation
 - File-based archiving
+- **Re-upload to continue conversations** (v2.1.0+)
 - Future ML / RAG reuse
 
 **Parksy Capture is built specifically for that intersection.**
@@ -136,7 +154,17 @@ This tool is for you.
 
 ## One-Line Definition
 
-> **When copy-paste fails, capture the entire conversation as a file.**
+> **When copy-paste fails, capture the entire conversation as a file — and re-upload it later.**
+
+---
+
+## Version History
+
+| Version | Changes |
+|---------|---------|
+| 2.1.0 | Log browser, re-share to LLM, copy to clipboard |
+| 2.0.0 | Cloud backup (GitHub), crash fixes |
+| 1.0.0 | Initial release, local save only |
 
 ---
 
