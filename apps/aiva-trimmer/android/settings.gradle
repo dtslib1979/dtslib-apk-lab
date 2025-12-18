@@ -23,4 +23,14 @@ plugins {
     id "org.jetbrains.kotlin.android" version "1.9.10" apply false
 }
 
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://github.com/ArthenICa/ffmpeg-kit/raw/main/android/ffmpeg-kit-audio-6.0-2.LTS' }
+        maven { url 'https://jitpack.io' }
+    }
+}
+
 include ":app"
