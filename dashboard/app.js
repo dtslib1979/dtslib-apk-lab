@@ -5,12 +5,12 @@ function renderApps(apps) {
 
     apps.forEach(app => {
         const card = document.createElement('div');
-        card.className = `app-card ${app.cardClass}`;
+        card.className = 'app-card';
 
         card.innerHTML = `
             <div class="app-icon">${app.icon}</div>
             <div class="app-name">${app.name}</div>
-            <div class="app-desc">${app.desc}</div>
+            <div class="app-desc">${app.description}</div>
             <span class="app-version">${app.version}</span>
             <a href="${app.downloadUrl}"
                class="download-btn"
@@ -27,7 +27,7 @@ function renderApps(apps) {
 // 앱 목록 로드
 async function loadApps() {
     try {
-        const response = await fetch('./apps.json');
+        const response = await fetch('./apps.json?v=' + Date.now());
         if (!response.ok) throw new Error('Failed to load apps.json');
         const apps = await response.json();
         renderApps(apps);
