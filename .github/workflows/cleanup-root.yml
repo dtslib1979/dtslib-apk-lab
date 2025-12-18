@@ -1,0 +1,42 @@
+name: Cleanup Root Remnants
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove root remnant files
+        run: |
+          # Remove AIVA Prep remnants from root
+          rm -rf android/
+          rm -rf lib/
+          rm -f pubspec.yaml
+          rm -f analysis_options.yaml
+          
+          echo "✅ Removed:"
+          echo "  - /android/"
+          echo "  - /lib/"
+          echo "  - /pubspec.yaml"
+          echo "  - /analysis_options.yaml"
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: remove root AIVA Prep remnants
+
+          Deleted:
+          - /android/ (old AIVA Prep android folder)
+          - /lib/ (old AIVA Prep lib folder)  
+          - /pubspec.yaml (old AIVA Prep config)
+          - /analysis_options.yaml (old config)
+          
+          All apps now properly located in apps/ subdirectories"
+          git push
