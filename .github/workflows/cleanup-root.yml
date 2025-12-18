@@ -2,59 +2,39 @@ name: Cleanup Root Remnants
 
 on:
   push:
+    branches: [main]
     paths:
       - '.github/workflows/cleanup-root.yml'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Remove root remnant files
         run: |
-          # Remove AIVA Prep remnants from root
           rm -rf android/
           rm -rf lib/
           rm -f pubspec.yaml
           rm -f analysis_options.yaml
           
-          echo "✅ Removed:"
-          echo "  - /android/"
-          echo "  - /lib/"
-          echo "  - /pubspec.yaml"
-          echo "  - /analysis_options.yaml"
+          echo "✅ Removed root AIVA Prep remnants"
 
-      - name: Commit changes
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore: remove root AIVA Prep remnants
+          git diff --staged --quiet || git commit -m "chore: remove root AIVA Prep remnants
 
           Deleted:
-          - /android/ (old AIVA Prep android folder)
-          - /lib/ (old AIVA Prep lib folder)  
-          - /pubspec.yaml (old AIVA Prep config)
-          - /analysis_options.yaml (old config)
-          
-          All apps now properly located in apps/ subdirectories"
-            git push
-          fi
-          
-      - name: Self-delete workflow
-        run: |
-          rm -f .github/workflows/cleanup-root.yml
-          git add -A
-          if git diff --staged --quiet; then
-            echo "Workflow already removed"
-          else
-            git commit -m "chore: remove one-time cleanup workflow"
-            git push
-          fi
+          - /android/
+          - /lib/
+          - /pubspec.yaml
+          - /analysis_options.yaml"
+          git push
