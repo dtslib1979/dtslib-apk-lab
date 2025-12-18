@@ -16,14 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Remove deprecated workflow files
+      - name: Remove deprecated workflow files (including self)
         run: |
           rm -f .github/workflows/android.yml
           rm -f .github/workflows/cleanup-root.yml
           rm -f .github/workflows/deploy-capture-worker.yml
           rm -f .github/workflows/sync-dashboard.yml
+          rm -f .github/workflows/cleanup-deprecated.yml
           
-          echo "✅ Removed deprecated workflows"
+          echo "✅ Removed deprecated workflows (including self)"
 
       - name: Commit and push
         run: |
@@ -33,12 +34,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "chore: remove deprecated workflows
-
-          Deleted:
-          - android.yml (deprecated)
-          - cleanup-root.yml (one-time use completed)
-          - deploy-capture-worker.yml (Cloudflare removed)
-          - sync-dashboard.yml (replaced by publish-store-index.yml)"
+            git commit -m "chore: cleanup complete - removed deprecated workflows"
             git push
           fi
