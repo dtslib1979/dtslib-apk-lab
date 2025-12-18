@@ -1,0 +1,49 @@
+name: Publish Store Index
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/*/pubspec.yaml'
+      - 'scripts/build_store_index.py'
+  workflow_dispatch:
+
+jobs:
+  sync-store:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Generate apps.json
+        run: python scripts/build_store_index.py
+      
+      - name: Bump SW cache version
+        run: |
+          # Extract current version number
+          CURRENT=$(grep -oP "apk-store-v\K[0-9]+" dashboard/sw.js)
+          NEXT=$((CURRENT + 1))
+          sed -i "s/apk-store-v${CURRENT}/apk-store-v${NEXT}/" dashboard/sw.js
+          echo "SW cache: v${CURRENT} → v${NEXT}"
+      
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dashboard/apps.json dashboard/sw.js
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: auto-sync store index from pubspec.yaml"
+            git push
+          fi
