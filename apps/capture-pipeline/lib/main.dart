@@ -229,7 +229,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
             ),
-            // Page indicators
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(_pages.length, (index) {
@@ -247,7 +246,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               }),
             ),
             const SizedBox(height: 32),
-            // Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: SizedBox(
@@ -316,7 +314,6 @@ class ShareHandler extends StatefulWidget {
 class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.parksy.capture/share');
   
-  // GitHub Direct API (no Worker needed)
   static const _githubToken = String.fromEnvironment('PARKSY_GITHUB_TOKEN', defaultValue: '');
   static const _githubRepo = 'dtslib1979/parksy-logs';
   static final _syncEnabled = _githubToken.isNotEmpty;
@@ -358,7 +355,6 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
         _icon = Icons.save;
       });
       
-      // Generate filename
       final ts = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
       final fname = 'ParksyLog_$ts.md';
       final content = _toMarkdown(text);
@@ -420,13 +416,11 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
 
   Future<bool> _syncToGitHub(String filename, String content) async {
     try {
-      // Path: logs/2024/12/ParksyLog_20241218_123456.md
       final now = DateTime.now();
       final year = now.year.toString();
       final month = now.month.toString().padLeft(2, '0');
       final path = 'logs/$year/$month/$filename';
       
-      // GitHub Contents API: PUT /repos/{owner}/{repo}/contents/{path}
       final url = 'https://api.github.com/repos/$_githubRepo/contents/$path';
       
       final res = await http.put(
@@ -507,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _showStarredOnly = false;
   String _searchQuery = '';
-  String _sortBy = 'date'; // date, size, name
+  String _sortBy = 'date';
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -535,12 +529,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void _applyFilters() {
     var filtered = List<Map<String, dynamic>>.from(_logs);
     
-    // Star filter
     if (_showStarredOnly) {
       filtered = filtered.where((log) => log['starred'] == true).toList();
     }
     
-    // Search filter
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       filtered = filtered.where((log) {
@@ -550,7 +542,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }).toList();
     }
     
-    // Sort
     switch (_sortBy) {
       case 'size':
         filtered.sort((a, b) => (b['size'] as int).compareTo(a['size'] as int));
@@ -654,13 +645,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             _buildHeader(),
-            // Stats
             if (_stats.isNotEmpty) _buildStats(),
-            // Search & Filters
             _buildSearchBar(),
-            // List
             Expanded(child: _buildList()),
           ],
         ),
@@ -755,7 +742,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // Star filter
           Container(
             decoration: BoxDecoration(
               color: _showStarredOnly ? const Color(0xFF58A6FF).withOpacity(0.2) : const Color(0xFF161B22),
@@ -778,7 +764,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // Sort menu
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             color: const Color(0xFF161B22),
@@ -965,7 +950,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 4.0.0'),
+            const Text('Version 5.0.0'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
@@ -1081,7 +1066,6 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
   }
 
   Future<void> _openOnGitHub() async {
-    // Extract date from filename: ParksyLog_20251218_104313.md -> 2025/12
     final match = RegExp(r'ParksyLog_(\d{4})(\d{2})').firstMatch(widget.filename);
     String path = 'logs';
     if (match != null) {
