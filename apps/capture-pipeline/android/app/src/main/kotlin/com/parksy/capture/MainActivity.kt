@@ -2,6 +2,8 @@ package com.parksy.capture
 
 import android.content.ContentValues
 import android.content.Intent
+import android.database.Cursor
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -16,6 +18,7 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.parksy.capture/share"
     private var sharedText: String? = null
     private var isShareIntent: Boolean = false
+    private val LOGS_FOLDER = "parksy-logs"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -116,42 +119,108 @@ class MainActivity : FlutterActivity() {
             }
     }
 
-    private fun getLogsDir(): File {
-        return File(
-            Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOWNLOADS
-            ), "parksy-logs"
-        )
-    }
-
-    private fun getMetaFile(): File {
-        return File(getLogsDir(), ".parksy-meta.json")
-    }
+    // ============================================================
+    // MediaStore-based file operations (Android 10+ Scoped Storage)
+    // ============================================================
 
     private fun getLogFiles(): List<Map<String, Any>> {
-        val dir = getLogsDir()
-        if (!dir.exists()) return emptyList()
-        
+        val files = mutableListOf<Map<String, Any>>()
         val meta = loadAllMeta()
         
-        return dir.listFiles()
-            ?.filter { it.isFile && it.name.endsWith(".md") && !it.name.startsWith(".") }
-            ?.sortedByDescending { it.lastModified() }
-            ?.map { file ->
-                val fileMeta = meta[file.name] ?: emptyMap()
-                val preview = getPreview(file)
-                mapOf(
-                    "name" to file.name,
-                    "size" to file.length(),
-                    "modified" to file.lastModified(),
-                    "preview" to preview,
-                    "starred" to (fileMeta["starred"] as? Boolean ?: false),
-                    "tags" to (fileMeta["tags"] as? List<*> ?: emptyList<String>())
-                )
-            } ?: emptyList()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Use MediaStore for Android 10+
+            val projection = arrayOf(
+                MediaStore.Downloads._ID,
+                MediaStore.Downloads.DISPLAY_NAME,
+                MediaStore.Downloads.SIZE,
+                MediaStore.Downloads.DATE_MODIFIED,
+                MediaStore.Downloads.RELATIVE_PATH
+            )
+            
+            val selection = "${MediaStore.Downloads.RELATIVE_PATH} LIKE ? AND ${MediaStore.Downloads.DISPLAY_NAME} LIKE ?"
+            val selectionArgs = arrayOf(
+                "%$LOGS_FOLDER%",
+                "ParksyLog_%.md"
+            )
+            val sortOrder = "${MediaStore.Downloads.DATE_MODIFIED} DESC"
+            
+            contentResolver.query(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                sortOrder
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
+                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
+                val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
+                
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val name = cursor.getString(nameColumn)
+                    val size = cursor.getLong(sizeColumn)
+                    val modified = cursor.getLong(modifiedColumn) * 1000 // Convert to milliseconds
+                    
+                    val uri = Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
+                    val preview = getPreviewFromUri(uri)
+                    val fileMeta = meta[name] ?: emptyMap()
+                    
+                    files.add(mapOf(
+                        "name" to name,
+                        "size" to size,
+                        "modified" to modified,
+                        "preview" to preview,
+                        "starred" to (fileMeta["starred"] as? Boolean ?: false),
+                        "tags" to (fileMeta["tags"] as? List<*> ?: emptyList<String>())
+                    ))
+                }
+            }
+        } else {
+            // Fallback for older Android versions
+            val dir = getLegacyLogsDir()
+            if (dir.exists()) {
+                dir.listFiles()
+                    ?.filter { it.isFile && it.name.endsWith(".md") && !it.name.startsWith(".") }
+                    ?.sortedByDescending { it.lastModified() }
+                    ?.forEach { file ->
+                        val fileMeta = meta[file.name] ?: emptyMap()
+                        files.add(mapOf(
+                            "name" to file.name,
+                            "size" to file.length(),
+                            "modified" to file.lastModified(),
+                            "preview" to getPreviewFromFile(file),
+                            "starred" to (fileMeta["starred"] as? Boolean ?: false),
+                            "tags" to (fileMeta["tags"] as? List<*> ?: emptyList<String>())
+                        ))
+                    }
+            }
+        }
+        
+        return files
     }
 
-    private fun getPreview(file: File, maxLines: Int = 3, maxChars: Int = 150): String {
+    private fun getPreviewFromUri(uri: Uri, maxLines: Int = 3, maxChars: Int = 150): String {
+        return try {
+            contentResolver.openInputStream(uri)?.use { stream ->
+                val content = stream.bufferedReader().readText()
+                val body = extractBody(content)
+                val lines = body.split("\n")
+                    .filter { it.isNotBlank() }
+                    .take(maxLines)
+                    .joinToString(" ")
+                if (lines.length > maxChars) {
+                    lines.substring(0, maxChars) + "..."
+                } else {
+                    lines
+                }
+            } ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun getPreviewFromFile(file: File, maxLines: Int = 3, maxChars: Int = 150): String {
         return try {
             val content = file.readText()
             val body = extractBody(content)
@@ -186,58 +255,98 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun readLogFile(filename: String): String? {
-        return try {
-            val file = File(getLogsDir(), filename)
-            if (file.exists()) file.readText() else null
-        } catch (e: Exception) {
-            null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val uri = findFileUri(filename) ?: return null
+            return try {
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    stream.bufferedReader().readText()
+                }
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            return try {
+                val file = File(getLegacyLogsDir(), filename)
+                if (file.exists()) file.readText() else null
+            } catch (e: Exception) {
+                null
+            }
         }
     }
 
     private fun deleteLogFile(filename: String): Boolean {
         return try {
-            val file = File(getLogsDir(), filename)
-            if (file.exists()) {
-                val deleted = file.delete()
-                if (deleted) {
-                    removeFromMeta(filename)
-                }
-                deleted
-            } else false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val uri = findFileUri(filename)
+                if (uri != null) {
+                    val deleted = contentResolver.delete(uri, null, null) > 0
+                    if (deleted) removeFromMeta(filename)
+                    deleted
+                } else false
+            } else {
+                val file = File(getLegacyLogsDir(), filename)
+                if (file.exists()) {
+                    val deleted = file.delete()
+                    if (deleted) removeFromMeta(filename)
+                    deleted
+                } else false
+            }
         } catch (e: Exception) {
             false
         }
     }
 
-    private fun searchLogs(query: String): List<Map<String, Any>> {
-        val dir = getLogsDir()
-        if (!dir.exists() || query.isBlank()) return emptyList()
+    private fun findFileUri(filename: String): Uri? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         
-        val lowerQuery = query.lowercase()
-        val meta = loadAllMeta()
+        val projection = arrayOf(MediaStore.Downloads._ID)
+        val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ? AND ${MediaStore.Downloads.RELATIVE_PATH} LIKE ?"
+        val selectionArgs = arrayOf(filename, "%$LOGS_FOLDER%")
         
-        return dir.listFiles()
-            ?.filter { it.isFile && it.name.endsWith(".md") && !it.name.startsWith(".") }
-            ?.filter { file ->
-                try {
-                    val content = file.readText().lowercase()
-                    content.contains(lowerQuery) || file.name.lowercase().contains(lowerQuery)
-                } catch (e: Exception) {
-                    false
-                }
+        contentResolver.query(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
+                return Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
             }
-            ?.sortedByDescending { it.lastModified() }
-            ?.map { file ->
-                val fileMeta = meta[file.name] ?: emptyMap()
-                mapOf(
-                    "name" to file.name,
-                    "size" to file.length(),
-                    "modified" to file.lastModified(),
-                    "preview" to getPreview(file),
-                    "starred" to (fileMeta["starred"] as? Boolean ?: false),
-                    "tags" to (fileMeta["tags"] as? List<*> ?: emptyList<String>())
-                )
-            } ?: emptyList()
+        }
+        return null
+    }
+
+    private fun searchLogs(query: String): List<Map<String, Any>> {
+        if (query.isBlank()) return emptyList()
+        
+        val allFiles = getLogFiles()
+        val lowerQuery = query.lowercase()
+        
+        return allFiles.filter { file ->
+            val name = (file["name"] as? String)?.lowercase() ?: ""
+            val preview = (file["preview"] as? String)?.lowercase() ?: ""
+            
+            if (name.contains(lowerQuery) || preview.contains(lowerQuery)) {
+                true
+            } else {
+                // Deep search in content
+                val filename = file["name"] as? String ?: ""
+                val content = readLogFile(filename)?.lowercase() ?: ""
+                content.contains(lowerQuery)
+            }
+        }
+    }
+
+    // ============================================================
+    // Metadata management (stored in app-private directory)
+    // ============================================================
+
+    private fun getMetaFile(): File {
+        val dir = getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            ?: filesDir
+        return File(dir, ".parksy-meta.json")
     }
 
     private fun loadAllMeta(): Map<String, Map<String, Any>> {
@@ -279,6 +388,7 @@ class MainActivity : FlutterActivity() {
                 json.put(filename, obj)
             }
             val metaFile = getMetaFile()
+            metaFile.parentFile?.mkdirs()
             metaFile.writeText(json.toString(2))
         } catch (e: Exception) {
             e.printStackTrace()
@@ -321,30 +431,26 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun getStats(): Map<String, Any> {
-        val dir = getLogsDir()
-        if (!dir.exists()) return mapOf(
-            "totalLogs" to 0,
-            "totalSize" to 0L,
-            "starredCount" to 0,
-            "oldestLog" to 0L,
-            "newestLog" to 0L
-        )
-        
-        val files = dir.listFiles()
-            ?.filter { it.isFile && it.name.endsWith(".md") && !it.name.startsWith(".") }
-            ?: emptyList()
-        
+        val files = getLogFiles()
         val meta = loadAllMeta()
         val starredCount = meta.count { it.value["starred"] == true }
         
+        val totalSize = files.sumOf { (it["size"] as? Long) ?: 0L }
+        val oldest = files.minOfOrNull { (it["modified"] as? Long) ?: Long.MAX_VALUE } ?: 0L
+        val newest = files.maxOfOrNull { (it["modified"] as? Long) ?: 0L } ?: 0L
+        
         return mapOf(
             "totalLogs" to files.size,
-            "totalSize" to files.sumOf { it.length() },
+            "totalSize" to totalSize,
             "starredCount" to starredCount,
-            "oldestLog" to (files.minOfOrNull { it.lastModified() } ?: 0L),
-            "newestLog" to (files.maxOfOrNull { it.lastModified() } ?: 0L)
+            "oldestLog" to oldest,
+            "newestLog" to newest
         )
     }
+
+    // ============================================================
+    // File save and share
+    // ============================================================
 
     private fun shareText(text: String, title: String) {
         val intent = Intent(Intent.ACTION_SEND).apply {
@@ -361,7 +467,7 @@ class MainActivity : FlutterActivity() {
                     put(MediaStore.Downloads.DISPLAY_NAME, filename)
                     put(MediaStore.Downloads.MIME_TYPE, "text/markdown")
                     put(MediaStore.Downloads.RELATIVE_PATH, 
-                        Environment.DIRECTORY_DOWNLOADS + "/parksy-logs")
+                        Environment.DIRECTORY_DOWNLOADS + "/$LOGS_FOLDER")
                 }
                 val uri = contentResolver.insert(
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
@@ -373,7 +479,7 @@ class MainActivity : FlutterActivity() {
                     true
                 } ?: false
             } else {
-                val dir = getLogsDir()
+                val dir = getLegacyLogsDir()
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, filename)
                 file.writeText(content)
@@ -383,5 +489,13 @@ class MainActivity : FlutterActivity() {
             e.printStackTrace()
             false
         }
+    }
+
+    private fun getLegacyLogsDir(): File {
+        return File(
+            Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS
+            ), LOGS_FOLDER
+        )
     }
 }
