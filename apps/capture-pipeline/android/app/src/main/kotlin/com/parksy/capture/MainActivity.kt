@@ -2,12 +2,12 @@ package com.parksy.capture
 
 import android.content.ContentValues
 import android.content.Intent
-import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -15,6 +15,7 @@ import java.io.File
 import org.json.JSONObject
 
 class MainActivity : FlutterActivity() {
+    private val TAG = "ParksyCapture"
     private val CHANNEL = "com.parksy.capture/share"
     private var sharedText: String? = null
     private var isShareIntent: Boolean = false
@@ -127,6 +128,8 @@ class MainActivity : FlutterActivity() {
         val files = mutableListOf<Map<String, Any>>()
         val meta = loadAllMeta()
         
+        Log.d(TAG, "getLogFiles() called, SDK: ${Build.VERSION.SDK_INT}")
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Use MediaStore for Android 10+
             val projection = arrayOf(
@@ -137,51 +140,69 @@ class MainActivity : FlutterActivity() {
                 MediaStore.Downloads.RELATIVE_PATH
             )
             
-            val selection = "${MediaStore.Downloads.RELATIVE_PATH} LIKE ? AND ${MediaStore.Downloads.DISPLAY_NAME} LIKE ?"
-            val selectionArgs = arrayOf(
-                "%$LOGS_FOLDER%",
-                "ParksyLog_%.md"
-            )
+            // Simple query: just match filename pattern
+            val selection = "${MediaStore.Downloads.DISPLAY_NAME} LIKE ?"
+            val selectionArgs = arrayOf("ParksyLog_%.md")
             val sortOrder = "${MediaStore.Downloads.DATE_MODIFIED} DESC"
             
-            contentResolver.query(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                projection,
-                selection,
-                selectionArgs,
-                sortOrder
-            )?.use { cursor ->
-                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
-                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
-                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
-                val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
-                
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idColumn)
-                    val name = cursor.getString(nameColumn)
-                    val size = cursor.getLong(sizeColumn)
-                    val modified = cursor.getLong(modifiedColumn) * 1000 // Convert to milliseconds
+            Log.d(TAG, "Querying MediaStore with pattern: ParksyLog_%.md")
+            
+            try {
+                contentResolver.query(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    sortOrder
+                )?.use { cursor ->
+                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+                    val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
+                    val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
+                    val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
+                    val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.RELATIVE_PATH)
                     
-                    val uri = Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
-                    val preview = getPreviewFromUri(uri)
-                    val fileMeta = meta[name] ?: emptyMap()
+                    Log.d(TAG, "Found ${cursor.count} files in MediaStore")
                     
-                    files.add(mapOf(
-                        "name" to name,
-                        "size" to size,
-                        "modified" to modified,
-                        "preview" to preview,
-                        "starred" to (fileMeta["starred"] as? Boolean ?: false),
-                        "tags" to (fileMeta["tags"] as? List<*> ?: emptyList<String>())
-                    ))
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idColumn)
+                        val name = cursor.getString(nameColumn)
+                        val size = cursor.getLong(sizeColumn)
+                        val modified = cursor.getLong(modifiedColumn) * 1000
+                        val relativePath = cursor.getString(pathColumn) ?: ""
+                        
+                        Log.d(TAG, "File: $name, path: $relativePath, size: $size")
+                        
+                        // Filter to only include files from parksy-logs folder
+                        if (!relativePath.contains(LOGS_FOLDER)) {
+                            Log.d(TAG, "Skipping $name - not in $LOGS_FOLDER folder")
+                            continue
+                        }
+                        
+                        val uri = Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
+                        val preview = getPreviewFromUri(uri)
+                        val fileMeta = meta[name] ?: emptyMap()
+                        
+                        files.add(mapOf(
+                            "name" to name,
+                            "size" to size,
+                            "modified" to modified,
+                            "preview" to preview,
+                            "starred" to (fileMeta["starred"] as? Boolean ?: false),
+                            "tags" to (fileMeta["tags"] as? List<*> ?: emptyList<String>())
+                        ))
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "MediaStore query failed: ${e.message}", e)
             }
         } else {
             // Fallback for older Android versions
             val dir = getLegacyLogsDir()
+            Log.d(TAG, "Using legacy file access: ${dir.absolutePath}")
+            
             if (dir.exists()) {
                 dir.listFiles()
-                    ?.filter { it.isFile && it.name.endsWith(".md") && !it.name.startsWith(".") }
+                    ?.filter { it.isFile && it.name.endsWith(".md") && it.name.startsWith("ParksyLog_") }
                     ?.sortedByDescending { it.lastModified() }
                     ?.forEach { file ->
                         val fileMeta = meta[file.name] ?: emptyMap()
@@ -197,6 +218,7 @@ class MainActivity : FlutterActivity() {
             }
         }
         
+        Log.d(TAG, "Returning ${files.size} log files")
         return files
     }
 
@@ -216,6 +238,7 @@ class MainActivity : FlutterActivity() {
                 }
             } ?: ""
         } catch (e: Exception) {
+            Log.e(TAG, "Failed to get preview from URI: ${e.message}")
             ""
         }
     }
@@ -255,13 +278,20 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun readLogFile(filename: String): String? {
+        Log.d(TAG, "readLogFile: $filename")
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val uri = findFileUri(filename) ?: return null
+            val uri = findFileUri(filename)
+            if (uri == null) {
+                Log.e(TAG, "Could not find URI for: $filename")
+                return null
+            }
             return try {
                 contentResolver.openInputStream(uri)?.use { stream ->
                     stream.bufferedReader().readText()
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Failed to read file: ${e.message}")
                 null
             }
         } else {
@@ -275,6 +305,8 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun deleteLogFile(filename: String): Boolean {
+        Log.d(TAG, "deleteLogFile: $filename")
+        
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val uri = findFileUri(filename)
@@ -292,6 +324,7 @@ class MainActivity : FlutterActivity() {
                 } else false
             }
         } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete file: ${e.message}")
             false
         }
     }
@@ -299,21 +332,40 @@ class MainActivity : FlutterActivity() {
     private fun findFileUri(filename: String): Uri? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         
-        val projection = arrayOf(MediaStore.Downloads._ID)
-        val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ? AND ${MediaStore.Downloads.RELATIVE_PATH} LIKE ?"
-        val selectionArgs = arrayOf(filename, "%$LOGS_FOLDER%")
+        val projection = arrayOf(
+            MediaStore.Downloads._ID,
+            MediaStore.Downloads.RELATIVE_PATH
+        )
+        val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ?"
+        val selectionArgs = arrayOf(filename)
         
-        contentResolver.query(
-            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            projection,
-            selection,
-            selectionArgs,
-            null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
-                return Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
+        try {
+            contentResolver.query(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
+                    val path = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Downloads.RELATIVE_PATH)) ?: ""
+                    
+                    // Prefer file from parksy-logs folder
+                    if (path.contains(LOGS_FOLDER)) {
+                        return Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
+                    }
+                }
+                
+                // Fallback: return first match
+                cursor.moveToFirst()
+                if (cursor.count > 0) {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
+                    return Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "findFileUri failed: ${e.message}")
         }
         return null
     }
@@ -461,6 +513,8 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun saveFile(filename: String, content: String): Boolean {
+        Log.d(TAG, "saveFile: $filename, content length: ${content.length}")
+        
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
@@ -472,21 +526,26 @@ class MainActivity : FlutterActivity() {
                 val uri = contentResolver.insert(
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
                 )
-                uri?.let {
-                    contentResolver.openOutputStream(it)?.use { os ->
+                if (uri != null) {
+                    contentResolver.openOutputStream(uri)?.use { os ->
                         os.write(content.toByteArray())
                     }
+                    Log.d(TAG, "File saved successfully via MediaStore")
                     true
-                } ?: false
+                } else {
+                    Log.e(TAG, "Failed to insert file into MediaStore")
+                    false
+                }
             } else {
                 val dir = getLegacyLogsDir()
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, filename)
                 file.writeText(content)
+                Log.d(TAG, "File saved successfully via File API")
                 true
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to save file: ${e.message}", e)
             false
         }
     }
