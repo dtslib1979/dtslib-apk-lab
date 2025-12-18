@@ -21,7 +21,7 @@ jobs:
       - name: Secret leak guard
         run: |
           cd ../..
-          if grep -rE "CHANGE_ME|ghp_|apiKey\s*=\s*'[^']|workerUrl\s*=\s*'http" --include="*.dart" --include="*.kt" --include="*.js" apps/capture-pipeline/; then
+          if grep -rE "CHANGE_ME|ghp_|gho_|github_pat_" --include="*.dart" --include="*.kt" --include="*.js" apps/capture-pipeline/; then
             echo "::error::Secret-like string found in source code!"
             exit 1
           fi
@@ -46,8 +46,7 @@ jobs:
       - name: Build Debug APK
         run: |
           flutter build apk --debug \
-            --dart-define=PARKSY_WORKER_URL=${{ secrets.PARKSY_WORKER_URL }} \
-            --dart-define=PARKSY_API_KEY=${{ secrets.PARKSY_API_KEY }}
+            --dart-define=PARKSY_GITHUB_TOKEN=${{ secrets.PARKSY_GITHUB_TOKEN }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
