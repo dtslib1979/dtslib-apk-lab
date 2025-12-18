@@ -2,6 +2,13 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // FFmpeg Kit repository for ffmpeg_kit_flutter_audio
+        maven {
+            url 'https://github.com/ArthenICa/ffmpeg-kit/raw/main/prebuilt/bundle-android-aar/test'
+            content {
+                includeGroup 'com.arthenica'
+            }
+        }
     }
 }
 
