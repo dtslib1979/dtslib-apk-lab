@@ -1,6 +1,9 @@
 name: Cleanup Root Remnants
 
 on:
+  push:
+    paths:
+      - '.github/workflows/cleanup-root.yml'
   workflow_dispatch:
 
 jobs:
@@ -30,7 +33,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: remove root AIVA Prep remnants
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: remove root AIVA Prep remnants
 
           Deleted:
           - /android/ (old AIVA Prep android folder)
@@ -39,4 +45,16 @@ jobs:
           - /analysis_options.yaml (old config)
           
           All apps now properly located in apps/ subdirectories"
-          git push
+            git push
+          fi
+          
+      - name: Self-delete workflow
+        run: |
+          rm -f .github/workflows/cleanup-root.yml
+          git add -A
+          if git diff --staged --quiet; then
+            echo "Workflow already removed"
+          else
+            git commit -m "chore: remove one-time cleanup workflow"
+            git push
+          fi
