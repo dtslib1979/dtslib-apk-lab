@@ -316,9 +316,10 @@ class ShareHandler extends StatefulWidget {
 class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.parksy.capture/share');
   
-  static const workerUrl = String.fromEnvironment('PARKSY_WORKER_URL', defaultValue: '');
-  static const apiKey = String.fromEnvironment('PARKSY_API_KEY', defaultValue: '');
-  static final cloudEnabled = workerUrl.isNotEmpty && apiKey.isNotEmpty;
+  // GitHub Direct API (no Worker needed)
+  static const _githubToken = String.fromEnvironment('PARKSY_GITHUB_TOKEN', defaultValue: '');
+  static const _githubRepo = 'dtslib1979/parksy-logs';
+  static final _syncEnabled = _githubToken.isNotEmpty;
 
   String _status = 'Receiving...';
   IconData _icon = Icons.downloading;
@@ -357,14 +358,19 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
         _icon = Icons.save;
       });
       
-      final localOk = await _saveLocal(text);
+      // Generate filename
+      final ts = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final fname = 'ParksyLog_$ts.md';
+      final content = _toMarkdown(text);
+      
+      final localOk = await _saveLocal(fname, content);
       if (!localOk) {
         _updateStatus('Save failed', Icons.error, const Color(0xFFF85149));
         _finish();
         return;
       }
 
-      if (!cloudEnabled) {
+      if (!_syncEnabled) {
         _updateStatus('Saved ✓', Icons.check_circle, const Color(0xFF7EE787));
         _finish();
         return;
@@ -375,7 +381,7 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
         _icon = Icons.cloud_upload;
       });
 
-      final cloudOk = await _saveCloud(text);
+      final cloudOk = await _syncToGitHub(fname, content);
       if (cloudOk) {
         _updateStatus('Saved & Synced ✓', Icons.cloud_done, const Color(0xFF7EE787));
       } else {
@@ -400,15 +406,11 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
     _animController.stop();
   }
 
-  Future<bool> _saveLocal(String text) async {
+  Future<bool> _saveLocal(String filename, String content) async {
     try {
-      final ts = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final fname = 'ParksyLog_$ts.md';
-      final content = _toMarkdown(text);
-      
       final result = await platform.invokeMethod<bool>(
         'saveToDownloads',
-        {'filename': fname, 'content': content},
+        {'filename': filename, 'content': content},
       );
       return result ?? false;
     } catch (e) {
@@ -416,19 +418,34 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
     }
   }
 
-  Future<bool> _saveCloud(String text) async {
+  Future<bool> _syncToGitHub(String filename, String content) async {
     try {
-      final ts = DateTime.now().toIso8601String();
-      final res = await http.post(
-        Uri.parse(workerUrl),
+      // Path: logs/2024/12/ParksyLog_20241218_123456.md
+      final now = DateTime.now();
+      final year = now.year.toString();
+      final month = now.month.toString().padLeft(2, '0');
+      final path = 'logs/$year/$month/$filename';
+      
+      // GitHub Contents API: PUT /repos/{owner}/{repo}/contents/{path}
+      final url = 'https://api.github.com/repos/$_githubRepo/contents/$path';
+      
+      final res = await http.put(
+        Uri.parse(url),
         headers: {
+          'Authorization': 'Bearer $_githubToken',
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
           'Content-Type': 'application/json',
-          'X-API-Key': apiKey,
         },
-        body: jsonEncode({'text': text, 'source': 'android', 'ts': ts}),
-      ).timeout(const Duration(seconds: 5));
-      return res.statusCode == 200 || res.statusCode == 201;
+        body: jsonEncode({
+          'message': 'Add $filename',
+          'content': base64Encode(utf8.encode(content)),
+        }),
+      ).timeout(const Duration(seconds: 10));
+      
+      return res.statusCode == 201 || res.statusCode == 200;
     } catch (e) {
+      debugPrint('GitHub sync failed: $e');
       return false;
     }
   }
