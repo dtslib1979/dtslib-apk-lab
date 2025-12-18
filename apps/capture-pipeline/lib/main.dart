@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 
 void main() {
@@ -61,7 +62,7 @@ class ParksyCaptureApp extends StatelessWidget {
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: Color(0xFF238636),
+        backgroundColor: Color(0xFF21262D),
         foregroundColor: Colors.white,
       ),
       snackBarTheme: SnackBarThemeData(
@@ -170,9 +171,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       color: Color(0xFF58A6FF),
     ),
     _OnboardingPage(
-      icon: Icons.upload,
-      title: 'Re-upload Anytime',
-      description: 'Browse saved logs and share them back.\nContinue conversations in any LLM app.',
+      icon: Icons.cloud_done,
+      title: 'Auto Backup to GitHub',
+      description: 'Logs sync to your private GitHub repo.\nAccess from any device, anytime.',
       color: Color(0xFF7EE787),
     ),
   ];
@@ -370,7 +371,7 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
       }
 
       setState(() {
-        _status = 'Uploading to cloud...';
+        _status = 'Syncing to GitHub...';
         _icon = Icons.cloud_upload;
       });
 
@@ -481,6 +482,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const platform = MethodChannel('com.parksy.capture/share');
+  static const _githubRepoUrl = 'https://github.com/dtslib1979/parksy-logs/tree/main/logs';
   
   List<Map<String, dynamic>> _logs = [];
   List<Map<String, dynamic>> _filteredLogs = [];
@@ -605,6 +607,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openGitHub() async {
+    final uri = Uri.parse(_githubRepoUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -638,6 +647,12 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(child: _buildList()),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openGitHub,
+        backgroundColor: const Color(0xFF21262D),
+        icon: const Icon(Icons.open_in_new, size: 20),
+        label: const Text('View on GitHub'),
       ),
     );
   }
@@ -933,7 +948,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 3.0.0'),
+            const Text('Version 4.0.0'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
@@ -1048,10 +1063,20 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
     setState(() => _starred = !_starred);
   }
 
-  Future<void> _shareContent() async {
-    if (_content == null) return;
-    final body = _extractBody(_content!);
-    await platform.invokeMethod('shareText', {'text': body, 'title': 'Share Log'});
+  Future<void> _openOnGitHub() async {
+    // Extract date from filename: ParksyLog_20251218_104313.md -> 2025/12
+    final match = RegExp(r'ParksyLog_(\d{4})(\d{2})').firstMatch(widget.filename);
+    String path = 'logs';
+    if (match != null) {
+      final year = match.group(1);
+      final month = match.group(2);
+      path = 'logs/$year/$month';
+    }
+    final url = 'https://github.com/dtslib1979/parksy-logs/tree/main/$path';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Future<void> _copyToClipboard() async {
@@ -1094,13 +1119,12 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
                     style: const TextStyle(fontSize: 15, height: 1.6),
                   ),
                 ),
-      floatingActionButton: _content != null
-          ? FloatingActionButton.extended(
-              onPressed: _shareContent,
-              icon: const Icon(Icons.upload),
-              label: const Text('Upload to LLM'),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openOnGitHub,
+        backgroundColor: const Color(0xFF21262D),
+        icon: const Icon(Icons.open_in_new, size: 20),
+        label: const Text('View on GitHub'),
+      ),
     );
   }
 }
