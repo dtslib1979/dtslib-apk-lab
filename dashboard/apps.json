@@ -11,19 +11,19 @@
   {
     "id": "laser-pen-overlay",
     "name": "Laser Pen Overlay",
-    "version": "v0.1.0",
+    "version": "v25.12.0",
     "description": "S Pen drawing overlay with finger passthrough",
     "icon": "✍️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
-    "lastUpdated": "2025-12-10"
+    "lastUpdated": "2025-12-18"
   },
   {
     "id": "aiva-trimmer",
     "name": "AIVA Trimmer",
-    "version": "v1.0.0",
+    "version": "v2.0.0",
     "description": "Audio trimmer optimized for AIVA exports",
     "icon": "🎧",
-    "downloadUrl": "#",
-    "lastUpdated": "TBD"
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
+    "lastUpdated": "2025-12-18"
   }
 ]
