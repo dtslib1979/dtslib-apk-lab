@@ -1,0 +1,36 @@
+name: Constitution Guard
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Run Constitution Guard
+        run: |
+          echo "🔍 Running Constitution Guard v1.3..."
+          python scripts/constitution_guard.py
+      
+      - name: Report Status
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ Constitution check passed"
+          else
+            echo "❌ Constitution violation detected"
+            echo "See CONSTITUTION.md §11 for enforcement rules"
+          fi

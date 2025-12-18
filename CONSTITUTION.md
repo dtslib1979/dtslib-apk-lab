@@ -1,4 +1,4 @@
-# PARKSY PERSONAL APK CONSTITUTION v1.1
+# PARKSY PERSONAL APK CONSTITUTION v1.3
 
 > Personal-use Android APK Development Constitution  
 > This document is **legally binding** for all projects in this repository.  
@@ -203,6 +203,127 @@ If an upgrade introduces:
 
 ---
 
+## 10. STORE SYNC LAW — Version Automation
+
+### 10.1 Single Source of Truth (SSOT)
+
+- **`apps/*/pubspec.yaml` version field is the ONLY truth**
+- `dashboard/apps.json` is auto-generated (DO NOT edit manually)
+- README에 버전 테이블 금지 (틀어지는 순간 배포 사고)
+
+### 10.2 Auto-Sync Pipeline
+
+```
+pubspec.yaml 버전 수정 → git push → publish-store-index.yml → apps.json 자동 갱신 → Vercel 배포
+```
+
+### 10.3 Commit Message Convention
+
+```
+release(앱이름): x.y.z+build
+```
+
+예: `release(capture-pipeline): 5.1.0+12`
+
+---
+
+## 11. HYBRID ENFORCEMENT LAW — Human-in-the-Loop Control
+
+This repository operates under a **Hybrid Enforcement Model**.
+
+The Constitution is enforced by code with **two levels of severity**:
+- 🔴 HARD BLOCK (execution must stop)
+- 🟡 SOFT WARNING (human decision required)
+
+---
+
+### 11.1 HARD BLOCK ZONES (Absolute Enforcement)
+
+The following paths are **CRITICAL ZONES**.
+
+Any constitutional violation detected in these paths MUST:
+- fail CI immediately
+- block merge to main
+- block deployment
+
+**Critical Paths:**
+```
+.github/**
+scripts/**
+dashboard/apps.json
+```
+
+These zones protect:
+- deployment integrity
+- store version correctness
+- atomic publishing guarantees
+
+**No AI agent is permitted to bypass this block.**
+
+---
+
+### 11.2 SOFT WARNING ZONES (Advisory Enforcement)
+
+The following paths are **EXPERIMENTAL ZONES**.
+
+Violations detected here MUST:
+- raise warnings
+- notify the human operator (Parksy)
+- request confirmation before promotion to main
+
+**Soft Zones:**
+```
+apps/**
+dashboard/** (except apps.json)
+```
+
+AI agents MAY continue working in these zones,
+but MUST clearly report:
+- which constitutional rule may be violated
+- why it might be justified
+- what non-goals were preserved
+
+---
+
+### 11.3 Human Decision Gate
+
+Only the human operator (Parksy) may:
+- approve a soft-zone violation
+- promote changes affecting critical zones
+- authorize constitutional amendments
+
+**AI agents MUST surface violations, but MUST NOT self-approve them.**
+
+---
+
+### 11.4 Enforcement Priority
+
+If a change touches BOTH zones in one commit:
+→ **HARD BLOCK rules take precedence.**
+
+Mixed commits are strongly discouraged.
+
+---
+
+### 11.5 Forbidden Patterns (Auto-Detected)
+
+```python
+FORBIDDEN_PATTERNS = [
+    r'firebase',
+    r'analytics',
+    r'crashlytics',
+    r'admob',
+    r'play.?store',
+    r'app.?store',
+    r'login|signup|auth',
+    r'subscription|payment',
+    r'telemetry|tracking',
+    r'multi.?user|multi.?device',
+]
+```
+
+---
+
 ## AMENDMENTS
 
 ### Amendment A1 — GitHub Archive Exception (2025-12-14)
@@ -213,19 +334,11 @@ If an upgrade introduces:
 - OLD: "Cloud servers, databases, APIs, uploads" (absolute prohibition)
 - NEW: GitHub repository archiving is **PERMITTED** for personal data asset purposes
 
-**Rationale:** 
-- Capture Pipeline requires GitHub API for archiving captured text
-- This serves the core purpose of "Personal workflow acceleration"
-- GitHub is already the "single source of truth" per §2.1
-- Data remains under personal control (private repository)
-- Enables LLM training dataset creation from personal captures
-
 **Scope:**
 - GitHub repository write access ONLY
 - No external cloud services (AWS, Firebase, etc.)
 - No third-party APIs beyond GitHub
-- Cloudflare Worker permitted as stateless proxy only
 
 ---
 
-**END OF CONSTITUTION v1.1+A1**
+**END OF CONSTITUTION v1.3**
