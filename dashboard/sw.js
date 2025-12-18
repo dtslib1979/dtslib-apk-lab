@@ -1,40 +1,42 @@
-const CACHE_NAME = 'apk-store-v9';
-const ASSETS = [
-    './',
-    './index.html',
-    './style.css',
-    './app.js',
-    './apps.json',
-    './manifest.json',
-    './icons/icon-192.png',
-    './icons/icon-512.png'
+const CACHE_NAME = 'apk-store-v10';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/app.js',
+  '/apps.json'
 ];
 
-// Install
 self.addEventListener('install', event => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(ASSETS))
-            .then(() => self.skipWaiting())
-    );
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
+  );
 });
 
-// Activate
 self.addEventListener('activate', event => {
-    event.waitUntil(
-        caches.keys().then(keys => {
-            return Promise.all(
-                keys.filter(k => k !== CACHE_NAME)
-                    .map(k => caches.delete(k))
-            );
-        }).then(() => self.clients.claim())
-    );
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
-// Fetch (Cache First)
 self.addEventListener('fetch', event => {
-    event.respondWith(
-        caches.match(event.request)
-            .then(cached => cached || fetch(event.request))
-    );
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request);
+      })
+  );
 });

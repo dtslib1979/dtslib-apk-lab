@@ -1,32 +1,29 @@
 [
   {
-    "id": "aiva-trimmer",
-    "name": "AIVA Trimmer",
-    "desc": "AIVA 음악 2분 트리밍",
-    "version": "v2.0.0",
-    "icon": "✂️",
-    "cardClass": "aiva",
-    "workflow": "build-aiva-trimmer",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip"
-  },
-  {
     "id": "capture-pipeline",
     "name": "Capture Pipeline",
-    "desc": "공유 텍스트 캡처 & 아카이빙",
-    "version": "v4.0.0",
-    "icon": "📥",
-    "cardClass": "capture",
-    "workflow": "build-capture-pipeline",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip"
+    "version": "v4.1.0",
+    "description": "Lossless conversation capture for LLM power users",
+    "icon": "💾",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
+    "lastUpdated": "2025-12-18"
   },
   {
     "id": "laser-pen-overlay",
     "name": "Laser Pen Overlay",
-    "desc": "S Pen 그리기 + 손가락 스크롤 분리 (Wacom 스타일)",
-    "version": "v25.12",
-    "icon": "🖊️",
-    "cardClass": "laser",
-    "workflow": "build-laser-pen",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip"
+    "version": "v0.1.0",
+    "description": "S Pen drawing overlay with finger passthrough",
+    "icon": "✍️",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
+    "lastUpdated": "2025-12-10"
+  },
+  {
+    "id": "aiva-trimmer",
+    "name": "AIVA Trimmer",
+    "version": "v1.0.0",
+    "description": "Audio trimmer optimized for AIVA exports",
+    "icon": "🎧",
+    "downloadUrl": "#",
+    "lastUpdated": "TBD"
   }
 ]
