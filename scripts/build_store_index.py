@@ -35,6 +35,14 @@ APPS_CONFIG = [
         "icon": "🎧",
         "pubspec": "apps/aiva-trimmer/pubspec.yaml",
         "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip"
+    },
+    {
+        "id": "tts-factory",
+        "name": "TTS Factory",
+        "description": "Batch TTS processing with Google Cloud",
+        "icon": "🎙️",
+        "pubspec": "apps/tts-factory/pubspec.yaml",
+        "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip"
     }
 ]
 

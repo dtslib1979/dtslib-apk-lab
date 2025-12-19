@@ -25,5 +25,14 @@
     "icon": "🎧",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
     "lastUpdated": "2025-12-18"
+  },
+  {
+    "id": "tts-factory",
+    "name": "TTS Factory",
+    "version": "v1.0.0",
+    "description": "Batch TTS processing with Google Cloud",
+    "icon": "🎙️",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
+    "lastUpdated": "2025-12-19"
   }
 ]

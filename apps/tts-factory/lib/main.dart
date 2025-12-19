@@ -1,0 +1,585 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+  runApp(const TTSFactoryApp());
+}
+
+class TTSFactoryApp extends StatelessWidget {
+  const TTSFactoryApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'TTS Factory',
+      debugShowCheckedModeBanner: false,
+      theme: _buildDarkTheme(),
+      home: const HomeScreen(),
+    );
+  }
+
+  ThemeData _buildDarkTheme() {
+    return ThemeData.dark().copyWith(
+      scaffoldBackgroundColor: const Color(0xFF0D1117),
+      primaryColor: const Color(0xFF58A6FF),
+      colorScheme: const ColorScheme.dark(
+        primary: Color(0xFF58A6FF),
+        secondary: Color(0xFF7EE787),
+        surface: Color(0xFF161B22),
+        error: Color(0xFFF85149),
+      ),
+      cardTheme: CardTheme(
+        color: const Color(0xFF161B22),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF30363D)),
+        ),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF0D1117),
+        elevation: 0,
+        centerTitle: false,
+      ),
+    );
+  }
+}
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  static const _serverUrl = String.fromEnvironment('TTS_SERVER_URL', defaultValue: '');
+  static const _appSecret = String.fromEnvironment('TTS_APP_SECRET', defaultValue: '');
+
+  final List<TTSItem> _items = [];
+  String _preset = 'neutral';
+  String? _currentJobId;
+  JobStatus _jobStatus = JobStatus.idle;
+  int _progress = 0;
+  int _total = 0;
+  Timer? _pollTimer;
+
+  final _presets = {
+    'neutral': '중립',
+    'calm': '차분',
+    'bright': '밝음',
+  };
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _pickTextFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['txt', 'md'],
+      allowMultiple: false,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      final file = File(result.files.single.path!);
+      final content = await file.readAsString();
+      _parseContent(content);
+    }
+  }
+
+  void _parseContent(String content) {
+    final lines = content.split('\n');
+    final items = <TTSItem>[];
+    int idx = 1;
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      if (trimmed.length > 1100) {
+        _showError('Item $idx exceeds 1100 characters');
+        return;
+      }
+      items.add(TTSItem(
+        id: idx.toString().padLeft(2, '0'),
+        text: trimmed,
+      ));
+      idx++;
+    }
+
+    if (items.length > 25) {
+      _showError('Maximum 25 items allowed');
+      return;
+    }
+
+    setState(() {
+      _items.clear();
+      _items.addAll(items);
+    });
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFF85149),
+      ),
+    );
+  }
+
+  Future<void> _startJob() async {
+    if (_items.isEmpty) {
+      _showError('No items to process');
+      return;
+    }
+
+    if (_serverUrl.isEmpty || _appSecret.isEmpty) {
+      _showError('Server not configured');
+      return;
+    }
+
+    setState(() {
+      _jobStatus = JobStatus.queued;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_serverUrl/v1/jobs'),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-app-secret': _appSecret,
+        },
+        body: jsonEncode({
+          'batch_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+          'preset': _preset,
+          'items': _items.map((e) => {
+            'id': e.id,
+            'text': e.text,
+            'max_chars': 1100,
+          }).toList(),
+        }),
+      );
+
+      if (response.statusCode == 202) {
+        final data = jsonDecode(response.body);
+        _currentJobId = data['job_id'];
+        setState(() {
+          _jobStatus = JobStatus.processing;
+          _total = _items.length;
+        });
+        _startPolling();
+      } else {
+        _showError('Failed to create job: ${response.statusCode}');
+        setState(() => _jobStatus = JobStatus.idle);
+      }
+    } catch (e) {
+      _showError('Network error: $e');
+      setState(() => _jobStatus = JobStatus.idle);
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pollStatus());
+  }
+
+  Future<void> _pollStatus() async {
+    if (_currentJobId == null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_serverUrl/v1/jobs/$_currentJobId'),
+        headers: {'x-app-secret': _appSecret},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _progress = data['progress'] ?? 0;
+          _total = data['total'] ?? _items.length;
+        });
+
+        if (data['status'] == 'completed') {
+          _pollTimer?.cancel();
+          await _downloadResult();
+        } else if (data['status'] == 'failed') {
+          _pollTimer?.cancel();
+          _showError('Job failed');
+          setState(() => _jobStatus = JobStatus.idle);
+        }
+      }
+    } catch (e) {
+      debugPrint('Poll error: $e');
+    }
+  }
+
+  Future<void> _downloadResult() async {
+    if (_currentJobId == null) return;
+
+    setState(() => _jobStatus = JobStatus.downloading);
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_serverUrl/v1/jobs/$_currentJobId/download'),
+        headers: {'x-app-secret': _appSecret},
+      );
+
+      if (response.statusCode == 200) {
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$_currentJobId.zip');
+        await file.writeAsBytes(response.bodyBytes);
+
+        setState(() => _jobStatus = JobStatus.completed);
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF161B22),
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Color(0xFF7EE787)),
+                  SizedBox(width: 12),
+                  Text('Complete'),
+                ],
+              ),
+              content: Text('Downloaded: ${file.path}'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Share.shareXFiles([XFile(file.path)]);
+                  },
+                  child: const Text('Share'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        setState(() {
+          _jobStatus = JobStatus.idle;
+          _currentJobId = null;
+          _progress = 0;
+        });
+      } else {
+        _showError('Download failed');
+        setState(() => _jobStatus = JobStatus.idle);
+      }
+    } catch (e) {
+      _showError('Download error: $e');
+      setState(() => _jobStatus = JobStatus.idle);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Row(
+          children: [
+            Text('🎙️', style: TextStyle(fontSize: 24)),
+            SizedBox(width: 12),
+            Text('TTS Factory'),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: _showAbout,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildPresetSelector(),
+            _buildStatus(),
+            Expanded(child: _buildItemList()),
+          ],
+        ),
+      ),
+      floatingActionButton: _buildFAB(),
+    );
+  }
+
+  Widget _buildPresetSelector() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      child: Row(
+        children: [
+          const Text('Voice:', style: TextStyle(color: Colors.grey)),
+          const SizedBox(width: 16),
+          ..._presets.entries.map((e) => Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(e.value),
+              selected: _preset == e.key,
+              onSelected: _jobStatus == JobStatus.idle
+                  ? (selected) {
+                      if (selected) setState(() => _preset = e.key);
+                    }
+                  : null,
+              selectedColor: const Color(0xFF58A6FF).withOpacity(0.3),
+              backgroundColor: const Color(0xFF21262D),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatus() {
+    if (_jobStatus == JobStatus.idle) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161B22),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF30363D)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _StatItem(label: 'Items', value: '${_items.length}'),
+            _StatItem(label: 'Max', value: '25'),
+            _StatItem(
+              label: 'Chars',
+              value: _items.isEmpty
+                  ? '0'
+                  : '${_items.map((e) => e.text.length).reduce((a, b) => a + b)}',
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _jobStatus.label,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text('$_progress / $_total'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            value: _total > 0 ? _progress / _total : null,
+            backgroundColor: const Color(0xFF30363D),
+            color: const Color(0xFF58A6FF),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemList() {
+    if (_items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.upload_file, size: 64, color: Colors.grey[700]),
+            const SizedBox(height: 16),
+            Text(
+              'Load a text file to start',
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Each line becomes one TTS item',
+              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _items.length,
+      itemBuilder: (context, index) {
+        final item = _items[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: const Color(0xFF21262D),
+              child: Text(
+                item.id,
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
+            ),
+            title: Text(
+              item.text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14),
+            ),
+            trailing: Text(
+              '${item.text.length}',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget? _buildFAB() {
+    if (_jobStatus != JobStatus.idle) return null;
+
+    if (_items.isEmpty) {
+      return FloatingActionButton.extended(
+        onPressed: _pickTextFile,
+        backgroundColor: const Color(0xFF238636),
+        icon: const Icon(Icons.upload_file),
+        label: const Text('Load File'),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FloatingActionButton(
+          heroTag: 'clear',
+          mini: true,
+          onPressed: () => setState(() => _items.clear()),
+          backgroundColor: const Color(0xFF21262D),
+          child: const Icon(Icons.clear),
+        ),
+        const SizedBox(height: 12),
+        FloatingActionButton.extended(
+          heroTag: 'start',
+          onPressed: _startJob,
+          backgroundColor: const Color(0xFF238636),
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Start'),
+        ),
+      ],
+    );
+  }
+
+  void _showAbout() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161B22),
+        title: const Row(
+          children: [
+            Text('🎙️', style: TextStyle(fontSize: 24)),
+            SizedBox(width: 12),
+            Text('TTS Factory'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Version 1.0.0'),
+            SizedBox(height: 16),
+            Text(
+              'Batch TTS processing client.\n\n'
+              '• Max 25 items per batch\n'
+              '• Max 1100 chars per item\n'
+              '• Korean Neural2 voices',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TTSItem {
+  final String id;
+  final String text;
+
+  TTSItem({required this.id, required this.text});
+}
+
+enum JobStatus {
+  idle('Ready'),
+  queued('Queued...'),
+  processing('Processing...'),
+  downloading('Downloading...'),
+  completed('Completed');
+
+  final String label;
+  const JobStatus(this.label);
+}
+
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF58A6FF),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        ),
+      ],
+    );
+  }
+}

@@ -1,0 +1,57 @@
+name: Build TTS Factory
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/tts-factory/**'
+      - '.github/workflows/build-tts-factory.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/tts-factory
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secret leak guard
+        run: |
+          cd ../..
+          if grep -rE "CHANGE_ME|ghp_|gho_|github_pat_" --include="*.dart" --include="*.kt" --include="*.js" apps/tts-factory/; then
+            echo "::error::Secret-like string found in source code!"
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets detected"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
+        run: |
+          flutter build apk --debug \
+            --dart-define=TTS_SERVER_URL=${{ secrets.TTS_SERVER_URL }} \
+            --dart-define=TTS_APP_SECRET=${{ secrets.TTS_APP_SECRET }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tts-factory-debug
+          path: apps/tts-factory/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
