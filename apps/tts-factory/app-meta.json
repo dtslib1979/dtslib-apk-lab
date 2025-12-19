@@ -1,0 +1,9 @@
+{
+  "id": "tts-factory",
+  "name": "TTS Factory",
+  "desc": "배치 TTS 변환 클라이언트",
+  "version": "v1.0.0",
+  "icon": "🎙️",
+  "cardClass": "tts",
+  "workflow": "build-tts-factory"
+}
