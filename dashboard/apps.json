@@ -6,7 +6,7 @@
     "description": "Lossless conversation capture for LLM power users",
     "icon": "💾",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
-    "lastUpdated": "2025-12-18"
+    "lastUpdated": "2025-12-19"
   },
   {
     "id": "laser-pen-overlay",
@@ -15,7 +15,7 @@
     "description": "S Pen drawing overlay with finger passthrough",
     "icon": "✍️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
-    "lastUpdated": "2025-12-18"
+    "lastUpdated": "2025-12-19"
   },
   {
     "id": "aiva-trimmer",
@@ -24,7 +24,7 @@
     "description": "Audio trimmer optimized for AIVA exports",
     "icon": "🎧",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
-    "lastUpdated": "2025-12-18"
+    "lastUpdated": "2025-12-19"
   },
   {
     "id": "tts-factory",
