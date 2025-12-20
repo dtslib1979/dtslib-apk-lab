@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 
 void main() {
@@ -83,11 +82,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _progress = 0;
   int _total = 0;
   Timer? _pollTimer;
+  String? _lastDownloadPath;
 
   final _presets = {
-    'neutral': '중립',
-    'calm': '차분',
-    'bright': '밝음',
+    'neutral': 'Neutral',
+    'calm': 'Calm',
+    'bright': 'Bright',
   };
 
   @override
@@ -114,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;
       if (trimmed.length > 1100) {
-        _showError('Item $idx exceeds 1100 characters');
+        _showError('Item $idx exceeds 1100 chars');
         return;
       }
       items.add(TTSItem(
@@ -125,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (items.length > 25) {
-      _showError('Maximum 25 items allowed');
+      _showError('Max 25 items allowed');
       return;
     }
 
@@ -135,18 +135,27 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _showError(String message) {
+  void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(msg),
         backgroundColor: const Color(0xFFF85149),
+      ),
+    );
+  }
+
+  void _showSuccess(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: const Color(0xFF238636),
       ),
     );
   }
 
   Future<void> _startJob() async {
     if (_items.isEmpty) {
-      _showError('No items to process');
+      _showError('No items');
       return;
     }
 
@@ -155,9 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    setState(() {
-      _jobStatus = JobStatus.queued;
-    });
+    setState(() => _jobStatus = JobStatus.queued);
 
     try {
       final response = await http.post(
@@ -249,37 +256,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final file = File('${dir.path}/$_currentJobId.zip');
         await file.writeAsBytes(response.bodyBytes);
 
-        setState(() => _jobStatus = JobStatus.completed);
-
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              backgroundColor: const Color(0xFF161B22),
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Color(0xFF7EE787)),
-                  SizedBox(width: 12),
-                  Text('Complete'),
-                ],
-              ),
-              content: Text('Downloaded: ${file.path}'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Close'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Share.shareXFiles([XFile(file.path)]);
-                  },
-                  child: const Text('Share'),
-                ),
-              ],
-            ),
-          );
-        }
+        _lastDownloadPath = file.path;
+        _showSuccess('Downloaded: ${file.path}');
 
         setState(() {
           _jobStatus = JobStatus.idle;
@@ -302,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Row(
           children: [
-            Text('🎙️', style: TextStyle(fontSize: 24)),
+            Icon(Icons.mic, size: 28),
             SizedBox(width: 12),
             Text('TTS Factory'),
           ],
@@ -346,11 +324,11 @@ class _HomeScreenState extends State<HomeScreen> {
               label: Text(e.value),
               selected: _preset == e.key,
               onSelected: _jobStatus == JobStatus.idle
-                  ? (selected) {
-                      if (selected) setState(() => _preset = e.key);
+                  ? (sel) {
+                      if (sel) setState(() => _preset = e.key);
                     }
                   : null,
-              selectedColor: const Color(0xFF58A6FF).withValues(alpha: 0.3),
+              selectedColor: const Color(0xFF58A6FF).withOpacity(0.3),
               backgroundColor: const Color(0xFF21262D),
             ),
           )),
@@ -373,7 +351,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _StatItem(label: 'Items', value: '${_items.length}'),
-            _StatItem(label: 'Max', value: '25'),
+            const _StatItem(label: 'Max', value: '25'),
             _StatItem(
               label: 'Chars',
               value: _items.isEmpty
@@ -430,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Each line becomes one TTS item',
+              'Each line = one TTS item',
               style: TextStyle(color: Colors.grey[700], fontSize: 12),
             ),
           ],
@@ -510,7 +488,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF161B22),
         title: const Row(
           children: [
-            Text('🎙️', style: TextStyle(fontSize: 24)),
+            Icon(Icons.mic, size: 28),
             SizedBox(width: 12),
             Text('TTS Factory'),
           ],
@@ -522,10 +500,10 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('Version 1.0.0'),
             SizedBox(height: 16),
             Text(
-              'Batch TTS processing client.\n\n'
-              '• Max 25 items per batch\n'
-              '• Max 1100 chars per item\n'
-              '• Korean Neural2 voices',
+              'Batch TTS client.\n\n'
+              'Max 25 items\n'
+              'Max 1100 chars/item\n'
+              'Korean Neural2 voices',
               style: TextStyle(color: Colors.grey),
             ),
           ],
@@ -544,7 +522,6 @@ class _HomeScreenState extends State<HomeScreen> {
 class TTSItem {
   final String id;
   final String text;
-
   TTSItem({required this.id, required this.text});
 }
 
@@ -562,7 +539,6 @@ enum JobStatus {
 class _StatItem extends StatelessWidget {
   final String label;
   final String value;
-
   const _StatItem({required this.label, required this.value});
 
   @override
