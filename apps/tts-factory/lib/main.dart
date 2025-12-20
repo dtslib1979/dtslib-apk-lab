@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,14 +67,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _serverUrl = String.fromEnvironment(
-    'TTS_SERVER_URL',
-    defaultValue: '',
-  );
-  static const _appSecret = String.fromEnvironment(
-    'TTS_APP_SECRET',
-    defaultValue: '',
-  );
+  String _serverUrl = '';
+  String _appSecret = '';
+  bool _isLoading = true;
 
   final List<TTSItem> _items = [];
   String _preset = 'neutral';
@@ -89,6 +85,31 @@ class _HomeScreenState extends State<HomeScreen> {
     'calm': 'Calm',
     'bright': 'Bright',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _serverUrl = prefs.getString('tts_server_url') ?? '';
+      _appSecret = prefs.getString('tts_app_secret') ?? '';
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveSettings(String url, String secret) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('tts_server_url', url);
+    await prefs.setString('tts_app_secret', secret);
+    setState(() {
+      _serverUrl = url;
+      _appSecret = secret;
+    });
+  }
 
   @override
   void dispose() {
@@ -160,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_serverUrl.isEmpty || _appSecret.isEmpty) {
-      _showError('Server not configured');
+      _showError('Server not configured - tap Settings');
       return;
     }
 
@@ -197,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _jobStatus = JobStatus.idle);
       }
     } catch (e) {
-      _showError('Network error');
+      _showError('Network error: $e');
       setState(() => _jobStatus = JobStatus.idle);
     }
   }
@@ -274,8 +295,77 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _openSettings() {
+    final urlController = TextEditingController(text: _serverUrl);
+    final secretController = TextEditingController(text: _appSecret);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161B22),
+        title: const Row(
+          children: [
+            Icon(Icons.settings, size: 24),
+            SizedBox(width: 12),
+            Text('Settings'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: urlController,
+              decoration: const InputDecoration(
+                labelText: 'Server URL',
+                hintText: 'https://your-tts-server.com',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: secretController,
+              decoration: const InputDecoration(
+                labelText: 'App Secret',
+                hintText: 'your-secret-key',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _saveSettings(
+                urlController.text.trim(),
+                secretController.text.trim(),
+              );
+              Navigator.pop(ctx);
+              _showSuccess('Settings saved');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF238636),
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Row(
@@ -287,6 +377,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            icon: Icon(
+              Icons.settings,
+              color: _serverUrl.isEmpty ? Colors.orange : Colors.grey,
+            ),
+            onPressed: _openSettings,
+          ),
+          IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: _showAbout,
           ),
@@ -295,6 +392,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            if (_serverUrl.isEmpty) _buildSetupBanner(),
             _buildPresetSelector(),
             _buildStatus(),
             Expanded(child: _buildItemList()),
@@ -302,6 +400,34 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: _buildFAB(),
+    );
+  }
+
+  Widget _buildSetupBanner() {
+    return GestureDetector(
+      onTap: _openSettings,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.orange),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.warning_amber, color: Colors.orange),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Tap here to configure server URL',
+                style: TextStyle(color: Colors.orange),
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.orange, size: 16),
+          ],
+        ),
+      ),
     );
   }
 
@@ -493,18 +619,23 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('TTS Factory'),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Version 1.0.0'),
-            SizedBox(height: 16),
-            Text(
+            const Text('Version 1.0.1'),
+            const SizedBox(height: 16),
+            const Text(
               'Batch TTS client.\n\n'
               'Max 25 items\n'
               'Max 1100 chars/item\n'
               'Korean Neural2 voices',
               style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Server: ${_serverUrl.isEmpty ? "Not configured" : _serverUrl}',
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
           ],
         ),
