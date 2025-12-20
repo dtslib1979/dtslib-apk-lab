@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
@@ -68,8 +67,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _serverUrl = String.fromEnvironment('TTS_SERVER_URL', defaultValue: '');
-  static const _appSecret = String.fromEnvironment('TTS_APP_SECRET', defaultValue: '');
+  static const _serverUrl = String.fromEnvironment(
+    'TTS_SERVER_URL',
+    defaultValue: '',
+  );
+  static const _appSecret = String.fromEnvironment(
+    'TTS_APP_SECRET',
+    defaultValue: '',
+  );
 
   final List<TTSItem> _items = [];
   String _preset = 'neutral';
@@ -91,17 +96,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _pickTextFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['txt', 'md'],
-      allowMultiple: false,
-    );
-
-    if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final content = await file.readAsString();
-      _parseContent(content);
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text != null && data!.text!.isNotEmpty) {
+      _parseContent(data.text!);
+    } else {
+      _showError('Clipboard is empty');
     }
   }
 
@@ -186,18 +186,21 @@ class _HomeScreenState extends State<HomeScreen> {
         });
         _startPolling();
       } else {
-        _showError('Failed to create job: ${response.statusCode}');
+        _showError('Failed: ${response.statusCode}');
         setState(() => _jobStatus = JobStatus.idle);
       }
     } catch (e) {
-      _showError('Network error: $e');
+      _showError('Network error');
       setState(() => _jobStatus = JobStatus.idle);
     }
   }
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pollStatus());
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _pollStatus(),
+    );
   }
 
   Future<void> _pollStatus() async {
@@ -288,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _jobStatus = JobStatus.idle);
       }
     } catch (e) {
-      _showError('Download error: $e');
+      _showError('Download error');
       setState(() => _jobStatus = JobStatus.idle);
     }
   }
@@ -347,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (selected) setState(() => _preset = e.key);
                     }
                   : null,
-              selectedColor: const Color(0xFF58A6FF).withOpacity(0.3),
+              selectedColor: const Color(0xFF58A6FF).withValues(alpha: 0.3),
               backgroundColor: const Color(0xFF21262D),
             ),
           )),
@@ -419,10 +422,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.upload_file, size: 64, color: Colors.grey[700]),
+            Icon(Icons.content_paste, size: 64, color: Colors.grey[700]),
             const SizedBox(height: 16),
             Text(
-              'Load a text file to start',
+              'Paste text to start',
               style: TextStyle(color: Colors.grey[500]),
             ),
             const SizedBox(height: 8),
@@ -471,10 +474,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (_items.isEmpty) {
       return FloatingActionButton.extended(
-        onPressed: _pickTextFile,
+        onPressed: _pasteFromClipboard,
         backgroundColor: const Color(0xFF238636),
-        icon: const Icon(Icons.upload_file),
-        label: const Text('Load File'),
+        icon: const Icon(Icons.content_paste),
+        label: const Text('Paste'),
       );
     }
 
