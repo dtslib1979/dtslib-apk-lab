@@ -33,6 +33,7 @@
     "description": "Batch TTS processing with Google Cloud",
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
-    "lastUpdated": "2025-12-19"
+    "lastUpdated": "2025-12-20",
+    "serverRequired": true
   }
 ]
