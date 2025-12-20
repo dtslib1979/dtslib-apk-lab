@@ -29,7 +29,7 @@
   {
     "id": "tts-factory",
     "name": "TTS Factory",
-    "version": "v1.0.0",
+    "version": "v1.0.1",
     "description": "Batch TTS processing with Google Cloud",
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
