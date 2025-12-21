@@ -444,20 +444,23 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const Text('Voice:', style: TextStyle(color: Colors.grey)),
           const SizedBox(width: 16),
-          ..._presets.entries.map((e) => Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(e.value),
-              selected: _preset == e.key,
-              onSelected: _jobStatus == JobStatus.idle
-                  ? (sel) {
-                      if (sel) setState(() => _preset = e.key);
-                    }
-                  : null,
-              selectedColor: const Color(0xFF58A6FF).withOpacity(0.3),
-              backgroundColor: const Color(0xFF21262D),
+          Expanded(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _presets.entries.map((e) => ChoiceChip(
+                label: Text(e.value),
+                selected: _preset == e.key,
+                onSelected: _jobStatus == JobStatus.idle
+                    ? (sel) {
+                        if (sel) setState(() => _preset = e.key);
+                      }
+                    : null,
+                selectedColor: const Color(0xFF58A6FF).withOpacity(0.3),
+                backgroundColor: const Color(0xFF21262D),
+              )).toList(),
             ),
-          )),
+          ),
         ],
       ),
     );
