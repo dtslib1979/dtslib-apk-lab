@@ -2,7 +2,7 @@
   "id": "laser-pen-overlay",
   "name": "Laser Pen Overlay",
   "desc": "S Pen 그리기 + 손가락 스크롤 분리 (Wacom 스타일)",
-  "version": "v25.12",
+  "version": "v25.12.0",
   "icon": "🖊️",
   "cardClass": "laser",
   "workflow": "build-laser-pen"
