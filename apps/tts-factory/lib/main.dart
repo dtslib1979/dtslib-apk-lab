@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -86,10 +85,21 @@ class _HomeScreenState extends State<HomeScreen> {
     'bright': 'Bright',
   };
 
+  // Download folder path
+  static const _downloadBasePath = '/storage/emulated/0/Download/TTS-Factory';
+
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _ensureDownloadFolder();
+  }
+
+  Future<void> _ensureDownloadFolder() async {
+    final dir = Directory(_downloadBasePath);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -170,6 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
       SnackBar(
         content: Text(msg),
         backgroundColor: const Color(0xFF238636),
+        duration: const Duration(seconds: 5),
       ),
     );
   }
@@ -252,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
           await _downloadResult();
         } else if (data['status'] == 'failed') {
           _pollTimer?.cancel();
-          _showError('Job failed');
+          _showError('Job failed: ${data['error'] ?? 'Unknown error'}');
           setState(() => _jobStatus = JobStatus.idle);
         }
       }
@@ -273,24 +284,27 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (response.statusCode == 200) {
-        final dir = await getApplicationDocumentsDirectory();
-        final file = File('${dir.path}/$_currentJobId.zip');
+        await _ensureDownloadFolder();
+        final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+        final fileName = 'tts_$timestamp.zip';
+        final file = File('$_downloadBasePath/$fileName');
         await file.writeAsBytes(response.bodyBytes);
 
         _lastDownloadPath = file.path;
-        _showSuccess('Downloaded: ${file.path}');
+        _showSuccess('Downloaded to Download/TTS-Factory/$fileName');
 
         setState(() {
           _jobStatus = JobStatus.idle;
           _currentJobId = null;
           _progress = 0;
+          _items.clear();
         });
       } else {
-        _showError('Download failed');
+        _showError('Download failed: ${response.statusCode}');
         setState(() => _jobStatus = JobStatus.idle);
       }
     } catch (e) {
-      _showError('Download error');
+      _showError('Download error: $e');
       setState(() => _jobStatus = JobStatus.idle);
     }
   }
@@ -331,6 +345,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 border: OutlineInputBorder(),
               ),
               obscureText: true,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF21262D),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.folder, size: 16, color: Colors.grey),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Download: /Download/TTS-Factory/',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -626,7 +660,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 1.0.1'),
+            const Text('Version 1.0.2'),
             const SizedBox(height: 16),
             const Text(
               'Batch TTS client.\n\n'
@@ -639,6 +673,11 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               'Server: ${_serverUrl.isEmpty ? "Not configured" : _serverUrl}',
               style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Download: /Download/TTS-Factory/',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
           ],
         ),
