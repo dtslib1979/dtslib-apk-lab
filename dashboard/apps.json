@@ -1,7 +1,7 @@
 [
   {
     "id": "capture-pipeline",
-    "name": "Capture Pipeline",
+    "name": "Parksy Capture",
     "version": "v5.0.0",
     "description": "Lossless conversation capture for LLM power users",
     "icon": "💾",
@@ -10,7 +10,7 @@
   },
   {
     "id": "laser-pen-overlay",
-    "name": "Laser Pen Overlay",
+    "name": "Parksy Pen",
     "version": "v25.12.0",
     "description": "S Pen drawing overlay with finger passthrough",
     "icon": "✍️",
@@ -19,7 +19,7 @@
   },
   {
     "id": "aiva-trimmer",
-    "name": "AIVA Trimmer",
+    "name": "Parksy AIVA",
     "version": "v2.0.0",
     "description": "Audio trimmer optimized for AIVA exports",
     "icon": "🎧",
@@ -28,7 +28,7 @@
   },
   {
     "id": "tts-factory",
-    "name": "TTS Factory",
+    "name": "Parksy TTS",
     "version": "v1.0.2",
     "description": "Batch TTS processing with Google Cloud",
     "icon": "🎙️",
