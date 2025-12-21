@@ -1,6 +1,6 @@
 {
   "id": "capture-pipeline",
-  "name": "Capture Pipeline",
+  "name": "Parksy Capture",
   "desc": "공유 텍스트 캡처 & 아카이빙",
   "version": "v5.0.0",
   "icon": "📥",

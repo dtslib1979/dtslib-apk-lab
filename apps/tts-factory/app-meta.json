@@ -1,6 +1,6 @@
 {
   "id": "tts-factory",
-  "name": "TTS Factory",
+  "name": "Parksy TTS",
   "desc": "배치 TTS 변환 클라이언트",
   "version": "v1.0.2",
   "icon": "🎙️",
