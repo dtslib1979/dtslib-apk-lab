@@ -1,38 +1,38 @@
 [
   {
     "id": "capture-pipeline",
-    "name": "Parksy Capture",
+    "name": "Capture Pipeline",
     "version": "v5.0.0",
     "description": "Lossless conversation capture for LLM power users",
     "icon": "💾",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
-    "lastUpdated": "2025-12-21"
+    "lastUpdated": "2025-12-22"
   },
   {
     "id": "laser-pen-overlay",
-    "name": "Parksy Pen",
+    "name": "Laser Pen Overlay",
     "version": "v25.12.0",
     "description": "S Pen drawing overlay with finger passthrough",
     "icon": "✍️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
-    "lastUpdated": "2025-12-21"
+    "lastUpdated": "2025-12-22"
   },
   {
     "id": "aiva-trimmer",
-    "name": "Parksy AIVA",
+    "name": "AIVA Trimmer",
     "version": "v2.0.0",
     "description": "Audio trimmer optimized for AIVA exports",
     "icon": "🎧",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
-    "lastUpdated": "2025-12-21"
+    "lastUpdated": "2025-12-22"
   },
   {
     "id": "tts-factory",
-    "name": "Parksy TTS",
+    "name": "TTS Factory",
     "version": "v1.0.2",
     "description": "Batch TTS processing with Google Cloud",
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
-    "lastUpdated": "2025-12-21"
+    "lastUpdated": "2025-12-22"
   }
 ]
