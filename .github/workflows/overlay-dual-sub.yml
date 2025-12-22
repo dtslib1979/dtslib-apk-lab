@@ -2,6 +2,7 @@ name: Build Overlay Dual Subtitle APK
 
 on:
   push:
+    branches: [main]
     paths:
       - 'apps/overlay-dual-sub/**'
       - '.github/workflows/overlay-dual-sub.yml'
@@ -10,63 +11,35 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/overlay-dual-sub
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
 
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Download Gradle 8.2 directly
-        working-directory: apps/overlay-dual-sub
-        run: |
-          mkdir -p gradle/wrapper
-          curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.2.0/gradle/wrapper/gradle-wrapper.jar
-          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-          cat > gradlew << 'SCRIPT'
-          #!/bin/sh
-          JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
-          exec "$JAVA_HOME/bin/java" -jar "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" "$@"
-          SCRIPT
-          chmod +x gradlew
+      - name: Get dependencies
+        run: flutter pub get
 
       - name: Build Debug APK
-        working-directory: apps/overlay-dual-sub
-        run: |
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace --info 2>&1 | tee build.log
-          echo ""
-          echo "=========================================="
-          echo "SEARCHING FOR APK FILES"
-          echo "=========================================="
-          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-          echo "=========================================="
-          echo "BUILD LOG - LAST 100 LINES"
-          echo "=========================================="
-          tail -100 build.log
+        run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: overlay-dual-sub-debug
-          path: |
-            apps/overlay-dual-sub/app/build/outputs/apk/**/*.apk
-            apps/overlay-dual-sub/**/build/outputs/apk/**/*.apk
+          path: apps/overlay-dual-sub/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 30
-          if-no-files-found: warn
