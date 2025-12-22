@@ -24,8 +24,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+        working-directory: apps/overlay-dual-sub
+
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
         working-directory: apps/overlay-dual-sub
 
       - name: Upload APK
