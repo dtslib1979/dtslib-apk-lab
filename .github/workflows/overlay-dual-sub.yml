@@ -49,20 +49,24 @@ jobs:
       - name: Build Debug APK
         working-directory: apps/overlay-dual-sub
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
-          BUILD_RESULT=$?
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace --info 2>&1 | tee build.log
           echo ""
           echo "=========================================="
-          echo "BUILD LOG - LAST 150 LINES"
+          echo "SEARCHING FOR APK FILES"
           echo "=========================================="
-          tail -150 build.log
+          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
           echo "=========================================="
-          exit $BUILD_RESULT
+          echo "BUILD LOG - LAST 100 LINES"
+          echo "=========================================="
+          tail -100 build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: success()
+        if: always()
         with:
           name: overlay-dual-sub-debug
-          path: apps/overlay-dual-sub/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            apps/overlay-dual-sub/app/build/outputs/apk/**/*.apk
+            apps/overlay-dual-sub/**/build/outputs/apk/**/*.apk
           retention-days: 30
+          if-no-files-found: warn
