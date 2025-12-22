@@ -111,6 +111,10 @@ app/src/main/java/.../overlaydualsub/
 
 v1.0.0
 
+## Build Status
+
+CI/CD: GitHub Actions with Android SDK setup
+
 ## Troubleshooting
 
 ### 오버레이가 안 보여요
