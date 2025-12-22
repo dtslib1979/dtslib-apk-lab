@@ -29,54 +29,16 @@ jobs:
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-          cache: false
-
-      - name: Clean conflicting files
-        run: |
-          echo "=== Before cleanup ==="
-          ls -la
-          rm -rf app gradle gradlew gradlew.bat build.gradle.kts settings.gradle.kts gradle.properties || true
-          echo "=== After cleanup ==="
-          ls -la
+          cache: true
 
       - name: Get dependencies
         run: flutter pub get
 
       - name: Build Debug APK
-        id: build
-        run: |
-          flutter build apk --debug 2>&1 | tee build.log
-        continue-on-error: true
-
-      - name: Show Build Errors
-        if: always()
-        run: |
-          echo "=== LAST 150 LINES OF BUILD LOG ==="
-          tail -150 build.log || echo "No build.log found"
-          echo ""
-          echo "=== GRADLE ERRORS ==="
-          grep -i "error\|exception\|failed\|FAILURE" build.log | head -50 || echo "No errors found"
-
-      - name: Upload Build Log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-log
-          path: apps/overlay-dual-sub/build.log
-          retention-days: 7
-
-      - name: Check Build Result
-        run: |
-          if [ -f "build/app/outputs/flutter-apk/app-debug.apk" ]; then
-            echo "Build succeeded!"
-          else
-            echo "Build failed - check build-log artifact"
-            exit 1
-          fi
+        run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: overlay-dual-sub-debug
           path: apps/overlay-dual-sub/build/app/outputs/flutter-apk/app-debug.apk
