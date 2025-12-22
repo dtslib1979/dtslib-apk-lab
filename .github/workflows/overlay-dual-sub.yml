@@ -24,6 +24,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Make gradlew executable
+        working-directory: apps/overlay-dual-sub
+        run: chmod +x gradlew
+
       - name: Build Debug APK
         working-directory: apps/overlay-dual-sub
         run: ./gradlew assembleDebug --no-daemon --stacktrace
