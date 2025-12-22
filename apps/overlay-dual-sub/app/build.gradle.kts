@@ -61,5 +61,8 @@ dependencies {
     // OkHttp for WebSocket
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // Coroutines for MicAudioCapturer
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
