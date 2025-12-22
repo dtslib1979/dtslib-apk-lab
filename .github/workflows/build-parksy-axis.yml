@@ -2,31 +2,44 @@ name: Build Parksy Axis
 
 on:
   push:
+    branches: [main]
     paths:
       - 'apps/parksy-axis/**'
+      - '.github/workflows/build-parksy-axis.yml'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/parksy-axis
+
     steps:
       - uses: actions/checkout@v4
-      
-      - uses: subosito/flutter-action@v2
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-      
+          cache: true
+
       - name: Get dependencies
-        working-directory: apps/parksy-axis
         run: flutter pub get
-      
-      - name: Build APK
-        working-directory: apps/parksy-axis
+
+      - name: Build Debug APK
         run: flutter build apk --debug
-      
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: parksy-axis-debug
           path: apps/parksy-axis/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
