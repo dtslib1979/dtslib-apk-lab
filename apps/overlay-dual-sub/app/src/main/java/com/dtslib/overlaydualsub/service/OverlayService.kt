@@ -7,7 +7,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.dtslib.overlaydualsub.R
+import com.dtslib.overlaydualsub.overlay.OverlayWindowController
 
 class OverlayService : Service() {
 
@@ -17,6 +17,7 @@ class OverlayService : Service() {
     }
 
     private var useMock = true
+    private var controller: OverlayWindowController? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -26,12 +27,19 @@ class OverlayService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         useMock = intent?.getBooleanExtra("useMock", true) ?: true
         startForeground(NOTIF_ID, buildNotif())
-        // TODO: S2에서 OverlayWindowController 초기화
+        
+        // Initialize overlay
+        if (controller == null) {
+            controller = OverlayWindowController(this)
+            controller?.show()
+        }
+        
         return START_STICKY
     }
 
     override fun onDestroy() {
-        // TODO: S2에서 오버레이 정리
+        controller?.hide()
+        controller = null
         super.onDestroy()
     }
 
