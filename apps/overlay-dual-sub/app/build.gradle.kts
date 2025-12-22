@@ -52,16 +52,25 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
 
-    // Compose
+    // Compose UI
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
 
+    // Compose Animation (for AnimatedVisibility)
+    implementation("androidx.compose.animation:animation")
+
+    // Compose Foundation (for gestures)
+    implementation("androidx.compose.foundation:foundation")
+
+    // SavedState for overlay
+    implementation("androidx.savedstate:savedstate:1.2.1")
+
     // OkHttp for WebSocket
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Coroutines for MicAudioCapturer
+    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
