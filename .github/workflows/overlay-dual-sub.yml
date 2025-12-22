@@ -18,6 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clean legacy Native Android files
+        run: |
+          rm -f build.gradle.kts settings.gradle.kts gradlew gradle.properties
+          rm -rf app/ gradle/
+          echo "Cleaned legacy files, keeping Flutter structure only"
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
