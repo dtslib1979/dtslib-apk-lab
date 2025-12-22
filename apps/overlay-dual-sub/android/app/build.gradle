@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.dtslib.overlaydualsub"
+    namespace "com.dtslib.overlay_dual_sub"
     compileSdk 35
     ndkVersion flutter.ndkVersion
 
@@ -41,8 +41,8 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.dtslib.overlaydualsub"
-        minSdk 29
+        applicationId "com.dtslib.overlay_dual_sub"
+        minSdk 24
         targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

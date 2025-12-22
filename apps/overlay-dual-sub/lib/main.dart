@@ -31,11 +31,7 @@ class HomePage extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: const Center(
-        child: Text(
-          'S Pen Overlay App\nv1.0.0',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 24),
-        ),
+        child: Text('S Pen Web Overlay v1.0.0'),
       ),
     );
   }
