@@ -1,5 +1,5 @@
 name: overlay_dual_sub
-description: S Pen web overlay drawing app for dual subtitles
+description: S Pen overlay annotation app for web pages
 publish_to: 'none'
 version: 1.0.0+1
 
