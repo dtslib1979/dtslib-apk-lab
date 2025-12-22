@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun BubbleComposable(
     onTap: () -> Unit,
+    onLongPress: () -> Unit,
     onDrag: (Float, Float) -> Unit
 ) {
     Box(
@@ -27,7 +28,10 @@ fun BubbleComposable(
             .clip(CircleShape)
             .background(Color(0xFF1976D2))
             .pointerInput(Unit) {
-                detectTapGestures(onTap = { onTap() })
+                detectTapGestures(
+                    onTap = { onTap() },
+                    onLongPress = { onLongPress() }
+                )
             }
             .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
