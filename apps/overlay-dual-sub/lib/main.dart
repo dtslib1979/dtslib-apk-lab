@@ -1,22 +1,18 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const OverlayDualSubApp());
+  runApp(const MyApp());
 }
 
-class OverlayDualSubApp extends StatelessWidget {
-  const OverlayDualSubApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Overlay Dual Sub',
-      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
       home: const HomePage(),
@@ -32,21 +28,13 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Overlay Dual Sub'),
-        centerTitle: true,
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.edit, size: 64, color: Colors.blue),
-            SizedBox(height: 16),
-            Text(
-              'S Pen Overlay v1.0.0',
-              style: TextStyle(fontSize: 24),
-            ),
-            SizedBox(height: 8),
-            Text('Flutter + Kotlin Hybrid'),
-          ],
+        child: Text(
+          'S Pen Overlay App\nv1.0.0',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 24),
         ),
       ),
     );
