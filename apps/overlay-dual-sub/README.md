@@ -78,33 +78,23 @@ val useMock = false // WebSocket 모드 (서버 필요)
 
 ## Tech Stack
 
-- Kotlin + Jetpack Compose
-- Min SDK 29 (Android 10)
+- Flutter + Dart
+- Min SDK 21 (Android 5.0)
 - Target SDK 34
 - Foreground Service + TYPE_APPLICATION_OVERLAY
-- OkHttp WebSocket
 
 ## Project Structure
 
 ```
-app/src/main/java/.../overlaydualsub/
-├── MainActivity.kt
-├── service/
-│   └── OverlayService.kt
-├── overlay/
-│   ├── OverlayWindowController.kt
-│   ├── BubbleComposable.kt
-│   ├── SubtitleBoxComposable.kt
-│   └── SettingsPanelComposable.kt
-├── audio/
-│   └── MicAudioCapturer.kt
-├── net/
-│   ├── SubtitleStreamClient.kt
-│   ├── MockSubtitleClient.kt
-│   └── WsSubtitleClient.kt
-└── model/
-    ├── SubtitleEvent.kt
-    └── OverlaySettings.kt
+lib/
+└── main.dart
+
+android/
+├── app/
+│   ├── build.gradle.kts
+│   └── src/main/
+│       ├── AndroidManifest.xml
+│       └── kotlin/.../MainActivity.kt
 ```
 
 ## Version
@@ -113,17 +103,6 @@ v1.0.0
 
 ## Build Status
 
-CI/CD: GitHub Actions with Android SDK setup
+CI/CD: GitHub Actions with Flutter SDK
 
-## Troubleshooting
-
-### 오버레이가 안 보여요
-- 설정 → 앱 → Dual Subtitle → 다른 앱 위에 표시 허용
-
-### Mock 자막이 안 나와요
-- Start 버튼 눌렀는지 확인
-- 알림바에 "Mock 모드 실행 중" 표시 확인
-
-### 자막 위치가 이상해요
-- 버블 롱프레스 → 설정 → Lock Position OFF
-- 자막 박스 드래그로 위치 조정
+Build #39 - Flutter project conversion complete
