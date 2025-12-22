@@ -2,7 +2,6 @@ package com.dtslib.overlaydualsub.overlay
 
 import android.content.Context
 import android.graphics.PixelFormat
-import android.os.Build
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.runtime.mutableStateOf
@@ -36,10 +35,12 @@ class OverlayWindowController(
     val settings = mutableStateOf(OverlaySettings())
     val subtitle = mutableStateOf(SubtitleEvent(segId = 0))
     val showBox = mutableStateOf(true)
+    val showSettings = mutableStateOf(false)
 
     // Views
     private var bubbleView: ComposeView? = null
     private var boxView: ComposeView? = null
+    private var settingsView: ComposeView? = null
 
     // Position
     private var bubbleX = 50
@@ -58,8 +59,10 @@ class OverlayWindowController(
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         bubbleView?.let { wm.removeView(it) }
         boxView?.let { wm.removeView(it) }
+        settingsView?.let { wm.removeView(it) }
         bubbleView = null
         boxView = null
+        settingsView = null
     }
 
     fun updateSubtitle(event: SubtitleEvent) {
@@ -70,6 +73,15 @@ class OverlayWindowController(
         showBox.value = !showBox.value
     }
 
+    fun toggleSettings() {
+        if (showSettings.value) {
+            hideSettingsPanel()
+        } else {
+            showSettingsPanel()
+        }
+        showSettings.value = !showSettings.value
+    }
+
     private fun showBubble() {
         val view = ComposeView(context).apply {
             setViewTreeLifecycleOwner(this@OverlayWindowController)
@@ -77,6 +89,7 @@ class OverlayWindowController(
             setContent {
                 BubbleComposable(
                     onTap = { toggleBox() },
+                    onLongPress = { toggleSettings() },
                     onDrag = { dx, dy -> moveBubble(dx, dy) }
                 )
             }
@@ -108,6 +121,40 @@ class OverlayWindowController(
         params.x = boxX
         params.y = boxY
         wm.addView(view, params)
+    }
+
+    private fun showSettingsPanel() {
+        val view = ComposeView(context).apply {
+            setViewTreeLifecycleOwner(this@OverlayWindowController)
+            setViewTreeSavedStateRegistryOwner(this@OverlayWindowController)
+            setContent {
+                SettingsPanelComposable(
+                    settings = settings.value,
+                    onUpdate = { newSettings ->
+                        settings.value = newSettings
+                        refreshBoxWidth()
+                    },
+                    onClose = { toggleSettings() }
+                )
+            }
+        }
+        settingsView = view
+
+        val params = settingsParams()
+        wm.addView(view, params)
+    }
+
+    private fun hideSettingsPanel() {
+        settingsView?.let { wm.removeView(it) }
+        settingsView = null
+    }
+
+    private fun refreshBoxWidth() {
+        boxView?.let {
+            val p = it.layoutParams as WindowManager.LayoutParams
+            p.width = (context.resources.displayMetrics.widthPixels * settings.value.boxWidth).toInt()
+            wm.updateViewLayout(it, p)
+        }
     }
 
     private fun moveBubble(dx: Float, dy: Float) {
@@ -155,6 +202,16 @@ class OverlayWindowController(
         ).apply {
             gravity = Gravity.TOP or Gravity.START
         }
+    }
+
+    private fun settingsParams() = WindowManager.LayoutParams(
+        WindowManager.LayoutParams.WRAP_CONTENT,
+        WindowManager.LayoutParams.WRAP_CONTENT,
+        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+        PixelFormat.TRANSLUCENT
+    ).apply {
+        gravity = Gravity.CENTER
     }
 
     private fun dpToPx(dp: Int): Int {
