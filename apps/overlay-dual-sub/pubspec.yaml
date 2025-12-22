@@ -1,5 +1,5 @@
 name: overlay_dual_sub
-description: S Pen web overlay drawing app for dual subtitle annotation
+description: S Pen Web Overlay Drawing App for Galaxy Tab S9
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  permission_handler: ^11.3.0
+  cupertino_icons: ^1.0.6
 
 dev_dependencies:
   flutter_test:
