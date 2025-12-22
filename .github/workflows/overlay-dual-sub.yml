@@ -24,9 +24,14 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Make gradlew executable
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
+
+      - name: Generate Gradle Wrapper
         working-directory: apps/overlay-dual-sub
-        run: chmod +x gradlew
+        run: gradle wrapper --gradle-version 8.2
 
       - name: Build Debug APK
         working-directory: apps/overlay-dual-sub
