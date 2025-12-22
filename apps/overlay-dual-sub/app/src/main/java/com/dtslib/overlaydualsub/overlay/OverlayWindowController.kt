@@ -5,6 +5,8 @@ import android.graphics.PixelFormat
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -103,15 +105,20 @@ class OverlayWindowController(
     }
 
     private fun showSubtitleBox() {
+        val ctrl = this
         val view = ComposeView(context).apply {
-            setViewTreeLifecycleOwner(this@OverlayWindowController)
-            setViewTreeSavedStateRegistryOwner(this@OverlayWindowController)
+            setViewTreeLifecycleOwner(ctrl)
+            setViewTreeSavedStateRegistryOwner(ctrl)
             setContent {
+                val currentSubtitle by ctrl.subtitle
+                val currentSettings by ctrl.settings
+                val visible by ctrl.showBox
+                
                 SubtitleBoxComposable(
-                    subtitle = subtitle.value,
-                    settings = settings.value,
-                    visible = showBox.value,
-                    onDrag = { dx, dy -> moveBox(dx, dy) }
+                    subtitle = currentSubtitle,
+                    settings = currentSettings,
+                    visible = visible,
+                    onDrag = { dx, dy -> ctrl.moveBox(dx, dy) }
                 )
             }
         }
@@ -124,17 +131,20 @@ class OverlayWindowController(
     }
 
     private fun showSettingsPanel() {
+        val ctrl = this
         val view = ComposeView(context).apply {
-            setViewTreeLifecycleOwner(this@OverlayWindowController)
-            setViewTreeSavedStateRegistryOwner(this@OverlayWindowController)
+            setViewTreeLifecycleOwner(ctrl)
+            setViewTreeSavedStateRegistryOwner(ctrl)
             setContent {
+                val currentSettings by ctrl.settings
+                
                 SettingsPanelComposable(
-                    settings = settings.value,
+                    settings = currentSettings,
                     onUpdate = { newSettings ->
-                        settings.value = newSettings
-                        refreshBoxWidth()
+                        ctrl.settings.value = newSettings
+                        ctrl.refreshBoxWidth()
                     },
-                    onClose = { toggleSettings() }
+                    onClose = { ctrl.toggleSettings() }
                 )
             }
         }
