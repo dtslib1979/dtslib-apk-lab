@@ -50,25 +50,14 @@ jobs:
         working-directory: apps/overlay-dual-sub
         run: |
           ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
-        continue-on-error: true
-
-      - name: Upload Build Log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-log
-          path: apps/overlay-dual-sub/build.log
-          retention-days: 7
-
-      - name: Check Build Result
-        working-directory: apps/overlay-dual-sub
-        run: |
-          if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
-            echo "Build succeeded!"
-          else
-            echo "Build failed - check build-log artifact"
-            exit 1
-          fi
+          BUILD_RESULT=$?
+          echo ""
+          echo "=========================================="
+          echo "BUILD LOG - LAST 150 LINES"
+          echo "=========================================="
+          tail -150 build.log
+          echo "=========================================="
+          exit $BUILD_RESULT
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
