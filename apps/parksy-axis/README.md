@@ -31,7 +31,11 @@ Codomain: {Capture, Note, Build, Test, Publish}
 ## Status
 
 - [x] Session 1: Scaffold
-- [ ] Session 2: FSM Logic
-- [ ] Session 3: Overlay UI
-- [ ] Session 4: Android Config
-- [ ] Session 5: Build + Deploy
+- [x] Session 2: FSM Logic
+- [x] Session 3: Overlay UI
+- [x] Session 4: Android Config
+- [x] Session 5: Build + Deploy
+
+## Download
+
+[APK Download](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip)
