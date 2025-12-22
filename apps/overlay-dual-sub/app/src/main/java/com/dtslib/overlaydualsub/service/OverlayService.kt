@@ -8,6 +8,9 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.dtslib.overlaydualsub.overlay.OverlayWindowController
+import com.dtslib.overlaydualsub.net.SubtitleStreamClient
+import com.dtslib.overlaydualsub.net.MockSubtitleClient
+import com.dtslib.overlaydualsub.net.WsSubtitleClient
 
 class OverlayService : Service() {
 
@@ -18,6 +21,7 @@ class OverlayService : Service() {
 
     private var useMock = true
     private var controller: OverlayWindowController? = null
+    private var client: SubtitleStreamClient? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -34,10 +38,21 @@ class OverlayService : Service() {
             controller?.show()
         }
         
+        // Initialize client
+        if (client == null) {
+            client = if (useMock) MockSubtitleClient() else WsSubtitleClient()
+            client?.setDelay(controller?.settings?.value?.delayMs ?: 500L)
+            client?.start { event ->
+                controller?.updateSubtitle(event)
+            }
+        }
+        
         return START_STICKY
     }
 
     override fun onDestroy() {
+        client?.stop()
+        client = null
         controller?.hide()
         controller = null
         super.onDestroy()
@@ -58,7 +73,7 @@ class OverlayService : Service() {
     private fun buildNotif(): Notification {
         return NotificationCompat.Builder(this, CH_ID)
             .setContentTitle("Dual Subtitle")
-            .setContentText("자막 오버레이 실행 중")
+            .setContentText(if (useMock) "Mock 모드 실행 중" else "WebSocket 모드")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .build()
