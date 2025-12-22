@@ -1,41 +1,39 @@
 # Parksy Axis
 
-박씨 좌표 - Broadcast stage indicator overlay
+방송용 사고 단계 오버레이
 
-## Math Model
-
-```
-state: ℤ₅ (mod 5)
-tap(): s → (s+1) mod 5
-
-Domain: {tap} → {0,1,2,3,4}
-Codomain: {Capture, Note, Build, Test, Publish}
-```
-
-## Structure
-
+## 구조
 ```
 [Idea]
-├─ Capture  (0)
-├─ Note     (1)
-├─ Build    (2)
-├─ Test     (3)
-└─ Publish  (4)
+├─ Capture  ◀ ●
+├─ Note
+├─ Build
+├─ Test
+└─ Publish
 ```
 
-## Interaction
+## 조작
+- 탭: 다음 단계
+- 순환: Publish → Capture
 
-- Single tap: next state
-- Cyclic: Publish → Capture
+## 기술
+- Flutter overlay (flutter_overlay_window)
+- FSM: ℤ₅ (mod 5)
+- Permission: SYSTEM_ALERT_WINDOW
 
-## Status
+## 빌드
+```bash
+cd apps/parksy-axis
+flutter pub get
+flutter build apk --release
+```
 
-- [x] Session 1: Scaffold
-- [x] Session 2: FSM Logic
-- [x] Session 3: Overlay UI
-- [x] Session 4: Android Config
-- [x] Session 5: Build + Deploy
-
-## Download
-
-[APK Download](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip)
+## 파일 구조
+```
+lib/
+├── main.dart          # entry + overlay entry
+├── app.dart           # MaterialApp
+├── screens/home.dart  # 권한 요청 + 오버레이 시작
+├── core/state.dart    # FSM 로직
+└── widgets/tree_view.dart  # 트리 UI
+```
