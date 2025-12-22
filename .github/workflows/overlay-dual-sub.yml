@@ -29,7 +29,11 @@ jobs:
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-          cache: true
+          cache: false
+
+      - name: Clean conflicting files
+        run: |
+          rm -rf app gradle gradlew gradlew.bat build.gradle.kts settings.gradle.kts gradle.properties || true
 
       - name: Get dependencies
         run: flutter pub get
