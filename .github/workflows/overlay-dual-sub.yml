@@ -21,30 +21,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.2
-        working-directory: apps/overlay-dual-sub
-
-      - name: Accept Android SDK Licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee build.log || (cat build.log && exit 1)
         working-directory: apps/overlay-dual-sub
-
-      - name: Upload Build Log on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: apps/overlay-dual-sub/build.log
-          retention-days: 7
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
