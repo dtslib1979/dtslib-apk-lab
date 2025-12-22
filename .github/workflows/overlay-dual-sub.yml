@@ -39,10 +39,31 @@ jobs:
         run: flutter pub get
 
       - name: Build Debug APK
-        run: flutter build apk --debug
+        id: build
+        run: |
+          flutter build apk --debug 2>&1 | tee build.log
+        continue-on-error: true
+
+      - name: Upload Build Log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: apps/overlay-dual-sub/build.log
+          retention-days: 7
+
+      - name: Check Build Result
+        run: |
+          if [ -f "build/app/outputs/flutter-apk/app-debug.apk" ]; then
+            echo "Build succeeded!"
+          else
+            echo "Build failed - check build-log artifact"
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: overlay-dual-sub-debug
           path: apps/overlay-dual-sub/build/app/outputs/flutter-apk/app-debug.apk
