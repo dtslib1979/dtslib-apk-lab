@@ -33,7 +33,11 @@ jobs:
 
       - name: Clean conflicting files
         run: |
+          echo "=== Before cleanup ==="
+          ls -la
           rm -rf app gradle gradlew gradlew.bat build.gradle.kts settings.gradle.kts gradle.properties || true
+          echo "=== After cleanup ==="
+          ls -la
 
       - name: Get dependencies
         run: flutter pub get
@@ -43,6 +47,15 @@ jobs:
         run: |
           flutter build apk --debug 2>&1 | tee build.log
         continue-on-error: true
+
+      - name: Show Build Errors
+        if: always()
+        run: |
+          echo "=== LAST 150 LINES OF BUILD LOG ==="
+          tail -150 build.log || echo "No build.log found"
+          echo ""
+          echo "=== GRADLE ERRORS ==="
+          grep -i "error\|exception\|failed\|FAILURE" build.log | head -50 || echo "No errors found"
 
       - name: Upload Build Log
         uses: actions/upload-artifact@v4
