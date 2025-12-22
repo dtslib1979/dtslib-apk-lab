@@ -27,23 +27,29 @@ jobs:
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.2'
-
-      - name: Generate Gradle Wrapper
+      - name: Download Gradle 8.2 directly
         working-directory: apps/overlay-dual-sub
-        run: gradle wrapper --gradle-version 8.2
-
-      - name: Make gradlew executable
-        working-directory: apps/overlay-dual-sub
-        run: chmod +x gradlew
+        run: |
+          mkdir -p gradle/wrapper
+          curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.2.0/gradle/wrapper/gradle-wrapper.jar
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+          cat > gradlew << 'SCRIPT'
+          #!/bin/sh
+          JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
+          exec "$JAVA_HOME/bin/java" -jar "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" "$@"
+          SCRIPT
+          chmod +x gradlew
 
       - name: Build Debug APK
         working-directory: apps/overlay-dual-sub
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee build.log
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
         continue-on-error: true
 
       - name: Upload Build Log
@@ -60,7 +66,7 @@ jobs:
           if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
             echo "Build succeeded!"
           else
-            echo "Build failed - check build-log artifact for details"
+            echo "Build failed - check build-log artifact"
             exit 1
           fi
 
