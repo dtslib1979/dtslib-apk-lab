@@ -1,0 +1,8 @@
+{
+  "name": "Parksy Axis",
+  "id": "parksy-axis",
+  "version": "v1.0.0",
+  "description": "Broadcast stage indicator overlay",
+  "category": "broadcast",
+  "status": "development"
+}
