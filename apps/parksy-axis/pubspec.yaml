@@ -1,5 +1,5 @@
 name: parksy_axis
-description: Broadcast stage indicator overlay
+description: Broadcast stage overlay - show current thinking position
 publish_to: 'none'
 version: 1.0.0+1
 
