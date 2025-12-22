@@ -18,6 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clean Native Android conflicts
+        run: |
+          echo "=== Before cleanup ==="
+          ls -la
+          rm -f build.gradle.kts settings.gradle.kts gradlew gradle.properties
+          rm -rf app gradle
+          echo "=== After cleanup ==="
+          ls -la
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -31,14 +40,38 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Flutter doctor
+        run: flutter doctor -v
+
       - name: Get dependencies
         run: flutter pub get
 
       - name: Build Debug APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug --verbose 2>&1 | tee build.log || true
+
+      - name: Upload Build Log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: apps/overlay-dual-sub/build.log
+          retention-days: 7
+
+      - name: Check Build Result
+        run: |
+          if [ -f "build/app/outputs/flutter-apk/app-debug.apk" ]; then
+            echo "Build SUCCESS!"
+            ls -la build/app/outputs/flutter-apk/
+          else
+            echo "Build FAILED - check build-log artifact"
+            echo "=== Last 100 lines of build.log ==="
+            tail -100 build.log
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: overlay-dual-sub-debug
           path: apps/overlay-dual-sub/build/app/outputs/flutter-apk/app-debug.apk
