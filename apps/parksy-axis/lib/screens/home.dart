@@ -15,7 +15,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _checkPermission();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _checkPermission();
+    final active = await FlutterOverlayWindow.isActive();
+    setState(() => _isShowing = active);
   }
 
   Future<void> _checkPermission() async {
@@ -33,13 +39,15 @@ class _HomeScreenState extends State<HomeScreen> {
       await FlutterOverlayWindow.closeOverlay();
     } else {
       await FlutterOverlayWindow.showOverlay(
+        entryPoint: 'overlayMain',
         height: 200,
         width: 220,
         alignment: OverlayAlignment.bottomLeft,
         enableDrag: true,
       );
     }
-    setState(() => _isShowing = !_isShowing);
+    final active = await FlutterOverlayWindow.isActive();
+    setState(() => _isShowing = active);
   }
 
   @override

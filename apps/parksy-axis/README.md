@@ -41,7 +41,11 @@ flutter build apk --debug
 
 [![APK Download](https://img.shields.io/badge/APK-Download-green)](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip)
 
-## v1.0.0 완료
+## v1.1.0
+- [x] 오버레이 entryPoint 버그 수정
+- [x] 앱 재시작 시 오버레이 상태 동기화
+
+## v1.0.0
 - [x] FSM 로직 (ℤ₅)
 - [x] 터미널 스타일 트리 UI
 - [x] 오버레이 시스템
