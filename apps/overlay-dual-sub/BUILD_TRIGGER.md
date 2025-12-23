@@ -1,3 +1,5 @@
 # Build Trigger
 
-Trigger build #50 to test Flutter workflow
+Build #64: Delete conflicting Native Android files from repo
+
+Keep only Flutter structure (android/, lib/, pubspec.yaml)
