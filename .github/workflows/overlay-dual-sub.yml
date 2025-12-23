@@ -2,6 +2,7 @@ name: Build Overlay Dual Subtitle APK
 
 on:
   push:
+    branches: [main]
     paths:
       - 'apps/overlay-dual-sub/**'
       - '.github/workflows/overlay-dual-sub.yml'
@@ -10,69 +11,35 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/overlay-dual-sub
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          gradle-version: '8.2'
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
 
-      - name: Generate Gradle Wrapper
-        working-directory: apps/overlay-dual-sub
-        run: gradle wrapper --gradle-version 8.2
-
-      - name: Make gradlew executable
-        working-directory: apps/overlay-dual-sub
-        run: chmod +x gradlew
+      - name: Get dependencies
+        run: flutter pub get
 
       - name: Build Debug APK
-        id: build
-        working-directory: apps/overlay-dual-sub
-        run: |
-          set +e
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
-          BUILD_EXIT=$?
-          echo "build_exit=$BUILD_EXIT" >> $GITHUB_OUTPUT
-          
-          # Extract error summary
-          echo "### Build Summary" >> $GITHUB_STEP_SUMMARY
-          if [ $BUILD_EXIT -ne 0 ]; then
-            echo "❌ Build FAILED" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -A5 "FAILURE\|error:\|Error:\|Exception" build.log | head -50 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ Build SUCCESS" >> $GITHUB_STEP_SUMMARY
-          fi
-          exit $BUILD_EXIT
-
-      - name: Upload Build Log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-log
-          path: apps/overlay-dual-sub/build.log
-          retention-days: 7
+        run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: overlay-dual-sub-debug
-          path: apps/overlay-dual-sub/app/build/outputs/apk/debug/app-debug.apk
+          path: apps/overlay-dual-sub/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 30
