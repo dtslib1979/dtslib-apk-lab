@@ -18,11 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clean Native Android conflicts
-        run: |
-          rm -f build.gradle.kts settings.gradle.kts gradlew gradle.properties
-          rm -rf app gradle
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -36,54 +31,14 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Create local.properties
-        run: |
-          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-          echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
-          cat android/local.properties
-
       - name: Get dependencies
         run: flutter pub get
 
       - name: Build Debug APK
-        id: build
-        run: |
-          flutter build apk --debug 2>&1 | tee build.log
-          if [ -f "build/app/outputs/flutter-apk/app-debug.apk" ]; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          else
-            echo "status=failed" >> $GITHUB_OUTPUT
-          fi
-        continue-on-error: true
-
-      - name: Show Error Summary
-        if: steps.build.outputs.status == 'failed'
-        run: |
-          echo "## Build Failed" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -i -E 'error|exception|failed' build.log | tail -50 >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Last 30 lines" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -30 build.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload Build Log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-log
-          path: apps/overlay-dual-sub/build.log
-          retention-days: 7
-
-      - name: Fail if build failed
-        if: steps.build.outputs.status == 'failed'
-        run: exit 1
+        run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: steps.build.outputs.status == 'success'
         with:
           name: overlay-dual-sub-debug
           path: apps/overlay-dual-sub/build/app/outputs/flutter-apk/app-debug.apk

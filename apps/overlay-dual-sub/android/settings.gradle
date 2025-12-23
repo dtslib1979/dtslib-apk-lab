@@ -1,22 +1,10 @@
 pluginManagement {
     def flutterSdkPath = {
-        def localPropertiesFile = file("local.properties")
         def properties = new Properties()
-        if (localPropertiesFile.exists()) {
-            localPropertiesFile.withInputStream { properties.load(it) }
-            return properties.getProperty("flutter.sdk")
-        }
-        // CI environment: use FLUTTER_ROOT env var
-        def flutterRoot = System.getenv("FLUTTER_ROOT")
-        if (flutterRoot != null) {
-            return flutterRoot
-        }
-        // Fallback: flutter command location
-        def result = "which flutter".execute().text.trim()
-        if (result) {
-            return new File(result).parentFile.parentFile.absolutePath
-        }
-        throw new GradleException("flutter.sdk not found")
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
     }
     settings.ext.flutterSdkPath = flutterSdkPath()
 
