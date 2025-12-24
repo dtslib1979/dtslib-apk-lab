@@ -29,6 +29,14 @@ APPS_CONFIG = [
         "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip"
     },
     {
+        "id": "overlay-dual-sub",
+        "name": "Overlay Dual Sub",
+        "description": "S Pen web overlay with 3s fade-out laser pen effect",
+        "icon": "🖊️",
+        "pubspec": "apps/overlay-dual-sub/pubspec.yaml",
+        "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/overlay-dual-sub/main/overlay-dual-sub-debug.zip"
+    },
+    {
         "id": "aiva-trimmer",
         "name": "AIVA Trimmer",
         "description": "Audio trimmer optimized for AIVA exports",
