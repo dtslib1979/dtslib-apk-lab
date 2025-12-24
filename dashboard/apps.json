@@ -18,6 +18,15 @@
     "lastUpdated": "2025-12-24"
   },
   {
+    "id": "overlay-dual-sub",
+    "name": "Overlay Dual Sub",
+    "version": "v1.0.0",
+    "description": "S Pen web overlay with 3s fade-out laser pen effect",
+    "icon": "🖊️",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/overlay-dual-sub/main/overlay-dual-sub-debug.zip",
+    "lastUpdated": "2025-12-24"
+  },
+  {
     "id": "aiva-trimmer",
     "name": "AIVA Trimmer",
     "version": "v2.0.0",
