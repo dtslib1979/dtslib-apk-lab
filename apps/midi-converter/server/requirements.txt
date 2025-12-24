@@ -1,0 +1,6 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+basic-pitch==0.3.3
+google-cloud-storage==2.14.0
+aiofiles==23.2.1
