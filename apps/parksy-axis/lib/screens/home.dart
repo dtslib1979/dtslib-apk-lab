@@ -39,7 +39,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await FlutterOverlayWindow.closeOverlay();
     } else {
       await FlutterOverlayWindow.showOverlay(
-        entryPoint: 'overlayMain',
         height: 200,
         width: 220,
         alignment: OverlayAlignment.bottomLeft,
