@@ -1,5 +1,5 @@
 name: overlay_dual_sub
-description: S Pen web overlay drawing app for dual subtitles
+description: S Pen web overlay drawing app with fade-out effect
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  permission_handler: ^11.3.0
 
 dev_dependencies:
   flutter_test:
