@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app.dart';
+import 'widgets/tree_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,50 +29,11 @@ class _OverlayAppState extends State<_OverlayApp> {
 
   @override
   Widget build(BuildContext context) {
-    const stages = ['Capture', 'Note', 'Build', 'Test', 'Publish'];
-    
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Material(
         color: Colors.transparent,
-        child: GestureDetector(
-          onTap: _next,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.85),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '[Idea]',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                ),
-                ...List.generate(5, (i) {
-                  final on = i == _stage;
-                  final pre = i == 4 ? '└─' : '├─';
-                  final mark = on ? ' ◀ ●' : '';
-                  return Text(
-                    '$pre ${stages[i]}$mark',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      color: on ? Colors.amber : Colors.grey,
-                      fontWeight: on ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
+        child: TreeView(active: _stage, onTap: _next),
       ),
     );
   }
