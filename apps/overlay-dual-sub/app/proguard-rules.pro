@@ -1,1 +1,1 @@
-# Add project specific ProGuard rules here.
+# DELETED - Moved to android/app/ if needed

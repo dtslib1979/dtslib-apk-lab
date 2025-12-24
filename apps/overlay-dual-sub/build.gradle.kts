@@ -1,4 +1,3 @@
-plugins {
-    id("com.android.application") version "8.2.0" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.21" apply false
-}
+// DELETED - This file conflicts with Flutter build
+// Flutter projects should NOT have root-level Gradle files
+// See: apps/laser-pen-overlay for correct structure

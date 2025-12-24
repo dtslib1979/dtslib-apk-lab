@@ -1,18 +1,3 @@
-pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.name = "overlay-dual-sub"
-include(":app")
+// DELETED - This file conflicts with Flutter build
+// Flutter projects should NOT have root-level settings.gradle
+// See: apps/laser-pen-overlay for correct structure
