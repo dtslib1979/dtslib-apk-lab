@@ -43,6 +43,9 @@ class _HomeScreenState extends State<HomeScreen> {
         width: 220,
         alignment: OverlayAlignment.bottomLeft,
         enableDrag: true,
+        flag: OverlayFlag.defaultFlag,
+        overlayTitle: 'Parksy Axis',
+        overlayContent: 'Stage Overlay Active',
       );
     }
     final active = await FlutterOverlayWindow.isActive();
