@@ -18,6 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clean conflicting files
+        run: |
+          # Remove Native Android pollution files that conflict with Flutter
+          rm -rf app/ gradle/ gradlew gradlew.bat
+          rm -f build.gradle.kts settings.gradle.kts gradle.properties
+          echo "Cleaned conflicting Native Android files"
+          ls -la
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -29,13 +37,16 @@ jobs:
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-          cache: true
+          cache: false
+
+      - name: Flutter doctor
+        run: flutter doctor -v
 
       - name: Get dependencies
         run: flutter pub get
 
       - name: Build Debug APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
