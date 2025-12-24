@@ -33,7 +33,10 @@ class _OverlayAppState extends State<_OverlayApp> {
       debugShowCheckedModeBanner: false,
       home: Material(
         color: Colors.transparent,
-        child: TreeView(active: _stage, onTap: _next),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: TreeView(active: _stage, onTap: _next),
+        ),
       ),
     );
   }
