@@ -1,7 +1,9 @@
 package com.parksy.capture
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -11,6 +13,8 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -27,6 +31,29 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
+        requestStoragePermissions()
+    }
+
+    private fun requestStoragePermissions() {
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+
+            arrayOf(
+                Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.READ_MEDIA_IMAGES
+            )
+        } else {
+            // Android 12 and below
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+
+        val notGranted = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (notGranted.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, notGranted.toTypedArray(), 1001)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -536,6 +563,7 @@ class MainActivity : FlutterActivity() {
                     }
                     // Force MediaStore to update immediately
                     contentResolver.notifyChange(uri, null)
+                    MediaScannerConnection.scanFile(this@MainActivity, arrayOf(uri.toString()), arrayOf("text/markdown"), null)
                     Log.d(TAG, "File saved successfully via MediaStore: $uri")
                     true
                 } else {
