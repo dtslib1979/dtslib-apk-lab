@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 void main() {
@@ -77,6 +78,76 @@ class ParksyCaptureApp extends StatelessWidget {
 }
 
 // ============================================================
+// API CONFIG - SharedPreferences 기반
+// ============================================================
+
+class ApiConfig {
+  static const String _keyOpenAI = 'openai_api_key';
+  static const String _keySupabaseUrl = 'supabase_url';
+  static const String _keySupabaseKey = 'supabase_key';
+  static const String _keyGitHubToken = 'github_token';
+
+  static String? openaiKey;
+  static String? supabaseUrl;
+  static String? supabaseKey;
+  static String? githubToken;
+
+  static bool get isAiConfigured =>
+      openaiKey != null &&
+      openaiKey!.isNotEmpty &&
+      supabaseUrl != null &&
+      supabaseUrl!.isNotEmpty &&
+      supabaseKey != null &&
+      supabaseKey!.isNotEmpty;
+
+  static bool get isGitHubConfigured =>
+      githubToken != null && githubToken!.isNotEmpty;
+
+  static Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 환경변수에서 먼저 읽고, 없으면 SharedPreferences에서
+    openaiKey = const String.fromEnvironment('PARKSY_OPENAI_KEY', defaultValue: '');
+    if (openaiKey!.isEmpty) {
+      openaiKey = prefs.getString(_keyOpenAI);
+    }
+
+    githubToken = const String.fromEnvironment('PARKSY_GITHUB_TOKEN', defaultValue: '');
+    if (githubToken!.isEmpty) {
+      githubToken = prefs.getString(_keyGitHubToken);
+    }
+
+    supabaseUrl = prefs.getString(_keySupabaseUrl) ?? 'https://ytdjfnyxhalcxfwbygff.supabase.co';
+    supabaseKey = prefs.getString(_keySupabaseKey) ?? 'sb_publishable_5Jbhm-mxlA8RUPn08WIMoA_IvaqHQE6';
+  }
+
+  static Future<void> save({
+    String? openai,
+    String? supabaseUrlVal,
+    String? supabaseKeyVal,
+    String? github,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (openai != null) {
+      await prefs.setString(_keyOpenAI, openai);
+      openaiKey = openai;
+    }
+    if (supabaseUrlVal != null) {
+      await prefs.setString(_keySupabaseUrl, supabaseUrlVal);
+      supabaseUrl = supabaseUrlVal;
+    }
+    if (supabaseKeyVal != null) {
+      await prefs.setString(_keySupabaseKey, supabaseKeyVal);
+      supabaseKey = supabaseKeyVal;
+    }
+    if (github != null) {
+      await prefs.setString(_keyGitHubToken, github);
+      githubToken = github;
+    }
+  }
+}
+
+// ============================================================
 // ROUTER - 실행 모드 분기
 // ============================================================
 
@@ -96,7 +167,12 @@ class _AppRouterState extends State<AppRouter> {
   @override
   void initState() {
     super.initState();
-    _checkLaunchMode();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await ApiConfig.load();
+    await _checkLaunchMode();
   }
 
   Future<void> _checkLaunchMode() async {
@@ -314,17 +390,14 @@ class ShareHandler extends StatefulWidget {
 
 class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.parksy.capture/share');
-  
-  static const _githubToken = String.fromEnvironment('PARKSY_GITHUB_TOKEN', defaultValue: '');
   static const _githubRepo = 'dtslib1979/parksy-logs';
-  static final _syncEnabled = _githubToken.isNotEmpty;
 
   String _status = 'Receiving...';
   IconData _icon = Icons.downloading;
   Color _iconColor = const Color(0xFF58A6FF);
   bool _isDone = false;
   late AnimationController _animController;
-  
+
   @override
   void initState() {
     super.initState();
@@ -332,7 +405,7 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
       vsync: this,
       duration: const Duration(seconds: 1),
     )..repeat();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _handleShare());
   }
 
@@ -355,11 +428,11 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
         _status = 'Saving locally...';
         _icon = Icons.save;
       });
-      
+
       final ts = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
       final fname = 'ParksyLog_$ts.md';
       final content = _toMarkdown(text);
-      
+
       final localOk = await _saveLocal(fname, content);
       if (!localOk) {
         _updateStatus('Save failed', Icons.error, const Color(0xFFF85149));
@@ -367,8 +440,8 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
         return;
       }
 
-      if (!_syncEnabled) {
-        _updateStatus('Saved ✓', Icons.check_circle, const Color(0xFF7EE787));
+      if (!ApiConfig.isGitHubConfigured) {
+        _updateStatus('Saved locally', Icons.check_circle, const Color(0xFF7EE787));
         _finish();
         return;
       }
@@ -380,11 +453,11 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
 
       final cloudOk = await _syncToGitHub(fname, content);
       if (cloudOk) {
-        _updateStatus('Saved & Synced ✓', Icons.cloud_done, const Color(0xFF7EE787));
+        _updateStatus('Saved & Synced', Icons.cloud_done, const Color(0xFF7EE787));
       } else {
-        _updateStatus('Saved locally ✓', Icons.check_circle, const Color(0xFF7EE787));
+        _updateStatus('Saved locally', Icons.check_circle, const Color(0xFF7EE787));
       }
-      
+
       _finish();
     } catch (e) {
       _updateStatus('Error: $e', Icons.error, const Color(0xFFF85149));
@@ -421,13 +494,13 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
       final year = now.year.toString();
       final month = now.month.toString().padLeft(2, '0');
       final path = 'logs/$year/$month/$filename';
-      
+
       final url = 'https://api.github.com/repos/$_githubRepo/contents/$path';
-      
+
       final res = await http.put(
         Uri.parse(url),
         headers: {
-          'Authorization': 'Bearer $_githubToken',
+          'Authorization': 'Bearer ${ApiConfig.githubToken}',
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
           'Content-Type': 'application/json',
@@ -437,7 +510,7 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
           'content': base64Encode(utf8.encode(content)),
         }),
       ).timeout(const Duration(seconds: 10));
-      
+
       return res.statusCode == 201 || res.statusCode == 200;
     } catch (e) {
       debugPrint('GitHub sync failed: $e');
@@ -482,6 +555,225 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
 }
 
 // ============================================================
+// SETTINGS SCREEN - API 키 설정
+// ============================================================
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final _openaiController = TextEditingController();
+  final _supabaseUrlController = TextEditingController();
+  final _supabaseKeyController = TextEditingController();
+  final _githubController = TextEditingController();
+  bool _obscureOpenAI = true;
+  bool _obscureGitHub = true;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _openaiController.text = ApiConfig.openaiKey ?? '';
+    _supabaseUrlController.text = ApiConfig.supabaseUrl ?? '';
+    _supabaseKeyController.text = ApiConfig.supabaseKey ?? '';
+    _githubController.text = ApiConfig.githubToken ?? '';
+  }
+
+  @override
+  void dispose() {
+    _openaiController.dispose();
+    _supabaseUrlController.dispose();
+    _supabaseKeyController.dispose();
+    _githubController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _isSaving = true);
+    await ApiConfig.save(
+      openai: _openaiController.text.trim(),
+      supabaseUrlVal: _supabaseUrlController.text.trim(),
+      supabaseKeyVal: _supabaseKeyController.text.trim(),
+      github: _githubController.text.trim(),
+    );
+    setState(() => _isSaving = false);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Settings saved')),
+      );
+      Navigator.pop(context, true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Settings'),
+        actions: [
+          _isSaving
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.check),
+                  onPressed: _save,
+                ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // AI Search Section
+          _buildSectionHeader('AI Search (RAG)', Icons.psychology),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _openaiController,
+            label: 'OpenAI API Key',
+            hint: 'sk-proj-...',
+            obscure: _obscureOpenAI,
+            onToggleObscure: () => setState(() => _obscureOpenAI = !_obscureOpenAI),
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _supabaseUrlController,
+            label: 'Supabase URL',
+            hint: 'https://xxx.supabase.co',
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _supabaseKeyController,
+            label: 'Supabase Anon Key',
+            hint: 'sb_...',
+          ),
+
+          const SizedBox(height: 32),
+
+          // GitHub Sync Section
+          _buildSectionHeader('GitHub Sync', Icons.cloud_sync),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _githubController,
+            label: 'GitHub Token',
+            hint: 'ghp_... or github_pat_...',
+            obscure: _obscureGitHub,
+            onToggleObscure: () => setState(() => _obscureGitHub = !_obscureGitHub),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Status
+          _buildStatusCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF58A6FF)),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF58A6FF),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    bool obscure = false,
+    VoidCallback? onToggleObscure,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        filled: true,
+        fillColor: const Color(0xFF161B22),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF30363D)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF30363D)),
+        ),
+        suffixIcon: onToggleObscure != null
+            ? IconButton(
+                icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                onPressed: onToggleObscure,
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildStatusCard() {
+    final aiOk = _openaiController.text.isNotEmpty;
+    final githubOk = _githubController.text.isNotEmpty;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            _buildStatusRow('AI Search', aiOk),
+            const SizedBox(height: 8),
+            _buildStatusRow('GitHub Sync', githubOk),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(String label, bool ok) {
+    return Row(
+      children: [
+        Icon(
+          ok ? Icons.check_circle : Icons.cancel,
+          size: 18,
+          color: ok ? const Color(0xFF7EE787) : Colors.grey,
+        ),
+        const SizedBox(width: 8),
+        Text(label),
+        const Spacer(),
+        Text(
+          ok ? 'Configured' : 'Not set',
+          style: TextStyle(
+            color: ok ? const Color(0xFF7EE787) : Colors.grey,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
 // HOME SCREEN - 메인 화면
 // ============================================================
 
@@ -510,10 +802,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late TabController _tabController;
 
   // AI Search state
-  static const _supabaseUrl = 'https://ytdjfnyxhalcxfwbygff.supabase.co';
-  static const _supabaseKey = 'sb_publishable_5Jbhm-mxlA8RUPn08WIMoA_IvaqHQE6';
-  static const _openaiKey = String.fromEnvironment('PARKSY_OPENAI_KEY', defaultValue: '');
-
   final TextEditingController _aiQueryController = TextEditingController();
   final SpeechToText _speech = SpeechToText();
   bool _isListening = false;
@@ -521,6 +809,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String? _aiAnswer;
   List<Map<String, dynamic>> _aiReferences = [];
   String? _aiError;
+
+  // Search mode: 'search' or 'generate'
+  String _searchMode = 'search';
 
   @override
   void initState() {
@@ -554,11 +845,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   void _applyFilters() {
     var filtered = List<Map<String, dynamic>>.from(_logs);
-    
+
     if (_showStarredOnly) {
       filtered = filtered.where((log) => log['starred'] == true).toList();
     }
-    
+
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       filtered = filtered.where((log) {
@@ -567,7 +858,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         return name.contains(query) || preview.contains(query);
       }).toList();
     }
-    
+
     switch (_sortBy) {
       case 'size':
         filtered.sort((a, b) => (b['size'] as int).compareTo(a['size'] as int));
@@ -578,7 +869,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       default:
         filtered.sort((a, b) => (b['modified'] as int).compareTo(a['modified'] as int));
     }
-    
+
     _filteredLogs = filtered;
   }
 
@@ -589,7 +880,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       setState(() {});
       return;
     }
-    
+
     try {
       final results = await platform.invokeMethod<List>('searchLogs', {'query': query});
       setState(() {
@@ -629,7 +920,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ],
       ),
     );
-    
+
     if (confirm == true) {
       await platform.invokeMethod('deleteLogFile', {'filename': filename});
       _loadData();
@@ -648,6 +939,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
+  Future<void> _openSettings() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    if (result == true) {
+      setState(() {}); // Refresh to reflect new settings
+    }
+  }
+
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -658,7 +959,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final now = DateTime.now();
     final diff = now.difference(date);
-    
+
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
@@ -756,12 +1057,52 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // ============================================================
 
   Widget _buildAiSearchTab() {
+    if (!ApiConfig.isAiConfigured) {
+      return _buildAiNotConfigured();
+    }
+
     return Column(
       children: [
         _buildAiSearchInput(),
+        _buildSearchModeSelector(),
         _buildAiSearchButton(),
         Expanded(child: _buildAiResult()),
       ],
+    );
+  }
+
+  Widget _buildAiNotConfigured() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.settings_outlined, size: 64, color: Colors.grey[600]),
+            const SizedBox(height: 24),
+            const Text(
+              'AI Search Not Configured',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Set up OpenAI API key and Supabase credentials to use AI search.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _openSettings,
+              icon: const Icon(Icons.settings),
+              label: const Text('Open Settings'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF238636),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -827,9 +1168,80 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildAiSearchButton() {
+  Widget _buildSearchModeSelector() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildModeButton(
+              'search',
+              '검색',
+              Icons.search,
+              '관련 기록 찾아서 요약',
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildModeButton(
+              'generate',
+              '종합 생성',
+              Icons.auto_awesome,
+              '자료 모아서 새 글 생성',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeButton(String mode, String label, IconData icon, String desc) {
+    final isSelected = _searchMode == mode;
+    return GestureDetector(
+      onTap: () => setState(() => _searchMode = mode),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF58A6FF).withOpacity(0.15) : const Color(0xFF161B22),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF58A6FF) : const Color(0xFF30363D),
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 16, color: isSelected ? const Color(0xFF58A6FF) : Colors.grey),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? const Color(0xFF58A6FF) : Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              desc,
+              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiSearchButton() {
+    final buttonLabel = _searchMode == 'search' ? 'AI한테 물어보기' : '종합 생성하기';
+    final buttonIcon = _searchMode == 'search' ? Icons.psychology : Icons.auto_awesome;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
       child: SizedBox(
         width: double.infinity,
         height: 48,
@@ -841,10 +1253,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
-              : const Icon(Icons.psychology, size: 20),
-          label: Text(_isAiSearching ? '검색 중...' : 'AI한테 물어보기'),
+              : Icon(buttonIcon, size: 20),
+          label: Text(_isAiSearching ? '처리 중...' : buttonLabel),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF238636),
+            backgroundColor: _searchMode == 'search'
+                ? const Color(0xFF238636)
+                : const Color(0xFF8B5CF6),
             foregroundColor: Colors.white,
             disabledBackgroundColor: const Color(0xFF21262D),
             disabledForegroundColor: Colors.grey,
@@ -857,13 +1271,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildAiResult() {
     if (_isAiSearching) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: Color(0xFF58A6FF)),
-            SizedBox(height: 16),
-            Text('기록을 검색하고 있어요...', style: TextStyle(color: Colors.grey)),
+            CircularProgressIndicator(
+              color: _searchMode == 'search' ? const Color(0xFF58A6FF) : const Color(0xFF8B5CF6),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _searchMode == 'search' ? '기록을 검색하고 있어요...' : '종합 글을 생성하고 있어요...',
+              style: const TextStyle(color: Colors.grey),
+            ),
           ],
         ),
       );
@@ -897,7 +1316,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Text('질문을 입력하세요', style: TextStyle(color: Colors.grey[500], fontSize: 16)),
             const SizedBox(height: 8),
             Text(
-              '과거 기록에서 답을 찾아드려요',
+              _searchMode == 'search'
+                  ? '과거 기록에서 답을 찾아드려요'
+                  : '관련 자료를 모아 새 글을 생성해요',
               style: TextStyle(color: Colors.grey[700], fontSize: 14),
             ),
           ],
@@ -919,11 +1340,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.auto_awesome, size: 18, color: Color(0xFF58A6FF)),
+                      Icon(
+                        _searchMode == 'search' ? Icons.auto_awesome : Icons.article,
+                        size: 18,
+                        color: _searchMode == 'search' ? const Color(0xFF58A6FF) : const Color(0xFF8B5CF6),
+                      ),
                       const SizedBox(width: 8),
-                      const Text(
-                        'AI 답변',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF58A6FF)),
+                      Text(
+                        _searchMode == 'search' ? 'AI 답변' : '종합 생성 결과',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _searchMode == 'search' ? const Color(0xFF58A6FF) : const Color(0xFF8B5CF6),
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 18),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: _aiAnswer!));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Copied')),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -1031,8 +1469,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final query = _aiQueryController.text.trim();
     if (query.isEmpty) return;
 
-    if (_openaiKey.isEmpty) {
-      setState(() => _aiError = 'OpenAI API 키가 설정되지 않았습니다');
+    if (!ApiConfig.isAiConfigured) {
+      setState(() => _aiError = 'API 키가 설정되지 않았습니다. 설정에서 입력해주세요.');
       return;
     }
 
@@ -1047,7 +1485,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       // Step 1: Get embedding for query
       final embedding = await _getEmbedding(query);
 
-      // Step 2: Search documents
+      // Step 2: Search documents (TOP_K = 10)
       final documents = await _searchDocuments(embedding);
 
       if (documents.isEmpty) {
@@ -1058,7 +1496,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         return;
       }
 
-      // Step 3: Generate answer
+      // Step 3: Generate answer based on mode
       final answer = await _generateAnswer(query, documents);
 
       setState(() {
@@ -1078,7 +1516,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final res = await http.post(
       Uri.parse('https://api.openai.com/v1/embeddings'),
       headers: {
-        'Authorization': 'Bearer $_openaiKey',
+        'Authorization': 'Bearer ${ApiConfig.openaiKey}',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -1097,15 +1535,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Future<List<Map<String, dynamic>>> _searchDocuments(List<double> embedding) async {
     final res = await http.post(
-      Uri.parse('$_supabaseUrl/rest/v1/rpc/match_documents'),
+      Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/rpc/match_documents'),
       headers: {
-        'Authorization': 'Bearer $_supabaseKey',
-        'apikey': _supabaseKey,
+        'Authorization': 'Bearer ${ApiConfig.supabaseKey}',
+        'apikey': ApiConfig.supabaseKey!,
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
         'query_embedding': embedding,
-        'match_count': 5,
+        'match_count': 10,  // TOP_K = 10
         'filter': {},
       }),
     ).timeout(const Duration(seconds: 30));
@@ -1127,31 +1565,42 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       return '[$date, $speaker]\n$content';
     }).join('\n\n---\n\n');
 
-    final res = await http.post(
-      Uri.parse('https://api.openai.com/v1/chat/completions'),
-      headers: {
-        'Authorization': 'Bearer $_openaiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': 'gpt-4o-mini',
-        'max_tokens': 1024,
-        'messages': [
-          {
-            'role': 'system',
-            'content': '''당신은 사용자의 과거 기록을 참고해서 답변하는 AI 비서입니다.
+    // Different system prompts based on mode
+    final systemPrompt = _searchMode == 'search'
+        ? '''당신은 사용자의 과거 기록을 참고해서 답변하는 AI 비서입니다.
 
 규칙:
 1. 제공된 기록을 기반으로 답변하세요
 2. 기록에 없는 내용은 추측하지 마세요
 3. 사용자의 말투와 스타일을 참고하세요
 4. 간결하고 직접적으로 답변하세요
-5. 관련 기록을 인용할 때는 날짜를 언급하세요''',
-          },
-          {
-            'role': 'user',
-            'content': '다음은 내 과거 기록입니다:\n\n$context\n\n---\n\n질문: $query\n\n위 기록을 참고해서 답변해줘.',
-          },
+5. 관련 기록을 인용할 때는 날짜를 언급하세요'''
+        : '''당신은 사용자의 과거 기록을 바탕으로 새로운 글을 종합 생성하는 AI 작가입니다.
+
+규칙:
+1. 제공된 여러 기록의 내용을 종합하여 새로운 글을 작성하세요
+2. 사용자의 생각, 경험, 인사이트를 하나의 흐름으로 엮어주세요
+3. 단순 요약이 아닌, 창의적이고 통찰력 있는 글을 생성하세요
+4. 마크다운 형식으로 구조화하세요 (제목, 소제목, 불릿 등)
+5. 원본 기록의 날짜나 맥락을 자연스럽게 녹여내세요
+6. 최소 500자 이상의 충실한 글을 작성하세요''';
+
+    final userPrompt = _searchMode == 'search'
+        ? '다음은 내 과거 기록입니다:\n\n$context\n\n---\n\n질문: $query\n\n위 기록을 참고해서 답변해줘.'
+        : '다음은 내 과거 기록입니다:\n\n$context\n\n---\n\n주제: $query\n\n위 기록들을 종합하여 이 주제에 대한 새로운 글을 작성해줘. 내 생각과 경험을 바탕으로 인사이트 있는 글을 만들어줘.';
+
+    final res = await http.post(
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+      headers: {
+        'Authorization': 'Bearer ${ApiConfig.openaiKey}',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': 'gpt-4o-mini',
+        'max_tokens': _searchMode == 'search' ? 1024 : 2048,
+        'messages': [
+          {'role': 'system', 'content': systemPrompt},
+          {'role': 'user', 'content': userPrompt},
         ],
       }),
     ).timeout(const Duration(seconds: 60));
@@ -1181,6 +1630,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const Spacer(),
           IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSettings,
+          ),
+          IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showAbout(),
           ),
@@ -1193,7 +1646,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final total = _stats['totalLogs'] ?? 0;
     final starred = _stats['starredCount'] ?? 0;
     final size = _formatSize(_stats['totalSize'] ?? 0);
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1358,7 +1811,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final modified = log['modified'] as int;
     final preview = log['preview'] as String? ?? '';
     final starred = log['starred'] as bool? ?? false;
-    
+
     final displayName = name.replaceAll('ParksyLog_', '').replaceAll('.md', '');
 
     return Card(
@@ -1457,7 +1910,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 5.0.0'),
+            const Text('Version 6.1.0'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
@@ -1593,7 +2046,7 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
     await Clipboard.setData(ClipboardData(text: body));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copied to clipboard ✓')),
+        const SnackBar(content: Text('Copied to clipboard')),
       );
     }
   }
