@@ -174,10 +174,11 @@ class MainActivity : FlutterActivity() {
                         val relativePath = cursor.getString(pathColumn) ?: ""
                         
                         Log.d(TAG, "File: $name, path: $relativePath, size: $size")
-                        
-                        // Filter to only include files from parksy-logs folder
-                        if (!relativePath.contains(LOGS_FOLDER)) {
-                            Log.d(TAG, "Skipping $name - not in $LOGS_FOLDER folder")
+
+                        // Include files from parksy-logs folder OR if path is unknown
+                        // (Some Android versions don't return RELATIVE_PATH correctly)
+                        if (relativePath.isNotEmpty() && !relativePath.contains(LOGS_FOLDER)) {
+                            Log.d(TAG, "Skipping $name - not in $LOGS_FOLDER folder (path: $relativePath)")
                             continue
                         }
                         
