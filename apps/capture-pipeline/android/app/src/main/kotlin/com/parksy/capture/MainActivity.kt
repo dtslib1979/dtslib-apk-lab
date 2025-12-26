@@ -202,13 +202,7 @@ class MainActivity : FlutterActivity() {
                         
                         Log.d(TAG, "File: $name, path: $relativePath, size: $size")
 
-                        // Include files from parksy-logs folder OR if path is unknown
-                        // (Some Android versions don't return RELATIVE_PATH correctly)
-                        if (relativePath.isNotEmpty() && !relativePath.contains(LOGS_FOLDER)) {
-                            Log.d(TAG, "Skipping $name - not in $LOGS_FOLDER folder (path: $relativePath)")
-                            continue
-                        }
-                        
+                        // No folder filter - just use filename pattern
                         val uri = Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
                         val preview = getPreviewFromUri(uri)
                         val fileMeta = meta[name] ?: emptyMap()
