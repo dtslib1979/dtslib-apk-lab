@@ -2,10 +2,13 @@ package com.parksy.capture
 
 import android.content.ContentValues
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
@@ -514,13 +517,13 @@ class MainActivity : FlutterActivity() {
 
     private fun saveFile(filename: String, content: String): Boolean {
         Log.d(TAG, "saveFile: $filename, content length: ${content.length}")
-        
+
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, filename)
                     put(MediaStore.Downloads.MIME_TYPE, "text/markdown")
-                    put(MediaStore.Downloads.RELATIVE_PATH, 
+                    put(MediaStore.Downloads.RELATIVE_PATH,
                         Environment.DIRECTORY_DOWNLOADS + "/$LOGS_FOLDER")
                 }
                 val uri = contentResolver.insert(
@@ -530,7 +533,9 @@ class MainActivity : FlutterActivity() {
                     contentResolver.openOutputStream(uri)?.use { os ->
                         os.write(content.toByteArray())
                     }
-                    Log.d(TAG, "File saved successfully via MediaStore")
+                    // Force MediaStore to update immediately
+                    contentResolver.notifyChange(uri, null)
+                    Log.d(TAG, "File saved successfully via MediaStore: $uri")
                     true
                 } else {
                     Log.e(TAG, "Failed to insert file into MediaStore")
@@ -541,6 +546,13 @@ class MainActivity : FlutterActivity() {
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, filename)
                 file.writeText(content)
+                // Trigger media scan for legacy storage
+                MediaScannerConnection.scanFile(
+                    this,
+                    arrayOf(file.absolutePath),
+                    arrayOf("text/markdown"),
+                    null
+                )
                 Log.d(TAG, "File saved successfully via File API")
                 true
             }
