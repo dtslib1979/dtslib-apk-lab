@@ -2,7 +2,7 @@
   {
     "id": "capture-pipeline",
     "name": "Capture Pipeline",
-    "version": "v8.0.1",
+    "version": "v8.0.2",
     "description": "Lossless conversation capture for LLM power users",
     "icon": "💾",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
