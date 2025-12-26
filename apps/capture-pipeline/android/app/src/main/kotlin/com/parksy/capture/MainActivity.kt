@@ -563,10 +563,8 @@ class MainActivity : FlutterActivity() {
                     }
                     // Force MediaStore to update immediately
                     contentResolver.notifyChange(uri, null)
-                    // MediaScanner needs actual file path, not content:// URI
-                    val filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/$LOGS_FOLDER/" + filename
-                    MediaScannerConnection.scanFile(this@MainActivity, arrayOf(filePath), arrayOf("text/markdown"), null)
-                    Log.d(TAG, "File saved successfully via MediaStore: $uri, path: $filePath")
+                    contentResolver.notifyChange(MediaStore.Downloads.EXTERNAL_CONTENT_URI, null)
+                    Log.d(TAG, "File saved successfully via MediaStore: $uri")
                     true
                 } else {
                     Log.e(TAG, "Failed to insert file into MediaStore")
