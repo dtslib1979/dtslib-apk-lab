@@ -85,11 +85,13 @@ class ApiConfig {
   static const String _keyOpenAI = 'openai_api_key';
   static const String _keySupabaseUrl = 'supabase_url';
   static const String _keySupabaseKey = 'supabase_key';
+  static const String _keyGitHubRepo = 'github_repo';
   static const String _keyGitHubToken = 'github_token';
 
   static String? openaiKey;
   static String? supabaseUrl;
   static String? supabaseKey;
+  static String? githubRepo;
   static String? githubToken;
 
   static bool get isAiConfigured =>
@@ -101,7 +103,8 @@ class ApiConfig {
       supabaseKey!.isNotEmpty;
 
   static bool get isGitHubConfigured =>
-      githubToken != null && githubToken!.isNotEmpty;
+      githubToken != null && githubToken!.isNotEmpty &&
+      githubRepo != null && githubRepo!.isNotEmpty;
 
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -117,6 +120,8 @@ class ApiConfig {
       githubToken = prefs.getString(_keyGitHubToken);
     }
 
+    githubRepo = prefs.getString(_keyGitHubRepo);
+
     supabaseUrl = prefs.getString(_keySupabaseUrl) ?? 'https://ytdjfnyxhalcxfwbygff.supabase.co';
     supabaseKey = prefs.getString(_keySupabaseKey) ?? 'sb_publishable_5Jbhm-mxlA8RUPn08WIMoA_IvaqHQE6';
   }
@@ -125,7 +130,8 @@ class ApiConfig {
     String? openai,
     String? supabaseUrlVal,
     String? supabaseKeyVal,
-    String? github,
+    String? githubRepoVal,
+    String? githubTokenVal,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (openai != null) {
@@ -140,9 +146,13 @@ class ApiConfig {
       await prefs.setString(_keySupabaseKey, supabaseKeyVal);
       supabaseKey = supabaseKeyVal;
     }
-    if (github != null) {
-      await prefs.setString(_keyGitHubToken, github);
-      githubToken = github;
+    if (githubRepoVal != null) {
+      await prefs.setString(_keyGitHubRepo, githubRepoVal);
+      githubRepo = githubRepoVal;
+    }
+    if (githubTokenVal != null) {
+      await prefs.setString(_keyGitHubToken, githubTokenVal);
+      githubToken = githubTokenVal;
     }
   }
 }
@@ -390,7 +400,6 @@ class ShareHandler extends StatefulWidget {
 
 class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.parksy.capture/share');
-  static const _githubRepo = 'dtslib1979/parksy-logs';
 
   String _status = 'Receiving...';
   IconData _icon = Icons.downloading;
@@ -495,7 +504,7 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
       final month = now.month.toString().padLeft(2, '0');
       final path = 'logs/$year/$month/$filename';
 
-      final url = 'https://api.github.com/repos/$_githubRepo/contents/$path';
+      final url = 'https://api.github.com/repos/${ApiConfig.githubRepo}/contents/$path';
 
       final res = await http.put(
         Uri.parse(url),
@@ -569,7 +578,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _openaiController = TextEditingController();
   final _supabaseUrlController = TextEditingController();
   final _supabaseKeyController = TextEditingController();
-  final _githubController = TextEditingController();
+  final _githubRepoController = TextEditingController();
+  final _githubTokenController = TextEditingController();
   bool _obscureOpenAI = true;
   bool _obscureGitHub = true;
   bool _isSaving = false;
@@ -580,7 +590,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _openaiController.text = ApiConfig.openaiKey ?? '';
     _supabaseUrlController.text = ApiConfig.supabaseUrl ?? '';
     _supabaseKeyController.text = ApiConfig.supabaseKey ?? '';
-    _githubController.text = ApiConfig.githubToken ?? '';
+    _githubRepoController.text = ApiConfig.githubRepo ?? '';
+    _githubTokenController.text = ApiConfig.githubToken ?? '';
   }
 
   @override
@@ -588,7 +599,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _openaiController.dispose();
     _supabaseUrlController.dispose();
     _supabaseKeyController.dispose();
-    _githubController.dispose();
+    _githubRepoController.dispose();
+    _githubTokenController.dispose();
     super.dispose();
   }
 
@@ -598,7 +610,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       openai: _openaiController.text.trim(),
       supabaseUrlVal: _supabaseUrlController.text.trim(),
       supabaseKeyVal: _supabaseKeyController.text.trim(),
-      github: _githubController.text.trim(),
+      githubRepoVal: _githubRepoController.text.trim(),
+      githubTokenVal: _githubTokenController.text.trim(),
     );
     setState(() => _isSaving = false);
     if (mounted) {
@@ -662,7 +675,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSectionHeader('GitHub Sync', Icons.cloud_sync),
           const SizedBox(height: 12),
           _buildTextField(
-            controller: _githubController,
+            controller: _githubRepoController,
+            label: 'GitHub Repo',
+            hint: 'username/repo-name',
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            controller: _githubTokenController,
             label: 'GitHub Token',
             hint: 'Your GitHub personal access token',
             obscure: _obscureGitHub,
@@ -731,7 +750,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildStatusCard() {
     final aiOk = _openaiController.text.isNotEmpty;
-    final githubOk = _githubController.text.isNotEmpty;
+    final githubOk = _githubRepoController.text.isNotEmpty && _githubTokenController.text.isNotEmpty;
 
     return Card(
       child: Padding(
@@ -786,7 +805,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.parksy.capture/share');
-  static const _githubRepoUrl = 'https://github.com/dtslib1979/parksy-logs/tree/main/logs';
+
+  String get _githubRepoUrl => ApiConfig.githubRepo != null
+      ? 'https://github.com/${ApiConfig.githubRepo}/tree/main/logs'
+      : '';
 
   // Logs tab state
   List<Map<String, dynamic>> _logs = [];
@@ -933,6 +955,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _openGitHub() async {
+    if (_githubRepoUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('GitHub Repo not configured. Go to Settings.')),
+      );
+      return;
+    }
     final uri = Uri.parse(_githubRepoUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -1910,7 +1938,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 6.1.0'),
+            const Text('Version 7.0.0'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
@@ -2026,6 +2054,12 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
   }
 
   Future<void> _openOnGitHub() async {
+    if (ApiConfig.githubRepo == null || ApiConfig.githubRepo!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('GitHub Repo not configured. Go to Settings.')),
+      );
+      return;
+    }
     final match = RegExp(r'ParksyLog_(\d{4})(\d{2})').firstMatch(widget.filename);
     String path = 'logs';
     if (match != null) {
@@ -2033,7 +2067,7 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
       final month = match.group(2);
       path = 'logs/$year/$month';
     }
-    final url = 'https://github.com/dtslib1979/parksy-logs/tree/main/$path';
+    final url = 'https://github.com/${ApiConfig.githubRepo}/tree/main/$path';
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
