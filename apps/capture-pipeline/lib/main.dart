@@ -664,7 +664,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildTextField(
             controller: _githubController,
             label: 'GitHub Token',
-            hint: 'ghp_... or github_pat_...',
+            hint: 'Your GitHub personal access token',
             obscure: _obscureGitHub,
             onToggleObscure: () => setState(() => _obscureGitHub = !_obscureGitHub),
           ),
