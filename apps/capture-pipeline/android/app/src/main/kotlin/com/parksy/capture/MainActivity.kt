@@ -220,31 +220,44 @@ class MainActivity : FlutterActivity() {
             } catch (e: Exception) {
                 Log.e(TAG, "MediaStore query failed: ${e.message}", e)
             }
+
+            // Fallback: if MediaStore returns empty, try direct file access
+            if (files.isEmpty()) {
+                Log.d(TAG, "MediaStore empty, trying direct file access")
+                tryDirectFileAccess(files, meta)
+            }
         } else {
             // Fallback for older Android versions
-            val dir = getLegacyLogsDir()
-            Log.d(TAG, "Using legacy file access: ${dir.absolutePath}")
-            
-            if (dir.exists()) {
-                dir.listFiles()
-                    ?.filter { it.isFile && it.name.endsWith(".md") && it.name.startsWith("ParksyLog_") }
-                    ?.sortedByDescending { it.lastModified() }
-                    ?.forEach { file ->
-                        val fileMeta = meta[file.name] ?: emptyMap()
-                        files.add(mapOf(
-                            "name" to file.name,
-                            "size" to file.length(),
-                            "modified" to file.lastModified(),
-                            "preview" to getPreviewFromFile(file),
-                            "starred" to (fileMeta["starred"] as? Boolean ?: false),
-                            "tags" to (fileMeta["tags"] as? List<*> ?: emptyList<String>())
-                        ))
-                    }
-            }
+            tryDirectFileAccess(files, meta)
         }
-        
+
         Log.d(TAG, "Returning ${files.size} log files")
         return files
+    }
+
+    private fun tryDirectFileAccess(files: MutableList<Map<String, Any>>, meta: Map<String, Map<String, Any>>) {
+        val dir = getLegacyLogsDir()
+        Log.d(TAG, "Direct file access: ${dir.absolutePath}, exists: ${dir.exists()}")
+
+        if (dir.exists()) {
+            val fileList = dir.listFiles()
+            Log.d(TAG, "Files in dir: ${fileList?.size ?: 0}")
+
+            fileList?.filter { it.isFile && it.name.endsWith(".md") && it.name.startsWith("ParksyLog_") }
+                ?.sortedByDescending { it.lastModified() }
+                ?.forEach { file ->
+                    Log.d(TAG, "Found file: ${file.name}")
+                    val fileMeta = meta[file.name] ?: emptyMap()
+                    files.add(mapOf(
+                        "name" to file.name,
+                        "size" to file.length(),
+                        "modified" to file.lastModified(),
+                        "preview" to getPreviewFromFile(file),
+                        "starred" to (fileMeta["starred"] as? Boolean ?: false),
+                        "tags" to (fileMeta["tags"] as? List<*> ?: emptyList<String>())
+                    ))
+                }
+        }
     }
 
     private fun getPreviewFromUri(uri: Uri, maxLines: Int = 3, maxChars: Int = 150): String {
