@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'dart:convert';
 
 void main() {
@@ -491,10 +492,11 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.parksy.capture/share');
   static const _githubRepoUrl = 'https://github.com/dtslib1979/parksy-logs/tree/main/logs';
-  
+
+  // Logs tab state
   List<Map<String, dynamic>> _logs = [];
   List<Map<String, dynamic>> _filteredLogs = [];
   Map<String, dynamic> _stats = {};
@@ -504,10 +506,34 @@ class _HomeScreenState extends State<HomeScreen> {
   String _sortBy = 'date';
   final TextEditingController _searchController = TextEditingController();
 
+  // Tab controller
+  late TabController _tabController;
+
+  // AI Search state
+  static const _supabaseUrl = 'https://ytdjfnyxhalcxfwbygff.supabase.co';
+  static const _supabaseKey = 'sb_publishable_5Jbhm-mxlA8RUPn08WIMoA_IvaqHQE6';
+  static const _openaiKey = String.fromEnvironment('PARKSY_OPENAI_KEY', defaultValue: '');
+
+  final TextEditingController _aiQueryController = TextEditingController();
+  final SpeechToText _speech = SpeechToText();
+  bool _isListening = false;
+  bool _isAiSearching = false;
+  String? _aiAnswer;
+  List<Map<String, dynamic>> _aiReferences = [];
+  String? _aiError;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _aiQueryController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -646,20 +672,501 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             _buildHeader(),
-            if (_stats.isNotEmpty) _buildStats(),
-            _buildSearchBar(),
-            Expanded(child: _buildList()),
+            _buildTabBar(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildLogsTab(),
+                  _buildAiSearchTab(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openGitHub,
-        backgroundColor: const Color(0xFF21262D),
-        icon: const Icon(Icons.open_in_new, size: 20),
-        label: const Text('View on GitHub'),
+      floatingActionButton: _tabController.index == 0
+          ? FloatingActionButton.extended(
+              onPressed: _openGitHub,
+              backgroundColor: const Color(0xFF21262D),
+              icon: const Icon(Icons.open_in_new, size: 20),
+              label: const Text('View on GitHub'),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        onTap: (_) => setState(() {}),
+        indicator: BoxDecoration(
+          color: const Color(0xFF58A6FF).withOpacity(0.2),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelColor: const Color(0xFF58A6FF),
+        unselectedLabelColor: Colors.grey,
+        dividerColor: Colors.transparent,
+        tabs: const [
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.folder_outlined, size: 18),
+                SizedBox(width: 8),
+                Text('Logs'),
+              ],
+            ),
+          ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.psychology_outlined, size: 18),
+                SizedBox(width: 8),
+                Text('AI'),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  Widget _buildLogsTab() {
+    return Column(
+      children: [
+        if (_stats.isNotEmpty) _buildStats(),
+        _buildSearchBar(),
+        Expanded(child: _buildList()),
+      ],
+    );
+  }
+
+  // ============================================================
+  // AI SEARCH TAB
+  // ============================================================
+
+  Widget _buildAiSearchTab() {
+    return Column(
+      children: [
+        _buildAiSearchInput(),
+        _buildAiSearchButton(),
+        Expanded(child: _buildAiResult()),
+      ],
+    );
+  }
+
+  Widget _buildAiSearchInput() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _aiQueryController,
+              decoration: InputDecoration(
+                hintText: '무엇이든 물어보세요...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _aiQueryController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _aiQueryController.clear();
+                          setState(() {});
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: const Color(0xFF161B22),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF30363D)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF30363D)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF58A6FF)),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _askAi(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: _isListening ? const Color(0xFFF85149).withOpacity(0.2) : const Color(0xFF161B22),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isListening ? const Color(0xFFF85149) : const Color(0xFF30363D),
+              ),
+            ),
+            child: IconButton(
+              icon: Icon(
+                _isListening ? Icons.mic : Icons.mic_none,
+                color: _isListening ? const Color(0xFFF85149) : Colors.grey,
+              ),
+              onPressed: _toggleVoiceInput,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiSearchButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton.icon(
+          onPressed: _isAiSearching || _aiQueryController.text.isEmpty ? null : _askAi,
+          icon: _isAiSearching
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.psychology, size: 20),
+          label: Text(_isAiSearching ? '검색 중...' : 'AI한테 물어보기'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF238636),
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0xFF21262D),
+            disabledForegroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiResult() {
+    if (_isAiSearching) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Color(0xFF58A6FF)),
+            SizedBox(height: 16),
+            Text('기록을 검색하고 있어요...', style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
+    if (_aiError != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Color(0xFFF85149)),
+            const SizedBox(height: 16),
+            Text(_aiError!, style: const TextStyle(color: Color(0xFFF85149))),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => setState(() => _aiError = null),
+              child: const Text('다시 시도'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_aiAnswer == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.psychology_outlined, size: 64, color: Colors.grey[700]),
+            const SizedBox(height: 16),
+            Text('질문을 입력하세요', style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+            const SizedBox(height: 8),
+            Text(
+              '과거 기록에서 답을 찾아드려요',
+              style: TextStyle(color: Colors.grey[700], fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Answer card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome, size: 18, color: Color(0xFF58A6FF)),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'AI 답변',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF58A6FF)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    _aiAnswer!,
+                    style: const TextStyle(fontSize: 15, height: 1.6),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (_aiReferences.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              '참조한 기록 (${_aiReferences.length}개)',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            ...(_aiReferences.map((ref) {
+              final metadata = ref['metadata'] as Map<String, dynamic>? ?? {};
+              final date = metadata['date']?.toString() ?? 'Unknown';
+              final speaker = metadata['speaker']?.toString() ?? 'unknown';
+              final similarity = ((ref['similarity'] as num?) ?? 0).toStringAsFixed(2);
+              final content = (ref['content'] as String?) ?? '';
+              final preview = content.length > 100 ? '${content.substring(0, 100)}...' : content;
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: Icon(
+                    speaker == 'user' ? Icons.person : Icons.smart_toy,
+                    color: speaker == 'user' ? const Color(0xFF7EE787) : const Color(0xFF58A6FF),
+                    size: 20,
+                  ),
+                  title: Text(
+                    date,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Text(
+                    preview,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  ),
+                  trailing: Text(
+                    similarity,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  ),
+                ),
+              );
+            })),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // AI SEARCH API FUNCTIONS
+  // ============================================================
+
+  Future<void> _toggleVoiceInput() async {
+    if (_isListening) {
+      _speech.stop();
+      setState(() => _isListening = false);
+    } else {
+      bool available = await _speech.initialize(
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') {
+            setState(() => _isListening = false);
+          }
+        },
+        onError: (error) {
+          setState(() => _isListening = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('음성 인식 오류: ${error.errorMsg}')),
+            );
+          }
+        },
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (result) {
+            setState(() {
+              _aiQueryController.text = result.recognizedWords;
+            });
+          },
+          localeId: 'ko_KR',
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('음성 인식을 사용할 수 없습니다')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _askAi() async {
+    final query = _aiQueryController.text.trim();
+    if (query.isEmpty) return;
+
+    if (_openaiKey.isEmpty) {
+      setState(() => _aiError = 'OpenAI API 키가 설정되지 않았습니다');
+      return;
+    }
+
+    setState(() {
+      _isAiSearching = true;
+      _aiError = null;
+      _aiAnswer = null;
+      _aiReferences = [];
+    });
+
+    try {
+      // Step 1: Get embedding for query
+      final embedding = await _getEmbedding(query);
+
+      // Step 2: Search documents
+      final documents = await _searchDocuments(embedding);
+
+      if (documents.isEmpty) {
+        setState(() {
+          _isAiSearching = false;
+          _aiAnswer = '관련된 기록을 찾을 수 없습니다.';
+        });
+        return;
+      }
+
+      // Step 3: Generate answer
+      final answer = await _generateAnswer(query, documents);
+
+      setState(() {
+        _isAiSearching = false;
+        _aiAnswer = answer;
+        _aiReferences = documents;
+      });
+    } catch (e) {
+      setState(() {
+        _isAiSearching = false;
+        _aiError = e.toString();
+      });
+    }
+  }
+
+  Future<List<double>> _getEmbedding(String text) async {
+    final res = await http.post(
+      Uri.parse('https://api.openai.com/v1/embeddings'),
+      headers: {
+        'Authorization': 'Bearer $_openaiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': 'text-embedding-3-small',
+        'input': text,
+      }),
+    ).timeout(const Duration(seconds: 30));
+
+    if (res.statusCode != 200) {
+      throw Exception('임베딩 생성 실패: ${res.statusCode}');
+    }
+
+    final data = jsonDecode(res.body);
+    return List<double>.from(data['data'][0]['embedding']);
+  }
+
+  Future<List<Map<String, dynamic>>> _searchDocuments(List<double> embedding) async {
+    final res = await http.post(
+      Uri.parse('$_supabaseUrl/rest/v1/rpc/match_documents'),
+      headers: {
+        'Authorization': 'Bearer $_supabaseKey',
+        'apikey': _supabaseKey,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'query_embedding': embedding,
+        'match_count': 5,
+        'filter': {},
+      }),
+    ).timeout(const Duration(seconds: 30));
+
+    if (res.statusCode != 200) {
+      throw Exception('문서 검색 실패: ${res.statusCode}');
+    }
+
+    final List<dynamic> data = jsonDecode(res.body);
+    return data.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Future<String> _generateAnswer(String query, List<Map<String, dynamic>> docs) async {
+    final context = docs.map((d) {
+      final metadata = d['metadata'] as Map<String, dynamic>? ?? {};
+      final date = metadata['date']?.toString() ?? 'Unknown';
+      final speaker = metadata['speaker']?.toString() ?? 'unknown';
+      final content = d['content'] ?? '';
+      return '[$date, $speaker]\n$content';
+    }).join('\n\n---\n\n');
+
+    final res = await http.post(
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+      headers: {
+        'Authorization': 'Bearer $_openaiKey',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': 'gpt-4o-mini',
+        'max_tokens': 1024,
+        'messages': [
+          {
+            'role': 'system',
+            'content': '''당신은 사용자의 과거 기록을 참고해서 답변하는 AI 비서입니다.
+
+규칙:
+1. 제공된 기록을 기반으로 답변하세요
+2. 기록에 없는 내용은 추측하지 마세요
+3. 사용자의 말투와 스타일을 참고하세요
+4. 간결하고 직접적으로 답변하세요
+5. 관련 기록을 인용할 때는 날짜를 언급하세요''',
+          },
+          {
+            'role': 'user',
+            'content': '다음은 내 과거 기록입니다:\n\n$context\n\n---\n\n질문: $query\n\n위 기록을 참고해서 답변해줘.',
+          },
+        ],
+      }),
+    ).timeout(const Duration(seconds: 60));
+
+    if (res.statusCode != 200) {
+      throw Exception('답변 생성 실패: ${res.statusCode}');
+    }
+
+    final data = jsonDecode(res.body);
+    return data['choices'][0]['message']['content'];
+  }
+
+  // ============================================================
+  // LOGS TAB UI
+  // ============================================================
 
   Widget _buildHeader() {
     return Padding(
