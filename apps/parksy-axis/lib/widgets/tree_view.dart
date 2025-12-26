@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import '../core/state.dart';
 
 class TreeView extends StatelessWidget {
   final int active;
   final VoidCallback onTap;
+  final String rootName;
+  final List<String> stages;
 
   const TreeView({
     super.key,
     required this.active,
     required this.onTap,
+    this.rootName = '[Idea]',
+    this.stages = const ['Capture', 'Note', 'Build', 'Test', 'Publish'],
   });
 
   @override
@@ -25,7 +28,7 @@ class TreeView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _label('[Idea]', false),
+            _label(rootName, false),
             ...List.generate(stages.length, (i) {
               final isActive = i == active;
               final prefix = i == stages.length - 1 ? '└─' : '├─';

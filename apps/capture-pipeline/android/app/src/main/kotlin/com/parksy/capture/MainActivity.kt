@@ -12,6 +12,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -35,24 +36,40 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun requestStoragePermissions() {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+
-            arrayOf(
-                Manifest.permission.READ_MEDIA_AUDIO,
-                Manifest.permission.READ_MEDIA_VIDEO,
-                Manifest.permission.READ_MEDIA_IMAGES
-            )
+        // Android 11+ (API 30+): Use MANAGE_EXTERNAL_STORAGE for full access
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                Log.d(TAG, "Requesting MANAGE_EXTERNAL_STORAGE permission")
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                    intent.data = Uri.parse("package:$packageName")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    startActivity(intent)
+                }
+            }
         } else {
-            // Android 12 and below
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            // Android 10 and below: Use traditional permissions
+            val permissions = arrayOf(
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            )
+            val notGranted = permissions.filter {
+                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+            }
+            if (notGranted.isNotEmpty()) {
+                ActivityCompat.requestPermissions(this, notGranted.toTypedArray(), 1001)
+            }
         }
+    }
 
-        val notGranted = permissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (notGranted.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, notGranted.toTypedArray(), 1001)
+    private fun hasFullStorageAccess(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED
         }
     }
 
@@ -145,6 +162,13 @@ class MainActivity : FlutterActivity() {
                         val stats = getStats()
                         result.success(stats)
                     }
+                    "hasStoragePermission" -> {
+                        result.success(hasFullStorageAccess())
+                    }
+                    "requestStoragePermission" -> {
+                        requestStoragePermissions()
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -157,11 +181,21 @@ class MainActivity : FlutterActivity() {
     private fun getLogFiles(): List<Map<String, Any>> {
         val files = mutableListOf<Map<String, Any>>()
         val meta = loadAllMeta()
-        
-        Log.d(TAG, "getLogFiles() called, SDK: ${Build.VERSION.SDK_INT}")
-        
+
+        Log.d(TAG, "getLogFiles() called, SDK: ${Build.VERSION.SDK_INT}, hasFullAccess: ${hasFullStorageAccess()}")
+
+        // With MANAGE_EXTERNAL_STORAGE permission, always use direct file access
+        // This is the most reliable method
+        if (hasFullStorageAccess()) {
+            Log.d(TAG, "Using direct file access (MANAGE_EXTERNAL_STORAGE granted)")
+            tryDirectFileAccess(files, meta)
+            Log.d(TAG, "Direct access found ${files.size} files")
+            return files
+        }
+
+        // Fallback to MediaStore if permission not granted
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Use MediaStore for Android 10+
+            Log.d(TAG, "Permission not granted, trying MediaStore fallback")
             val projection = arrayOf(
                 MediaStore.Downloads._ID,
                 MediaStore.Downloads.DISPLAY_NAME,
@@ -169,14 +203,11 @@ class MainActivity : FlutterActivity() {
                 MediaStore.Downloads.DATE_MODIFIED,
                 MediaStore.Downloads.RELATIVE_PATH
             )
-            
-            // Simple query: just match filename pattern
+
             val selection = "${MediaStore.Downloads.DISPLAY_NAME} LIKE ?"
             val selectionArgs = arrayOf("ParksyLog_%.md")
             val sortOrder = "${MediaStore.Downloads.DATE_MODIFIED} DESC"
-            
-            Log.d(TAG, "Querying MediaStore with pattern: ParksyLog_%.md")
-            
+
             try {
                 contentResolver.query(
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI,
@@ -189,24 +220,19 @@ class MainActivity : FlutterActivity() {
                     val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
                     val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
                     val modifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
-                    val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.RELATIVE_PATH)
-                    
-                    Log.d(TAG, "Found ${cursor.count} files in MediaStore")
-                    
+
+                    Log.d(TAG, "MediaStore found ${cursor.count} files")
+
                     while (cursor.moveToNext()) {
                         val id = cursor.getLong(idColumn)
                         val name = cursor.getString(nameColumn)
                         val size = cursor.getLong(sizeColumn)
                         val modified = cursor.getLong(modifiedColumn) * 1000
-                        val relativePath = cursor.getString(pathColumn) ?: ""
-                        
-                        Log.d(TAG, "File: $name, path: $relativePath, size: $size")
 
-                        // No folder filter - just use filename pattern
                         val uri = Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
                         val preview = getPreviewFromUri(uri)
                         val fileMeta = meta[name] ?: emptyMap()
-                        
+
                         files.add(mapOf(
                             "name" to name,
                             "size" to size,
@@ -220,14 +246,7 @@ class MainActivity : FlutterActivity() {
             } catch (e: Exception) {
                 Log.e(TAG, "MediaStore query failed: ${e.message}", e)
             }
-
-            // Fallback: if MediaStore returns empty, try direct file access
-            if (files.isEmpty()) {
-                Log.d(TAG, "MediaStore empty, trying direct file access")
-                tryDirectFileAccess(files, meta)
-            }
         } else {
-            // Fallback for older Android versions
             tryDirectFileAccess(files, meta)
         }
 
@@ -316,8 +335,26 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun readLogFile(filename: String): String? {
-        Log.d(TAG, "readLogFile: $filename")
-        
+        Log.d(TAG, "readLogFile: $filename, hasFullAccess: ${hasFullStorageAccess()}")
+
+        // With MANAGE_EXTERNAL_STORAGE, use direct file access
+        if (hasFullStorageAccess()) {
+            return try {
+                val file = File(getLegacyLogsDir(), filename)
+                if (file.exists()) {
+                    Log.d(TAG, "Reading file directly: ${file.absolutePath}")
+                    file.readText()
+                } else {
+                    Log.e(TAG, "File not found: ${file.absolutePath}")
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Direct read failed: ${e.message}")
+                null
+            }
+        }
+
+        // Fallback to MediaStore
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val uri = findFileUri(filename)
             if (uri == null) {
@@ -343,10 +380,19 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun deleteLogFile(filename: String): Boolean {
-        Log.d(TAG, "deleteLogFile: $filename")
-        
+        Log.d(TAG, "deleteLogFile: $filename, hasFullAccess: ${hasFullStorageAccess()}")
+
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // With MANAGE_EXTERNAL_STORAGE, use direct file delete
+            if (hasFullStorageAccess()) {
+                val file = File(getLegacyLogsDir(), filename)
+                if (file.exists()) {
+                    val deleted = file.delete()
+                    if (deleted) removeFromMeta(filename)
+                    Log.d(TAG, "Direct delete: $deleted")
+                    deleted
+                } else false
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val uri = findFileUri(filename)
                 if (uri != null) {
                     val deleted = contentResolver.delete(uri, null, null) > 0

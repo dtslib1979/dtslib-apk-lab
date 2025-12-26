@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import '../services/settings_service.dart';
+import 'settings.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,6 +13,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _hasPermission = false;
   bool _isShowing = false;
+  AxisSettings? _settings;
 
   @override
   void initState() {
@@ -29,13 +32,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkPermission();
+      _loadSettings();
     }
   }
 
   Future<void> _init() async {
     await _checkPermission();
+    await _loadSettings();
     final active = await FlutterOverlayWindow.isActive();
     setState(() => _isShowing = active);
+  }
+
+  Future<void> _loadSettings() async {
+    SettingsService.clearCache();
+    _settings = await SettingsService.load();
+    if (mounted) setState(() {});
   }
 
   Future<void> _checkPermission() async {
@@ -48,14 +59,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _checkPermission();
   }
 
+  OverlayAlignment _getAlignment() {
+    switch (_settings?.position ?? 'bottomLeft') {
+      case 'topLeft':
+        return OverlayAlignment.topLeft;
+      case 'topRight':
+        return OverlayAlignment.topRight;
+      case 'bottomRight':
+        return OverlayAlignment.bottomRight;
+      default:
+        return OverlayAlignment.bottomLeft;
+    }
+  }
+
   Future<void> _toggleOverlay() async {
     if (_isShowing) {
       await FlutterOverlayWindow.closeOverlay();
     } else {
       await FlutterOverlayWindow.showOverlay(
-        height: 200,
-        width: 220,
-        alignment: OverlayAlignment.bottomLeft,
+        height: _settings?.height ?? 200,
+        width: _settings?.width ?? 220,
+        alignment: _getAlignment(),
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
         overlayTitle: 'Parksy Axis',
@@ -66,29 +90,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() => _isShowing = active);
   }
 
+  void _openSettings() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    if (result == true) {
+      await _loadSettings();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Center(
+      body: SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
+            const Spacer(),
             const Text(
               'Parksy Axis',
-              style: TextStyle(color: Colors.amber, fontSize: 24),
+              style: TextStyle(color: Colors.amber, fontSize: 28, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            Text(
+              'v2.0.0',
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+            const Spacer(),
             if (!_hasPermission)
-              ElevatedButton(
+              ElevatedButton.icon(
                 onPressed: _requestPermission,
-                child: const Text('권한 허용'),
+                icon: const Icon(Icons.security),
+                label: const Text('권한 허용'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                ),
               )
             else
-              ElevatedButton(
+              ElevatedButton.icon(
                 onPressed: _toggleOverlay,
-                child: Text(_isShowing ? '오버레이 닫기' : '오버레이 시작'),
+                icon: Icon(_isShowing ? Icons.stop : Icons.play_arrow),
+                label: Text(_isShowing ? '오버레이 닫기' : '오버레이 시작'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isShowing ? Colors.red : Colors.amber,
+                  foregroundColor: _isShowing ? Colors.white : Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                ),
               ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 32),
+              child: IconButton(
+                onPressed: _openSettings,
+                icon: const Icon(Icons.settings, color: Colors.grey, size: 32),
+              ),
+            ),
           ],
         ),
       ),
