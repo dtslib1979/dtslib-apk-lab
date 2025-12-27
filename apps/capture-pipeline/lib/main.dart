@@ -940,6 +940,92 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // Status
           _buildStatusCard(),
+
+          const SizedBox(height: 24),
+
+          // Debug 버튼
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _showDebugInfo,
+              icon: const Icon(Icons.bug_report, size: 20),
+              label: const Text('디버그 정보 보기'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.orange,
+                side: const BorderSide(color: Colors.orange),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 디버그 정보 표시
+  Future<void> _showDebugInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // SharedPreferences에서 직접 읽기
+    final rawToken = prefs.getString('github_token');
+    final rawRepo = prefs.getString('github_repo');
+
+    // ApiConfig 현재 값
+    final configToken = ApiConfig.githubToken;
+    final configRepo = ApiConfig.githubRepo;
+
+    // 토큰 마스킹 (앞 10자, 뒤 4자만 표시)
+    String maskToken(String? t) {
+      if (t == null || t.isEmpty) return '(없음)';
+      if (t.length <= 14) return '${t.substring(0, 4)}...';
+      return '${t.substring(0, 10)}...${t.substring(t.length - 4)}';
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('디버그 정보'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('[ SharedPreferences 직접 읽기 ]',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+              const SizedBox(height: 8),
+              Text('Token 길이: ${rawToken?.length ?? 0}'),
+              Text('Token: ${maskToken(rawToken)}'),
+              Text('Repo: ${rawRepo ?? "(없음)"}'),
+              const SizedBox(height: 16),
+              const Text('[ ApiConfig 현재 값 ]',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+              const SizedBox(height: 8),
+              Text('Token 길이: ${configToken?.length ?? 0}'),
+              Text('Token: ${maskToken(configToken)}'),
+              Text('Repo: ${configRepo ?? "(없음)"}'),
+              const SizedBox(height: 16),
+              const Text('[ 현재 입력 필드 ]',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+              const SizedBox(height: 8),
+              Text('Token 길이: ${_githubTokenController.text.length}'),
+              Text('Token: ${maskToken(_githubTokenController.text)}'),
+              Text('Repo: ${_githubRepoController.text}'),
+              const SizedBox(height: 16),
+              const Text('[ 비교 ]',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.purple)),
+              const SizedBox(height: 8),
+              Text('SharedPrefs == ApiConfig: ${rawToken == configToken ? "✅ 일치" : "❌ 불일치"}'),
+              Text('ApiConfig == 입력필드: ${configToken == _githubTokenController.text ? "✅ 일치" : "❌ 불일치"}'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
         ],
       ),
     );

@@ -2,7 +2,7 @@
   "id": "capture-pipeline",
   "name": "Parksy Capture",
   "desc": "공유 텍스트 캡처 & AI 검색",
-  "version": "v10.0.5",
+  "version": "v10.0.6",
   "icon": "📥",
   "cardClass": "capture",
   "workflow": "build-capture-pipeline"
