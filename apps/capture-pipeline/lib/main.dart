@@ -120,7 +120,7 @@ class ApiConfig {
       githubToken = prefs.getString(_keyGitHubToken);
     }
 
-    githubRepo = prefs.getString(_keyGitHubRepo);
+    githubRepo = prefs.getString(_keyGitHubRepo) ?? 'dtslib1979/parksy-logs';
 
     supabaseUrl = prefs.getString(_keySupabaseUrl) ?? 'https://ytdjfnyxhalcxfwbygff.supabase.co';
     supabaseKey = prefs.getString(_keySupabaseKey) ?? 'sb_publishable_5Jbhm-mxlA8RUPn08WIMoA_IvaqHQE6';
