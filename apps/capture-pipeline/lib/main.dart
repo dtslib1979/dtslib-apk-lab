@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -5,7 +8,6 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -460,17 +462,18 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
         _icon = Icons.cloud_upload;
       });
 
-      final cloudOk = await _syncToGitHub(fname, content);
-      if (cloudOk) {
+      final syncResult = await _syncToGitHub(fname, content);
+      if (syncResult == null) {
         _updateStatus('Saved & Synced', Icons.cloud_done, const Color(0xFF7EE787));
+        _finish();
       } else {
-        _updateStatus('Saved locally', Icons.check_circle, const Color(0xFF7EE787));
+        // 동기화 실패 - 에러 원인 표시
+        _updateStatus('⚠️ GitHub 실패: $syncResult', Icons.cloud_off, const Color(0xFFF85149));
+        _finish(hasError: true);
       }
-
-      _finish();
     } catch (e) {
       _updateStatus('Error: $e', Icons.error, const Color(0xFFF85149));
-      _finish();
+      _finish(hasError: true);
     }
   }
 
@@ -497,8 +500,13 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
     }
   }
 
-  Future<bool> _syncToGitHub(String filename, String content) async {
+  /// GitHub 동기화. 성공 시 null, 실패 시 에러 메시지 반환
+  Future<String?> _syncToGitHub(String filename, String content) async {
     try {
+      if (ApiConfig.githubToken == null || ApiConfig.githubToken!.isEmpty) {
+        return 'Token 없음';
+      }
+
       final now = DateTime.now();
       final year = now.year.toString();
       final month = now.month.toString().padLeft(2, '0');
@@ -518,12 +526,24 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
           'message': 'Add $filename',
           'content': base64Encode(utf8.encode(content)),
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 15));
 
-      return res.statusCode == 201 || res.statusCode == 200;
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return null; // 성공
+      } else if (res.statusCode == 401) {
+        return 'Token 만료/무효';
+      } else if (res.statusCode == 403) {
+        return 'Token 권한 부족';
+      } else if (res.statusCode == 404) {
+        return 'Repo 없음';
+      } else {
+        return 'HTTP ${res.statusCode}';
+      }
+    } on TimeoutException {
+      return '타임아웃';
     } catch (e) {
       debugPrint('GitHub sync failed: $e');
-      return false;
+      return '네트워크 오류';
     }
   }
 
@@ -532,8 +552,10 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
     return '---\ndate: $ts\nsource: android-share\n---\n\n$text\n';
   }
 
-  void _finish() {
-    Future.delayed(const Duration(seconds: 2), () {
+  void _finish({bool hasError = false}) {
+    // 에러 있으면 더 오래 표시 (3초)
+    final delay = hasError ? 3 : 2;
+    Future.delayed(Duration(seconds: delay), () {
       if (mounted) SystemNavigator.pop();
     });
   }
@@ -583,6 +605,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _obscureOpenAI = true;
   bool _obscureGitHub = true;
   bool _isSaving = false;
+  bool _isTesting = false;
+  List<Map<String, dynamic>> _testResults = [];
 
   @override
   void initState() {
@@ -620,6 +644,150 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       Navigator.pop(context, true);
     }
+  }
+
+  /// GitHub 연결 테스트 (4단계)
+  Future<void> _testGitHubConnection() async {
+    final token = _githubTokenController.text.trim();
+    final repo = _githubRepoController.text.trim();
+
+    if (token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('GitHub Token을 입력하세요')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isTesting = true;
+      _testResults = [];
+    });
+
+    final results = <Map<String, dynamic>>[];
+
+    // 1. Token 유효 체크
+    try {
+      final res = await http.get(
+        Uri.parse('https://api.github.com/user'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        results.add({
+          'step': '1. Token 체크',
+          'ok': true,
+          'msg': '유효함 (${data['login']})',
+        });
+      } else {
+        results.add({
+          'step': '1. Token 체크',
+          'ok': false,
+          'msg': 'HTTP ${res.statusCode}',
+        });
+      }
+    } catch (e) {
+      results.add({'step': '1. Token 체크', 'ok': false, 'msg': '$e'});
+    }
+
+    // 2. 권한 체크
+    try {
+      final res = await http.get(
+        Uri.parse('https://api.github.com/user'),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+
+      final scopes = res.headers['x-oauth-scopes'] ?? '';
+      final hasRepo = scopes.contains('repo') || scopes.contains('public_repo');
+      results.add({
+        'step': '2. 권한 체크',
+        'ok': hasRepo || scopes.isEmpty, // Fine-grained token은 scopes 없음
+        'msg': scopes.isEmpty ? 'Fine-grained token' : scopes,
+      });
+    } catch (e) {
+      results.add({'step': '2. 권한 체크', 'ok': false, 'msg': '$e'});
+    }
+
+    // 3. 저장소 접근 체크
+    if (repo.isNotEmpty) {
+      try {
+        final res = await http.get(
+          Uri.parse('https://api.github.com/repos/$repo'),
+          headers: {'Authorization': 'Bearer $token'},
+        ).timeout(const Duration(seconds: 10));
+
+        if (res.statusCode == 200) {
+          results.add({
+            'step': '3. 저장소 체크',
+            'ok': true,
+            'msg': repo,
+          });
+        } else if (res.statusCode == 404) {
+          results.add({
+            'step': '3. 저장소 체크',
+            'ok': false,
+            'msg': '저장소 없음 또는 접근 권한 없음',
+          });
+        } else {
+          results.add({
+            'step': '3. 저장소 체크',
+            'ok': false,
+            'msg': 'HTTP ${res.statusCode}',
+          });
+        }
+      } catch (e) {
+        results.add({'step': '3. 저장소 체크', 'ok': false, 'msg': '$e'});
+      }
+    }
+
+    // 4. 테스트 업로드
+    if (repo.isNotEmpty && results.where((r) => r['ok'] == true).length >= 2) {
+      try {
+        final testPath = 'logs/2025/12/_TEST_CONNECTION.md';
+        final testContent = '# Connection Test\nTime: ${DateTime.now()}\n';
+
+        final res = await http.put(
+          Uri.parse('https://api.github.com/repos/$repo/contents/$testPath'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'message': 'Connection test',
+            'content': base64Encode(utf8.encode(testContent)),
+          }),
+        ).timeout(const Duration(seconds: 15));
+
+        if (res.statusCode == 201 || res.statusCode == 200) {
+          results.add({
+            'step': '4. 테스트 업로드',
+            'ok': true,
+            'msg': '성공! 파일 생성됨',
+          });
+        } else if (res.statusCode == 422) {
+          // 이미 파일 존재 - SHA 필요
+          results.add({
+            'step': '4. 테스트 업로드',
+            'ok': true,
+            'msg': '성공 (파일 이미 존재)',
+          });
+        } else {
+          results.add({
+            'step': '4. 테스트 업로드',
+            'ok': false,
+            'msg': 'HTTP ${res.statusCode}',
+          });
+        }
+      } catch (e) {
+        results.add({'step': '4. 테스트 업로드', 'ok': false, 'msg': '$e'});
+      }
+    }
+
+    setState(() {
+      _isTesting = false;
+      _testResults = results;
+    });
   }
 
   @override
@@ -687,6 +855,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
             obscure: _obscureGitHub,
             onToggleObscure: () => setState(() => _obscureGitHub = !_obscureGitHub),
           ),
+          const SizedBox(height: 16),
+
+          // GitHub 연결 테스트 버튼
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isTesting ? null : _testGitHubConnection,
+              icon: _isTesting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.science, size: 20),
+              label: Text(_isTesting ? '테스트 중...' : '연결 테스트'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF238636),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFF21262D),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+
+          // 테스트 결과 표시
+          if (_testResults.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('테스트 결과', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    ..._testResults.map((r) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            r['ok'] == true ? Icons.check_circle : Icons.cancel,
+                            size: 18,
+                            color: r['ok'] == true ? const Color(0xFF7EE787) : const Color(0xFFF85149),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(r['step'], style: const TextStyle(fontWeight: FontWeight.w500)),
+                                Text(
+                                  r['msg'],
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           const SizedBox(height: 32),
 
@@ -1938,7 +2173,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 9.0.0'),
+            const Text('Version 10.0.0'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
