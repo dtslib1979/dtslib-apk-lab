@@ -111,6 +111,10 @@ class ApiConfig {
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
 
+    // 디버그
+    final rawToken = prefs.getString(_keyGitHubToken);
+    debugPrint('DEBUG load - raw token length: ${rawToken?.length}, first10: ${rawToken != null && rawToken.length > 10 ? rawToken.substring(0, 10) : rawToken}');
+
     // 환경변수에서 먼저 읽고, 없으면 SharedPreferences에서
     openaiKey = const String.fromEnvironment('PARKSY_OPENAI_KEY', defaultValue: '');
     if (openaiKey!.isEmpty) {
@@ -121,6 +125,8 @@ class ApiConfig {
     if (githubToken!.isEmpty) {
       githubToken = prefs.getString(_keyGitHubToken)?.trim();
     }
+
+    debugPrint('DEBUG load - final githubToken length: ${githubToken?.length}');
 
     // githubRepo는 기본값 유지 (개인용 앱이므로)
     githubRepo = (prefs.getString(_keyGitHubRepo) ?? 'dtslib1979/parksy-logs').trim();
@@ -159,6 +165,7 @@ class ApiConfig {
     }
     if (githubTokenVal != null) {
       final trimmed = githubTokenVal.trim();
+      debugPrint('DEBUG save - token length: ${trimmed.length}');
       await prefs.setString(_keyGitHubToken, trimmed);
       githubToken = trimmed;
     }
@@ -2179,7 +2186,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 10.0.4'),
+            const Text('Version 10.0.5'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
