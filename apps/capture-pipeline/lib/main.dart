@@ -122,7 +122,8 @@ class ApiConfig {
       githubToken = prefs.getString(_keyGitHubToken);
     }
 
-    githubRepo = prefs.getString(_keyGitHubRepo);
+    // githubRepo는 기본값 유지 (개인용 앱이므로)
+    githubRepo = prefs.getString(_keyGitHubRepo) ?? 'dtslib1979/parksy-logs';
 
     supabaseUrl = prefs.getString(_keySupabaseUrl);
     supabaseKey = prefs.getString(_keySupabaseKey);
@@ -2173,7 +2174,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 10.0.1'),
+            const Text('Version 10.0.2'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
