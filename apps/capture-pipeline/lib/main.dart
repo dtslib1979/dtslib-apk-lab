@@ -114,19 +114,19 @@ class ApiConfig {
     // 환경변수에서 먼저 읽고, 없으면 SharedPreferences에서
     openaiKey = const String.fromEnvironment('PARKSY_OPENAI_KEY', defaultValue: '');
     if (openaiKey!.isEmpty) {
-      openaiKey = prefs.getString(_keyOpenAI);
+      openaiKey = prefs.getString(_keyOpenAI)?.trim();
     }
 
     githubToken = const String.fromEnvironment('PARKSY_GITHUB_TOKEN', defaultValue: '');
     if (githubToken!.isEmpty) {
-      githubToken = prefs.getString(_keyGitHubToken);
+      githubToken = prefs.getString(_keyGitHubToken)?.trim();
     }
 
     // githubRepo는 기본값 유지 (개인용 앱이므로)
-    githubRepo = prefs.getString(_keyGitHubRepo) ?? 'dtslib1979/parksy-logs';
+    githubRepo = (prefs.getString(_keyGitHubRepo) ?? 'dtslib1979/parksy-logs').trim();
 
-    supabaseUrl = prefs.getString(_keySupabaseUrl);
-    supabaseKey = prefs.getString(_keySupabaseKey);
+    supabaseUrl = prefs.getString(_keySupabaseUrl)?.trim();
+    supabaseKey = prefs.getString(_keySupabaseKey)?.trim();
   }
 
   static Future<void> save({
@@ -2179,7 +2179,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 10.0.3'),
+            const Text('Version 10.0.4'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
