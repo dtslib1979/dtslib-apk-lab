@@ -138,24 +138,29 @@ class ApiConfig {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (openai != null) {
-      await prefs.setString(_keyOpenAI, openai);
-      openaiKey = openai;
+      final trimmed = openai.trim();
+      await prefs.setString(_keyOpenAI, trimmed);
+      openaiKey = trimmed;
     }
     if (supabaseUrlVal != null) {
-      await prefs.setString(_keySupabaseUrl, supabaseUrlVal);
-      supabaseUrl = supabaseUrlVal;
+      final trimmed = supabaseUrlVal.trim();
+      await prefs.setString(_keySupabaseUrl, trimmed);
+      supabaseUrl = trimmed;
     }
     if (supabaseKeyVal != null) {
-      await prefs.setString(_keySupabaseKey, supabaseKeyVal);
-      supabaseKey = supabaseKeyVal;
+      final trimmed = supabaseKeyVal.trim();
+      await prefs.setString(_keySupabaseKey, trimmed);
+      supabaseKey = trimmed;
     }
     if (githubRepoVal != null) {
-      await prefs.setString(_keyGitHubRepo, githubRepoVal);
-      githubRepo = githubRepoVal;
+      final trimmed = githubRepoVal.trim();
+      await prefs.setString(_keyGitHubRepo, trimmed);
+      githubRepo = trimmed;
     }
     if (githubTokenVal != null) {
-      await prefs.setString(_keyGitHubToken, githubTokenVal);
-      githubToken = githubTokenVal;
+      final trimmed = githubTokenVal.trim();
+      await prefs.setString(_keyGitHubToken, trimmed);
+      githubToken = trimmed;
     }
   }
 }
@@ -2174,7 +2179,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 10.0.2'),
+            const Text('Version 10.0.3'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
