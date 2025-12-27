@@ -122,10 +122,10 @@ class ApiConfig {
       githubToken = prefs.getString(_keyGitHubToken);
     }
 
-    githubRepo = prefs.getString(_keyGitHubRepo) ?? 'dtslib1979/parksy-logs';
+    githubRepo = prefs.getString(_keyGitHubRepo);
 
-    supabaseUrl = prefs.getString(_keySupabaseUrl) ?? 'https://ytdjfnyxhalcxfwbygff.supabase.co';
-    supabaseKey = prefs.getString(_keySupabaseKey) ?? 'sb_publishable_5Jbhm-mxlA8RUPn08WIMoA_IvaqHQE6';
+    supabaseUrl = prefs.getString(_keySupabaseUrl);
+    supabaseKey = prefs.getString(_keySupabaseKey);
   }
 
   static Future<void> save({
@@ -2173,7 +2173,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 10.0.0'),
+            const Text('Version 10.0.1'),
             const SizedBox(height: 16),
             Text(
               'Lossless conversation capture for LLM power users.\n\n'
