@@ -2,11 +2,11 @@
   {
     "id": "capture-pipeline",
     "name": "Capture Pipeline",
-    "version": "v9.0.0",
+    "version": "v9.0.2",
     "description": "Lossless conversation capture for LLM power users",
     "icon": "💾",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
-    "lastUpdated": "2025-12-26"
+    "lastUpdated": "2025-12-27"
   },
   {
     "id": "laser-pen-overlay",
@@ -15,7 +15,7 @@
     "description": "S Pen drawing overlay with finger passthrough",
     "icon": "✍️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
-    "lastUpdated": "2025-12-26"
+    "lastUpdated": "2025-12-27"
   },
   {
     "id": "overlay-dual-sub",
@@ -24,7 +24,7 @@
     "description": "S Pen web overlay with 3s fade-out laser pen effect",
     "icon": "🖊️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/overlay-dual-sub/main/overlay-dual-sub-debug.zip",
-    "lastUpdated": "2025-12-26"
+    "lastUpdated": "2025-12-27"
   },
   {
     "id": "aiva-trimmer",
@@ -33,7 +33,7 @@
     "description": "Audio trimmer optimized for AIVA exports",
     "icon": "🎧",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
-    "lastUpdated": "2025-12-26"
+    "lastUpdated": "2025-12-27"
   },
   {
     "id": "tts-factory",
@@ -42,6 +42,6 @@
     "description": "Batch TTS processing with Google Cloud",
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
-    "lastUpdated": "2025-12-26"
+    "lastUpdated": "2025-12-27"
   }
 ]
