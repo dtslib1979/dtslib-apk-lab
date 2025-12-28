@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -85,21 +86,34 @@ class _HomeScreenState extends State<HomeScreen> {
     'bright': 'Bright',
   };
 
-  // Download folder path
-  static const _downloadBasePath = '/storage/emulated/0/Download/TTS-Factory';
+  String? _downloadBasePath;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
-    _ensureDownloadFolder();
+    _initDownloadPath();
   }
 
-  Future<void> _ensureDownloadFolder() async {
-    final dir = Directory(_downloadBasePath);
+  Future<void> _initDownloadPath() async {
+    final dir = await _getDownloadDirectory();
+    _downloadBasePath = dir.path;
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
+  }
+
+  Future<Directory> _getDownloadDirectory() async {
+    // Try external storage first (visible in file managers)
+    final extDir = await getExternalStorageDirectory();
+    if (extDir != null) {
+      // Use app-specific external storage: Android/data/com.parksy.ttsfactory/files/TTS-Factory
+      final ttsDir = Directory('${extDir.path}/TTS-Factory');
+      return ttsDir;
+    }
+    // Fallback to app documents directory
+    final docDir = await getApplicationDocumentsDirectory();
+    return Directory('${docDir.path}/TTS-Factory');
   }
 
   Future<void> _loadSettings() async {
@@ -284,14 +298,17 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (response.statusCode == 200) {
-        await _ensureDownloadFolder();
+        final dir = await _getDownloadDirectory();
+        if (!await dir.exists()) {
+          await dir.create(recursive: true);
+        }
         final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
         final fileName = 'tts_$timestamp.zip';
-        final file = File('$_downloadBasePath/$fileName');
+        final file = File('${dir.path}/$fileName');
         await file.writeAsBytes(response.bodyBytes);
 
         _lastDownloadPath = file.path;
-        _showSuccess('Downloaded to Download/TTS-Factory/$fileName');
+        _showSuccess('Saved: $fileName');
 
         setState(() {
           _jobStatus = JobStatus.idle;
@@ -353,14 +370,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: const Color(0xFF21262D),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.folder, size: 16, color: Colors.grey),
-                  SizedBox(width: 8),
+                  const Icon(Icons.folder, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Download: /Download/TTS-Factory/',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      'Save to: ${_downloadBasePath ?? "App Storage"}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -660,7 +678,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 1.0.2'),
+            const Text('Version 1.0.3'),
             const SizedBox(height: 16),
             const Text(
               'Batch TTS client.\n\n'
@@ -675,9 +693,9 @@ class _HomeScreenState extends State<HomeScreen> {
               style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Download: /Download/TTS-Factory/',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+            Text(
+              'Save to: ${_downloadBasePath ?? "App Storage"}',
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
           ],
         ),

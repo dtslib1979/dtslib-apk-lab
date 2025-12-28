@@ -2,7 +2,7 @@
   "id": "tts-factory",
   "name": "Parksy TTS",
   "desc": "배치 TTS 변환 클라이언트",
-  "version": "v1.0.2",
+  "version": "v1.0.3",
   "icon": "🎙️",
   "cardClass": "tts",
   "workflow": "build-tts-factory"
