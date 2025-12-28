@@ -1,0 +1,9 @@
+{
+  "id": "capture-lite",
+  "name": "Parksy Capture Lite",
+  "desc": "초보자용 간단 텍스트 캡처 앱",
+  "version": "v1.0.0",
+  "icon": "📋",
+  "cardClass": "capture-lite",
+  "workflow": "build-capture-lite"
+}
