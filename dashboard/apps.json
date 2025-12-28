@@ -1,12 +1,12 @@
 [
   {
     "id": "capture-pipeline",
-    "name": "Capture Pipeline",
-    "version": "v10.0.7",
+    "name": "Parksy Capture",
+    "version": "v10.0.8",
     "description": "Lossless conversation capture for LLM power users",
-    "icon": "💾",
+    "icon": "📥",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
-    "lastUpdated": "2025-12-27"
+    "lastUpdated": "2025-12-28"
   },
   {
     "id": "laser-pen-overlay",

@@ -115,16 +115,9 @@ class ApiConfig {
     final rawToken = prefs.getString(_keyGitHubToken);
     debugPrint('DEBUG load - raw token length: ${rawToken?.length}, first10: ${rawToken != null && rawToken.length > 10 ? rawToken.substring(0, 10) : rawToken}');
 
-    // 환경변수에서 먼저 읽고, 없으면 SharedPreferences에서
-    openaiKey = const String.fromEnvironment('PARKSY_OPENAI_KEY', defaultValue: '');
-    if (openaiKey!.isEmpty) {
-      openaiKey = prefs.getString(_keyOpenAI)?.trim();
-    }
-
-    githubToken = const String.fromEnvironment('PARKSY_GITHUB_TOKEN', defaultValue: '');
-    if (githubToken!.isEmpty) {
-      githubToken = prefs.getString(_keyGitHubToken)?.trim();
-    }
+    // SharedPreferences에서만 읽기 (환경변수 하드코딩 문제 해결)
+    openaiKey = prefs.getString(_keyOpenAI)?.trim();
+    githubToken = prefs.getString(_keyGitHubToken)?.trim();
 
     debugPrint('DEBUG load - final githubToken length: ${githubToken?.length}');
 
