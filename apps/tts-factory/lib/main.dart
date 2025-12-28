@@ -72,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<TTSItem> _items = [];
   String _preset = 'neutral';
+  String _language = 'en';
   String? _currentJobId;
   JobStatus _jobStatus = JobStatus.idle;
   int _progress = 0;
@@ -83,6 +84,14 @@ class _HomeScreenState extends State<HomeScreen> {
     'neutral': 'Neutral',
     'calm': 'Calm',
     'bright': 'Bright',
+  };
+
+  final _languages = {
+    'en': 'English',
+    'ja': '日本語',
+    'zh': '中文',
+    'es': 'Español',
+    'ko': '한국어',
   };
 
   // Download folder path
@@ -208,6 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
         body: jsonEncode({
           'batch_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
           'preset': _preset,
+          'language': _language,
           'items': _items.map((e) => {
             'id': e.id,
             'text': e.text,
@@ -427,6 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             if (_serverUrl.isEmpty) _buildSetupBanner(),
+            _buildLanguageSelector(),
             _buildPresetSelector(),
             _buildStatus(),
             Expanded(child: _buildItemList()),
@@ -461,6 +472,41 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(Icons.arrow_forward_ios, color: Colors.orange, size: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageSelector() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      child: Row(
+        children: [
+          const Text('Lang:', style: TextStyle(color: Colors.grey)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _languages.entries.map((e) => ChoiceChip(
+                label: Text(e.value),
+                selected: _language == e.key,
+                onSelected: _jobStatus == JobStatus.idle
+                    ? (sel) {
+                        if (sel) setState(() => _language = e.key);
+                      }
+                    : null,
+                selectedColor: const Color(0xFF7EE787).withValues(alpha: 0.3),
+                backgroundColor: const Color(0xFF21262D),
+              )).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -666,7 +712,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'Batch TTS client.\n\n'
               'Max 25 items\n'
               'Max 1100 chars/item\n'
-              'Korean Neural2 voices',
+              'Multi-language Neural2 voices',
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 16),

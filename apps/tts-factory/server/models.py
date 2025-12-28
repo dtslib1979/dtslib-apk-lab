@@ -14,6 +14,7 @@ class BatchRequest(BaseModel):
     """Batch TTS request."""
     batch_date: str
     preset: str = "neutral"
+    language: str = "en"
     items: List[TTSItem] = Field(max_length=25)
 
 

@@ -26,6 +26,7 @@ def run_job(job_id: str, req: Dict[str, Any]):
     try:
         items = req["items"]
         preset = req.get("preset", "neutral")
+        language = req.get("language", "en")
         total = len(items)
 
         # Init job state
@@ -63,7 +64,7 @@ def run_job(job_id: str, req: Dict[str, Any]):
 
             # Synthesize
             out_path = audio_dir / f"{item_id}.mp3"
-            ok = tts.synth(text, preset, out_path)
+            ok = tts.synth(text, preset, language, out_path)
 
             if ok:
                 results.append({"id": item_id, "status": "ok", "reason": ""})
