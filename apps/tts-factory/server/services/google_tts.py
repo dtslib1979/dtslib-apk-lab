@@ -38,5 +38,6 @@ class GoogleTTS:
             )
             out.write_bytes(resp.audio_content)
             return True
-        except Exception:
+        except Exception as e:
+            print(f"TTS error: {e}")
             return False

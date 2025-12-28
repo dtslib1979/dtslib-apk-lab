@@ -444,7 +444,7 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.2),
+          color: Colors.orange.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.orange),
         ),
@@ -490,7 +490,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (sel) setState(() => _preset = e.key);
                       }
                     : null,
-                selectedColor: const Color(0xFF58A6FF).withOpacity(0.3),
+                selectedColor: const Color(0xFF58A6FF).withValues(alpha: 0.3),
                 backgroundColor: const Color(0xFF21262D),
               )).toList(),
             ),
@@ -660,7 +660,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Version 1.0.2'),
+            const Text('TTS Factory'),
             const SizedBox(height: 16),
             const Text(
               'Batch TTS client.\n\n'
