@@ -34,5 +34,14 @@
     "icon": "✂️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
     "lastUpdated": "2025-12-28"
+  },
+  {
+    "id": "tts-factory",
+    "name": "Parksy TTS",
+    "version": "v1.1.0",
+    "description": "Multi-language batch TTS client (requires server)",
+    "icon": "🎙️",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
+    "lastUpdated": "2025-12-29"
   }
 ]
