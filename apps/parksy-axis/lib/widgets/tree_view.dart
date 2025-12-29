@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class TreeView extends StatelessWidget {
   final int active;
   final VoidCallback onTap;
-  final ValueChanged<int>? onStageTap; // 개별 스테이지 탭 → 해당 단계로 점프
+  final ValueChanged<int>? onStageTap;
   final String rootName;
   final List<String> stages;
 
@@ -20,56 +20,57 @@ class TreeView extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: FittedBox(
-        fit: BoxFit.contain,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.85),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _label(rootName, false),
-              ...List.generate(stages.length, (i) {
-                final isActive = i == active;
-                final prefix = i == stages.length - 1 ? '└─' : '├─';
-                return _row(prefix, stages[i], isActive, i);
-              }),
-            ],
-          ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[800]!, width: 1),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _label(rootName, false),
+            const SizedBox(height: 4),
+            ...List.generate(stages.length, (i) {
+              final isActive = i == active;
+              final prefix = i == stages.length - 1 ? '└─' : '├─';
+              return _row(prefix, stages[i], isActive, i);
+            }),
+          ],
         ),
       ),
     );
   }
 
   Widget _label(String t, bool on) {
-    return Text(
-      t,
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 14,
-        color: on ? Colors.amber : Colors.grey,
-        fontWeight: on ? FontWeight.bold : FontWeight.normal,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Text(
+        t,
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 16,
+          color: on ? Colors.amber : Colors.grey[400],
+          fontWeight: on ? FontWeight.bold : FontWeight.w500,
+        ),
       ),
     );
   }
 
   Widget _row(String pre, String txt, bool on, int index) {
-    final mark = on ? ' ◀●' : '';
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onStageTap != null ? () => onStageTap!(index) : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         child: Text(
-          '$pre $txt$mark',
+          '$pre $txt${on ? " ◀●" : ""}',
           style: TextStyle(
             fontFamily: 'monospace',
-            fontSize: 14,
-            color: on ? Colors.amber : Colors.grey.shade500,
+            fontSize: 16,
+            color: on ? Colors.amber : Colors.grey[500],
             fontWeight: on ? FontWeight.bold : FontWeight.normal,
           ),
         ),

@@ -106,63 +106,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Spacer(),
+            const Spacer(flex: 2),
+            // 앱 아이콘
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.account_tree_rounded,
+                color: Colors.amber,
+                size: 64,
+              ),
+            ),
+            const SizedBox(height: 24),
+            // 타이틀
             const Text(
               'Parksy Axis',
-              style: TextStyle(color: Colors.amber, fontSize: 28, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.amber,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'v2.5.1',
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
-            ),
-            const Spacer(),
-            if (!_hasPermission)
-              ElevatedButton.icon(
-                onPressed: _requestPermission,
-                icon: const Icon(Icons.security),
-                label: const Text('권한 허용'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            const SizedBox(height: 12),
+            // 버전 뱃지
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[800]!),
+              ),
+              child: Text(
+                'v2.6.0',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
-              )
-            else
-              Column(
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _toggleOverlay,
-                    icon: Icon(_isShowing ? Icons.stop : Icons.play_arrow),
-                    label: Text(_isShowing ? '오버레이 닫기' : '오버레이 시작'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isShowing ? Colors.red : Colors.amber,
-                      foregroundColor: _isShowing ? Colors.white : Colors.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: _openSettings,
-                    icon: const Icon(Icons.account_tree),
-                    label: const Text('트리 편집'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.amber,
-                      side: const BorderSide(color: Colors.amber),
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                    ),
-                  ),
-                ],
-              ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 32),
-              child: IconButton(
-                onPressed: _openSettings,
-                icon: const Icon(Icons.settings, color: Colors.grey, size: 32),
               ),
             ),
+            const Spacer(flex: 2),
+            // 버튼 영역
+            Center(
+              child: !_hasPermission
+                  ? ElevatedButton.icon(
+                      onPressed: _requestPermission,
+                      icon: const Icon(Icons.security),
+                      label: const Text('권한 허용'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _toggleOverlay,
+                          icon: Icon(_isShowing ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                          label: Text(_isShowing ? '오버레이 닫기' : '오버레이 시작'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isShowing ? Colors.red : Colors.amber,
+                            foregroundColor: _isShowing ? Colors.white : Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        OutlinedButton.icon(
+                          onPressed: _openSettings,
+                          icon: const Icon(Icons.edit_rounded),
+                          label: const Text('트리 편집'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.amber,
+                            side: const BorderSide(color: Colors.amber, width: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            const Spacer(flex: 3),
           ],
         ),
       ),
