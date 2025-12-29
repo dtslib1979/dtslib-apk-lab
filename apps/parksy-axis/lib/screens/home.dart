@@ -114,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 8),
             Text(
-              'v2.2.0',
+              'v2.4.0',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
             const Spacer(),
@@ -130,15 +130,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               )
             else
-              ElevatedButton.icon(
-                onPressed: _toggleOverlay,
-                icon: Icon(_isShowing ? Icons.stop : Icons.play_arrow),
-                label: Text(_isShowing ? '오버레이 닫기' : '오버레이 시작'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isShowing ? Colors.red : Colors.amber,
-                  foregroundColor: _isShowing ? Colors.white : Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                ),
+              Column(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _toggleOverlay,
+                    icon: Icon(_isShowing ? Icons.stop : Icons.play_arrow),
+                    label: Text(_isShowing ? '오버레이 닫기' : '오버레이 시작'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isShowing ? Colors.red : Colors.amber,
+                      foregroundColor: _isShowing ? Colors.white : Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: _openSettings,
+                    icon: const Icon(Icons.account_tree),
+                    label: const Text('트리 편집'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.amber,
+                      side: const BorderSide(color: Colors.amber),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    ),
+                  ),
+                ],
               ),
             const Spacer(),
             Padding(

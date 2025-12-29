@@ -25,9 +25,13 @@ class AxisSettings {
       };
 
   factory AxisSettings.fromJson(Map<String, dynamic> json) {
+    final stagesList = json['stages'] as List?;
+    final stages = stagesList != null && stagesList.isNotEmpty
+        ? List<String>.from(stagesList)
+        : null; // null이면 생성자 기본값 사용
     return AxisSettings(
       rootName: json['rootName'] ?? '[Idea]',
-      stages: List<String>.from(json['stages'] ?? []),
+      stages: stages,
       position: json['position'] ?? 'bottomLeft',
       width: json['width'] ?? 220,
       height: json['height'] ?? 200,

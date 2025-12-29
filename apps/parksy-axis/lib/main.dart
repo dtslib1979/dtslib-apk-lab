@@ -72,14 +72,19 @@ class _OverlayAppState extends State<_OverlayApp> {
       debugShowCheckedModeBanner: false,
       home: Material(
         color: Colors.transparent,
-        child: Align(
-          alignment: _getAlignment(),
-          child: TreeView(
-            active: _stage,
-            onTap: _next,
-            onStageTap: _jumpTo,
-            rootName: _settings?.rootName ?? '[Idea]',
-            stages: _settings?.stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'],
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Align(
+              alignment: _getAlignment(),
+              child: TreeView(
+                active: _stage,
+                onTap: _next,
+                onStageTap: _jumpTo,
+                rootName: _settings?.rootName ?? '[Idea]',
+                stages: _settings?.stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'],
+              ),
+            ),
           ),
         ),
       ),
