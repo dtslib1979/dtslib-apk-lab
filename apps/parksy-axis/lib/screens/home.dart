@@ -152,14 +152,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 ),
               ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 32),
-              child: IconButton(
-                onPressed: _openSettings,
-                icon: const Icon(Icons.settings, color: Colors.grey, size: 32),
+            const SizedBox(height: 24),
+            // 설정 버튼 (눈에 잘 띄게)
+            OutlinedButton.icon(
+              onPressed: _openSettings,
+              icon: const Icon(Icons.edit_note, color: Colors.amber),
+              label: const Text('트리 편집', style: TextStyle(color: Colors.amber)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.amber),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
+            const SizedBox(height: 48),
           ],
         ),
       ),

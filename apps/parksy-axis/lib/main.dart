@@ -83,18 +83,21 @@ class _OverlayAppState extends State<_OverlayApp> {
       debugShowCheckedModeBanner: false,
       home: Material(
         color: Colors.transparent,
-        child: Align(
-          alignment: _getAlignment(),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: TreeView(
-              active: _stage,
-              onTap: _next,
-              onDoubleTap: _cycleSize,
-              onStageTap: _jumpTo,
-              rootName: _settings?.rootName ?? '[Idea]',
-              stages: _settings?.stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'],
-              sizeLabel: _settings?.sizePreset.label,
+        child: SafeArea(
+          minimum: const EdgeInsets.all(16), // 시스템 영역 회피
+          child: Align(
+            alignment: _getAlignment(),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: TreeView(
+                active: _stage,
+                onTap: _next,
+                onDoubleTap: _cycleSize,
+                onStageTap: _jumpTo,
+                rootName: _settings?.rootName ?? '[Idea]',
+                stages: _settings?.stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'],
+                sizeLabel: _settings?.sizePreset.label,
+              ),
             ),
           ),
         ),
