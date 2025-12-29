@@ -86,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         width: width,
         alignment: _getAlignment(),
         enableDrag: true,
-        flag: OverlayFlag.defaultFlag,
+        flag: OverlayFlag.focusPointer,
         overlayTitle: 'Parksy Axis',
         overlayContent: 'Stage Overlay Active',
       );
@@ -121,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 8),
             Text(
-              'v2.4.1',
+              'v2.4.2',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
             const SizedBox(height: 4),
