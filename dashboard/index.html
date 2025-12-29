@@ -3,33 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#000000">
-    <meta name="description" content="Parksy APK Store - Personal use only">
     <title>Parksy Store</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            padding: 40px 0;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+        }
+        .app-grid {
+            display: grid;
+            gap: 20px;
+        }
+        .app-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .app-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .app-icon {
+            font-size: 3rem;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+        }
+        .app-info {
+            flex: 1;
+        }
+        .app-name {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .app-version {
+            color: #00d4ff;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+        }
+        .app-desc {
+            color: #aaa;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        .download-btn {
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        .download-btn:hover {
+            opacity: 0.9;
+        }
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            color: #666;
+        }
+        .warning {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 30px;
+            color: #ffc107;
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
 <body>
-    <div class="warning">
-        ⚠️ Personal use only. No distribution.
+    <div class="container">
+        <header>
+            <h1>🏪 Parksy Store</h1>
+            <p class="subtitle">Personal APK Distribution Hub</p>
+        </header>
+        
+        <div class="warning">
+            ⚠️ Personal use only. Debug builds - not for distribution.
+        </div>
+        
+        <div class="app-grid" id="appGrid">
+            <!-- Apps loaded dynamically -->
+        </div>
+        
+        <footer>
+            <p>Built with GitHub Actions + nightly.link</p>
+        </footer>
     </div>
     
-    <header class="header">
-        <h1>📦 Parksy Store</h1>
-        <p class="subtitle">박씨 전용 APK 다운로드</p>
-    </header>
-    
-    <main class="app-grid" id="appGrid">
-        <!-- JS로 렌더링 -->
-    </main>
-    
-    <footer>
-        <p>nightly.link 통해 Debug APK 제공</p>
-        <p>© 2025 Parksy</p>
-    </footer>
-    
-    <script src="app.js"></script>
+    <script>
+        fetch('apps.json')
+            .then(r => r.json())
+            .then(apps => {
+                const grid = document.getElementById('appGrid');
+                grid.innerHTML = apps.map(app => `
+                    <div class="app-card">
+                        <div class="app-icon">${app.icon}</div>
+                        <div class="app-info">
+                            <div class="app-name">${app.name}</div>
+                            <div class="app-version">${app.version}</div>
+                            <div class="app-desc">${app.description}</div>
+                        </div>
+                        <a href="${app.downloadUrl}" class="download-btn">Download</a>
+                    </div>
+                `).join('');
+            });
+    </script>
 </body>
 </html>
