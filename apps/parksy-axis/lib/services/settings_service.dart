@@ -59,9 +59,12 @@ class AxisSettings {
       };
 
   factory AxisSettings.fromJson(Map<String, dynamic> json) {
+    final stagesList = json['stages'] as List?;
     return AxisSettings(
       rootName: json['rootName'] ?? '[Idea]',
-      stages: List<String>.from(json['stages'] ?? []),
+      stages: (stagesList != null && stagesList.isNotEmpty)
+          ? List<String>.from(stagesList)
+          : null,
       position: json['position'] ?? 'bottomLeft',
       sizePreset: SizePresetExt.fromString(json['sizePreset']),
     );
