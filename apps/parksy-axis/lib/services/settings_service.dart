@@ -11,9 +11,9 @@ class AxisSettings {
   AxisSettings({
     this.rootName = '[Idea]',
     List<String>? stages,
-    this.position = 'bottomLeft',
-    this.width = 220,
-    this.height = 200,
+    this.position = 'topLeft',
+    this.width = 280,
+    this.height = 260,
   }) : stages = stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'];
 
   Map<String, dynamic> toJson() => {
@@ -32,9 +32,9 @@ class AxisSettings {
     return AxisSettings(
       rootName: json['rootName'] ?? '[Idea]',
       stages: stages,
-      position: json['position'] ?? 'bottomLeft',
-      width: json['width'] ?? 220,
-      height: json['height'] ?? 200,
+      position: json['position'] ?? 'topLeft',
+      width: json['width'] ?? 280,
+      height: json['height'] ?? 260,
     );
   }
 }

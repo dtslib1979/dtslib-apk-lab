@@ -60,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   OverlayAlignment _getAlignment() {
-    switch (_settings?.position ?? 'bottomLeft') {
+    switch (_settings?.position ?? 'topLeft') {
       case 'topLeft':
         return OverlayAlignment.topLeft;
       case 'topRight':
@@ -77,8 +77,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await FlutterOverlayWindow.closeOverlay();
     } else {
       await FlutterOverlayWindow.showOverlay(
-        height: _settings?.height ?? 200,
-        width: _settings?.width ?? 220,
+        height: _settings?.height ?? 260,
+        width: _settings?.width ?? 280,
         alignment: _getAlignment(),
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
@@ -114,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 8),
             Text(
-              'v2.4.1',
+              'v2.5.0',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
             const Spacer(),
