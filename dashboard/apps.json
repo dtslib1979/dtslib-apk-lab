@@ -43,5 +43,14 @@
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
     "lastUpdated": "2025-12-29"
+  },
+  {
+    "id": "parksy-axis",
+    "name": "Parksy Axis",
+    "version": "v3.0.0",
+    "description": "Face-cam replacement - broadcast stage position overlay",
+    "icon": "🎯",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip",
+    "lastUpdated": "2025-12-29"
   }
 ]
