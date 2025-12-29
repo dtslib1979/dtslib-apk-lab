@@ -5,14 +5,14 @@
     "version": "v5.0.0",
     "description": "방송용 사고 단계 오버레이 (FSM 상태 전이)",
     "icon": "🎯",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
     "lastUpdated": "2025-12-29"
   },
   {
     "id": "parksy-pen",
     "name": "Parksy Pen",
-    "version": "v25.12.0",
-    "description": "S Pen 레이저펜 오버레이 판서",
+    "version": "v1.0.31",
+    "description": "S Pen 레이저펜 오버레이 판서 (Build #31)",
     "icon": "✍️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
     "lastUpdated": "2025-12-29"
