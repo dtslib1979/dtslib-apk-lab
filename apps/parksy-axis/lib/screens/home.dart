@@ -114,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 8),
             Text(
-              'v2.5.0',
+              'v2.5.1',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
             const Spacer(),

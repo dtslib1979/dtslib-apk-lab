@@ -47,7 +47,7 @@
   {
     "id": "parksy-axis",
     "name": "Parksy Axis",
-    "version": "v2.5.0",
+    "version": "v2.5.1",
     "description": "Face-cam replacement - broadcast stage position overlay",
     "icon": "🎯",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip",
