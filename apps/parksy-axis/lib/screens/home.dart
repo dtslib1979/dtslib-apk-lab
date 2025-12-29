@@ -60,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   OverlayAlignment _getAlignment() {
-    switch (_settings?.position ?? 'topLeft') {
+    switch (_settings?.position ?? 'bottomLeft') {
       case 'topLeft':
         return OverlayAlignment.topLeft;
       case 'topRight':

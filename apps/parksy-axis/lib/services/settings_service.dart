@@ -11,7 +11,7 @@ class AxisSettings {
   AxisSettings({
     this.rootName = '[Idea]',
     List<String>? stages,
-    this.position = 'topLeft',
+    this.position = 'bottomLeft',
     this.width = 280,
     this.height = 260,
   }) : stages = stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'];
@@ -32,7 +32,7 @@ class AxisSettings {
     return AxisSettings(
       rootName: json['rootName'] ?? '[Idea]',
       stages: stages,
-      position: json['position'] ?? 'topLeft',
+      position: json['position'] ?? 'bottomLeft',
       width: json['width'] ?? 280,
       height: json['height'] ?? 260,
     );
