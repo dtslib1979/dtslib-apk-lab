@@ -1,54 +1,45 @@
 [
   {
-    "id": "parksy-axis",
-    "name": "Parksy Axis",
-    "version": "v5.0.0",
-    "description": "방송용 사고 단계 오버레이 (FSM 상태 전이)",
-    "icon": "🎯",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
-    "lastUpdated": "2025-12-29"
-  },
-  {
-    "id": "parksy-pen",
-    "name": "Parksy Pen",
-    "version": "v1.0.31",
-    "description": "S Pen 레이저펜 오버레이 판서 (Build #31)",
-    "icon": "✍️",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
-    "lastUpdated": "2025-12-29"
-  },
-  {
-    "id": "parksy-capture",
-    "name": "Parksy Capture",
+    "id": "capture-pipeline",
+    "name": "Capture Pipeline",
     "version": "v10.0.8",
-    "description": "텍스트 캡처 → GitHub 자동 아카이브",
+    "description": "Lossless conversation capture for LLM power users",
     "icon": "💾",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
     "lastUpdated": "2025-12-29"
   },
   {
-    "id": "parksy-subtitle",
-    "name": "Parksy Subtitle",
+    "id": "laser-pen-overlay",
+    "name": "Laser Pen Overlay",
+    "version": "v1.0.31",
+    "description": "S Pen drawing overlay with finger passthrough",
+    "icon": "✍️",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
+    "lastUpdated": "2025-12-29"
+  },
+  {
+    "id": "overlay-dual-sub",
+    "name": "Overlay Dual Sub",
     "version": "v1.0.0",
-    "description": "이중자막 오버레이",
+    "description": "S Pen web overlay with 3s fade-out laser pen effect",
     "icon": "🖊️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/overlay-dual-sub/main/overlay-dual-sub-debug.zip",
     "lastUpdated": "2025-12-29"
   },
   {
-    "id": "parksy-aiva",
-    "name": "Parksy AIVA",
+    "id": "aiva-trimmer",
+    "name": "AIVA Trimmer",
     "version": "v2.0.0",
-    "description": "AIVA MP3 무음 트리밍",
+    "description": "Audio trimmer optimized for AIVA exports",
     "icon": "🎧",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
     "lastUpdated": "2025-12-29"
   },
   {
-    "id": "parksy-tts",
-    "name": "Parksy TTS",
+    "id": "tts-factory",
+    "name": "TTS Factory",
     "version": "v1.0.2",
-    "description": "배치 TTS 생성기 (Google Cloud)",
+    "description": "Batch TTS processing with Google Cloud",
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
     "lastUpdated": "2025-12-29"
