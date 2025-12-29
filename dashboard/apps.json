@@ -1,45 +1,45 @@
 [
   {
     "id": "capture-pipeline",
-    "name": "Capture Pipeline",
+    "name": "Parksy Capture",
     "version": "v10.0.8",
     "description": "Lossless conversation capture for LLM power users",
-    "icon": "💾",
+    "icon": "📥",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
     "lastUpdated": "2025-12-29"
   },
   {
     "id": "laser-pen-overlay",
-    "name": "Laser Pen Overlay",
+    "name": "Parksy Pen",
     "version": "v25.12.0",
     "description": "S Pen drawing overlay with finger passthrough",
-    "icon": "✍️",
+    "icon": "🖊️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
     "lastUpdated": "2025-12-29"
   },
   {
     "id": "overlay-dual-sub",
-    "name": "Overlay Dual Sub",
+    "name": "Parksy DualSub",
     "version": "v1.0.0",
-    "description": "S Pen web overlay with 3s fade-out laser pen effect",
-    "icon": "🖊️",
+    "description": "Dual subtitle overlay for real-time translation",
+    "icon": "💬",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/overlay-dual-sub/main/overlay-dual-sub-debug.zip",
     "lastUpdated": "2025-12-29"
   },
   {
     "id": "aiva-trimmer",
-    "name": "AIVA Trimmer",
+    "name": "Parksy AIVA",
     "version": "v2.0.0",
     "description": "Audio trimmer optimized for AIVA exports",
-    "icon": "🎧",
+    "icon": "✂️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
     "lastUpdated": "2025-12-29"
   },
   {
     "id": "tts-factory",
-    "name": "TTS Factory",
+    "name": "Parksy TTS",
     "version": "v1.0.2",
-    "description": "Batch TTS processing with Google Cloud",
+    "description": "Multi-language batch TTS client",
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
     "lastUpdated": "2025-12-29"
