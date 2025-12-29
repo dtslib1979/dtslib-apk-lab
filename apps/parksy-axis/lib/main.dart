@@ -37,13 +37,24 @@ class _OverlayAppState extends State<_OverlayApp> {
     setState(() => _loading = false);
   }
 
+  /// 탭 → 다음 스테이지
   void _next() {
     final max = _settings?.stages.length ?? 5;
     setState(() => _stage = (_stage + 1) % max);
   }
 
+  /// 스테이지 직접 점프
   void _jumpTo(int index) {
     setState(() => _stage = index);
+  }
+
+  /// 더블탭 → S/M/L 크기 순환
+  Future<void> _cycleSize() async {
+    if (_settings == null) return;
+    final next = _settings!.sizePreset.next;
+    _settings!.sizePreset = next;
+    await SettingsService.saveSizePreset(next);
+    setState(() {});
   }
 
   Alignment _getAlignment() {
@@ -74,12 +85,17 @@ class _OverlayAppState extends State<_OverlayApp> {
         color: Colors.transparent,
         child: Align(
           alignment: _getAlignment(),
-          child: TreeView(
-            active: _stage,
-            onTap: _next,
-            onStageTap: _jumpTo,
-            rootName: _settings?.rootName ?? '[Idea]',
-            stages: _settings?.stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'],
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: TreeView(
+              active: _stage,
+              onTap: _next,
+              onDoubleTap: _cycleSize,
+              onStageTap: _jumpTo,
+              rootName: _settings?.rootName ?? '[Idea]',
+              stages: _settings?.stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'],
+              sizeLabel: _settings?.sizePreset.label,
+            ),
           ),
         ),
       ),

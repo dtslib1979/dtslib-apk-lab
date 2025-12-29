@@ -76,9 +76,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_isShowing) {
       await FlutterOverlayWindow.closeOverlay();
     } else {
+      // 화면 크기 기반 오버레이 크기 계산
+      final screen = MediaQuery.of(context).size;
+      final width = _settings?.getWidth(screen.width) ?? 220;
+      final height = _settings?.getHeight(screen.height) ?? 200;
+
       await FlutterOverlayWindow.showOverlay(
-        height: _settings?.height ?? 200,
-        width: _settings?.width ?? 220,
+        height: height,
+        width: width,
         alignment: _getAlignment(),
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
@@ -102,6 +107,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final sizeLabel = _settings?.sizePreset.label ?? 'S';
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -114,8 +121,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 8),
             Text(
-              'v2.1.0',
+              'v2.2.0',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Size: $sizeLabel',
+              style: TextStyle(color: Colors.grey[700], fontSize: 12),
             ),
             const Spacer(),
             if (!_hasPermission)

@@ -155,39 +155,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
 
-          // 오버레이 크기
+          // 오버레이 크기 (S/M/L)
           const Text('오버레이 크기', style: TextStyle(color: Colors.amber, fontSize: 16)),
+          const SizedBox(height: 4),
+          Text(
+            '방송 중 더블탭으로 변경 가능',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('너비: ${_settings.width}', style: const TextStyle(color: Colors.white70)),
-                    Slider(
-                      value: _settings.width.toDouble(),
-                      min: 150,
-                      max: 350,
-                      onChanged: (v) => setState(() => _settings.width = v.toInt()),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('높이: ${_settings.height}', style: const TextStyle(color: Colors.white70)),
-                    Slider(
-                      value: _settings.height.toDouble(),
-                      min: 100,
-                      max: 400,
-                      onChanged: (v) => setState(() => _settings.height = v.toInt()),
-                    ),
-                  ],
-                ),
-              ),
+              _sizeChip(SizePreset.S, 'S (30%)'),
+              const SizedBox(width: 8),
+              _sizeChip(SizePreset.M, 'M (42%)'),
+              const SizedBox(width: 8),
+              _sizeChip(SizePreset.L, 'L (55%)'),
             ],
           ),
           const SizedBox(height: 24),
@@ -253,6 +235,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
       onSelected: (_) => setState(() => _settings.position = value),
       selectedColor: Colors.amber,
       labelStyle: TextStyle(color: selected ? Colors.black : Colors.white),
+    );
+  }
+
+  Widget _sizeChip(SizePreset preset, String label) {
+    final selected = _settings.sizePreset == preset;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _settings.sizePreset = preset),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? Colors.amber : Colors.grey[900],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? Colors.amber : Colors.grey[700]!,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.black : Colors.white,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
