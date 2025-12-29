@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class TreeView extends StatelessWidget {
   final int active;
   final VoidCallback onTap;
+  final ValueChanged<int>? onStageTap; // 개별 스테이지 탭 → 해당 단계로 점프
   final String rootName;
   final List<String> stages;
 
@@ -10,6 +11,7 @@ class TreeView extends StatelessWidget {
     super.key,
     required this.active,
     required this.onTap,
+    this.onStageTap,
     this.rootName = '[Idea]',
     this.stages = const ['Capture', 'Note', 'Build', 'Test', 'Publish'],
   });
@@ -32,7 +34,7 @@ class TreeView extends StatelessWidget {
             ...List.generate(stages.length, (i) {
               final isActive = i == active;
               final prefix = i == stages.length - 1 ? '└─' : '├─';
-              return _row(prefix, stages[i], isActive);
+              return _row(prefix, stages[i], isActive, i);
             }),
           ],
         ),
@@ -52,15 +54,22 @@ class TreeView extends StatelessWidget {
     );
   }
 
-  Widget _row(String pre, String txt, bool on) {
-    final mark = on ? '◀ ● ' : '    ';
-    return Text(
-      '$pre $txt $mark',
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 14,
-        color: on ? Colors.amber : Colors.grey,
-        fontWeight: on ? FontWeight.bold : FontWeight.normal,
+  Widget _row(String pre, String txt, bool on, int index) {
+    final mark = on ? ' ◀●' : '';
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onStageTap != null ? () => onStageTap!(index) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          '$pre $txt$mark',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 14,
+            color: on ? Colors.amber : Colors.grey.shade500,
+            fontWeight: on ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
