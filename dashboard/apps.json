@@ -1,5 +1,14 @@
 [
   {
+    "id": "parksy-axis",
+    "name": "Parksy Axis",
+    "version": "v4.0.0",
+    "description": "방송용 사고 단계 오버레이 (6테마/5폰트/반응형)",
+    "icon": "🎯",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip",
+    "lastUpdated": "2025-12-29"
+  },
+  {
     "id": "capture-pipeline",
     "name": "Capture Pipeline",
     "version": "v10.0.8",
