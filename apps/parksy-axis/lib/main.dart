@@ -42,6 +42,23 @@ class _OverlayAppState extends State<_OverlayApp> {
     setState(() => _stage = (_stage + 1) % max);
   }
 
+  void _jumpTo(int index) {
+    setState(() => _stage = index);
+  }
+
+  Alignment _getAlignment() {
+    switch (_settings?.position ?? 'bottomLeft') {
+      case 'topLeft':
+        return Alignment.topLeft;
+      case 'topRight':
+        return Alignment.topRight;
+      case 'bottomRight':
+        return Alignment.bottomRight;
+      default:
+        return Alignment.bottomLeft;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -56,10 +73,11 @@ class _OverlayAppState extends State<_OverlayApp> {
       home: Material(
         color: Colors.transparent,
         child: Align(
-          alignment: Alignment.topLeft,
+          alignment: _getAlignment(),
           child: TreeView(
             active: _stage,
             onTap: _next,
+            onStageTap: _jumpTo,
             rootName: _settings?.rootName ?? '[Idea]',
             stages: _settings?.stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'],
           ),

@@ -1,7 +1,7 @@
 name: parksy_axis
-description: Broadcast stage overlay - show current thinking position
+description: Face-cam replacement - broadcast stage position overlay
 publish_to: 'none'
-version: 2.0.0+3
+version: 2.1.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

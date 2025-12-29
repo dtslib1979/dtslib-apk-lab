@@ -1,8 +1,8 @@
 {
   "name": "Parksy Axis",
   "package": "kr.parksy.axis",
-  "version": "v2.0.0",
-  "description": "Broadcast stage overlay",
+  "version": "v2.1.0",
+  "description": "Face-cam replacement - broadcast stage position overlay",
   "category": "broadcast",
   "icon": "axis_icon.png"
 }
