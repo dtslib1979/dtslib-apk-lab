@@ -4,6 +4,8 @@ import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
+// v4.0.0 Pro Edition - Force rebuild trigger
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const AxisApp());
