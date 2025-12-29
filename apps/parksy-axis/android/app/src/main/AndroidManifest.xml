@@ -35,6 +35,9 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="overlay_window"/>
+            <meta-data
+                android:name="io.flutter.embedding.android.OverlayEntryPoint"
+                android:value="overlayMain"/>
         </service>
 
         <meta-data

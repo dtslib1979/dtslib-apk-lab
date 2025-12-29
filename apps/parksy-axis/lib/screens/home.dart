@@ -143,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 border: Border.all(color: Colors.grey[800]!),
               ),
               child: Text(
-                'v2.6.0',
+                'v2.6.1',
                 style: TextStyle(
                   color: Colors.grey[500],
                   fontSize: 12,
