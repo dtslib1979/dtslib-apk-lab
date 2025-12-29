@@ -77,8 +77,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await FlutterOverlayWindow.closeOverlay();
     } else {
       await FlutterOverlayWindow.showOverlay(
-        height: _settings?.height ?? 260,
-        width: _settings?.width ?? 280,
+        height: _settings?.height ?? 180,
+        width: _settings?.width ?? 180,
         alignment: _getAlignment(),
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
