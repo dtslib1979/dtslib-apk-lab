@@ -2,52 +2,39 @@
 
 방송용 사고 단계 오버레이 (박씨 좌표)
 
-## 구조
-```
-[Idea]
-├─ Capture  ◀ ●
-├─ Note
-├─ Build
-├─ Test
-└─ Publish
-```
+## v4.0.0 Pro Edition
 
-## 조작
-- 탭: 다음 단계
-- 순환: Publish → Capture
+| Feature | Description |
+|---------|-------------|
+| 🎨 6 Themes | Amber, Cyan, Lime, Pink, Purple, Mono |
+| 📝 5 Fonts | Mono, Sans, Serif, Condensed, Rounded |
+| 📐 Responsive | 크기에 비례하는 텍스트 스케일링 |
+| 🌫️ Opacity | 배경 투명도 자유 조절 |
+| ✨ Stroke | 테두리 굵기 커스텀 |
+| 💾 Persist | 모든 설정 자동 저장 |
 
 ## 수학 모델
 ```
-state: ℤ₅ (mod 5)
-tap(): s → (s+1) mod 5
+state: ℤ_n (mod n, n = stages.length)
+tap(): s → (s+1) mod n
+scale(): (w,h) → fontSize × ((w/260 + h/300) / 2)
 
-Domain: {tap} → {0,1,2,3,4}
-Codomain: {Capture, Note, Build, Test, Publish}
-```
-
-## 기술
-- Flutter overlay (flutter_overlay_window)
-- FSM: ℤ₅ cyclic
-- Permission: SYSTEM_ALERT_WINDOW
-
-## 빌드
-```bash
-cd apps/parksy-axis
-flutter pub get
-flutter build apk --debug
+Domain: {tap, scale} → {state, style}
+Codomain: 반응형 FSM UI
 ```
 
 ## 다운로드
 
 [![APK Download](https://img.shields.io/badge/APK-Download-green)](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip)
 
-## v1.1.0
-- [x] 오버레이 entryPoint 버그 수정
-- [x] 앱 재시작 시 오버레이 상태 동기화
+## 사용법
 
-## v1.0.0
-- [x] FSM 로직 (ℤ₅)
-- [x] 터미널 스타일 트리 UI
-- [x] 오버레이 시스템
-- [x] GitHub Actions CI/CD
-- [x] 스토어 등록
+1. 앱 실행 → 권한 허용
+2. "커스터마이징"에서 테마/폰트/크기 설정
+3. "오버레이 시작" 탭
+4. 오버레이 탭 → 다음 스테이지
+5. 스테이지 직접 탭 → 해당 스테이지로 이동
+
+---
+
+*Personal use only. Not for distribution.*

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/settings_service.dart';
+import '../models/theme.dart';
+import '../widgets/tree_view.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,99 +11,81 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late AxisSettings _settings;
+  late AxisSettings _s;
   bool _loading = true;
-  final _rootController = TextEditingController();
+  final _rootCtrl = TextEditingController();
+  int _previewStage = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _load();
   }
 
-  Future<void> _loadSettings() async {
-    _settings = await SettingsService.load();
-    _rootController.text = _settings.rootName;
+  Future<void> _load() async {
+    _s = await SettingsService.load();
+    _rootCtrl.text = _s.rootName;
     setState(() => _loading = false);
   }
 
   Future<void> _save() async {
-    _settings.rootName = _rootController.text;
-    await SettingsService.save(_settings);
+    _s.rootName = _rootCtrl.text;
+    await SettingsService.save(_s);
     if (mounted) Navigator.pop(context, true);
   }
 
   void _addStage() {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          title: const Text('스테이지 추가'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: '스테이지 이름'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  setState(() => _settings.stages.add(controller.text));
-                }
-                Navigator.pop(ctx);
-              },
-              child: const Text('추가'),
-            ),
-          ],
-        );
-      },
-    );
+    _showInputDialog('스테이지 추가', '', (val) {
+      if (val.isNotEmpty) {
+        setState(() => _s.stages.add(val));
+      }
+    });
   }
 
-  void _editStage(int index) {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final controller = TextEditingController(text: _settings.stages[index]);
-        return AlertDialog(
-          title: const Text('스테이지 수정'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  setState(() => _settings.stages[index] = controller.text);
-                }
-                Navigator.pop(ctx);
-              },
-              child: const Text('저장'),
-            ),
-          ],
-        );
-      },
-    );
+  void _editStage(int i) {
+    _showInputDialog('스테이지 수정', _s.stages[i], (val) {
+      if (val.isNotEmpty) {
+        setState(() => _s.stages[i] = val);
+      }
+    });
   }
 
-  void _deleteStage(int index) {
-    if (_settings.stages.length <= 1) {
+  void _deleteStage(int i) {
+    if (_s.stages.length <= 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('최소 1개의 스테이지가 필요합니다')),
+        const SnackBar(content: Text('최소 1개 스테이지 필요')),
       );
       return;
     }
-    setState(() => _settings.stages.removeAt(index));
+    setState(() => _s.stages.removeAt(i));
+  }
+
+  void _showInputDialog(String title, String init, Function(String) onOk) {
+    final ctrl = TextEditingController(text: init);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '이름 입력'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              onOk(ctrl.text);
+              Navigator.pop(ctx);
+            },
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -112,147 +96,234 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
 
+    final theme = AxisTheme.byId(_s.themeId);
+    final font = AxisFont.byId(_s.fontId);
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('설정'),
+        title: const Text('커스터마이징'),
         backgroundColor: Colors.black,
         actions: [
           IconButton(
-            icon: const Icon(Icons.check),
+            icon: Icon(Icons.check, color: theme.accent),
             onPressed: _save,
           ),
         ],
       ),
-      body: ListView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        children: [
-          // 루트 이름
-          const Text('루트 이름', style: TextStyle(color: Colors.amber, fontSize: 16)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _rootController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.grey[900],
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 실시간 미리보기
+            Center(
+              child: SizedBox(
+                width: _s.width.toDouble(),
+                height: _s.height.toDouble(),
+                child: TreeView(
+                  active: _previewStage,
+                  onTap: () {
+                    setState(() {
+                      _previewStage = (_previewStage + 1) % _s.stages.length;
+                    });
+                  },
+                  rootName: _rootCtrl.text,
+                  stages: _s.stages,
+                  theme: theme,
+                  font: font,
+                  bgOpacity: _s.bgOpacity,
+                  strokeWidth: _s.strokeWidth,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // 오버레이 위치
-          const Text('오버레이 위치', style: TextStyle(color: Colors.amber, fontSize: 16)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              _positionChip('topLeft', '좌상단'),
-              _positionChip('topRight', '우상단'),
-              _positionChip('bottomLeft', '좌하단'),
-              _positionChip('bottomRight', '우하단'),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // 오버레이 크기
-          const Text('오버레이 크기', style: TextStyle(color: Colors.amber, fontSize: 16)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('너비: ${_settings.width}', style: const TextStyle(color: Colors.white70)),
-                    Slider(
-                      value: _settings.width.toDouble(),
-                      min: 150,
-                      max: 350,
-                      onChanged: (v) => setState(() => _settings.width = v.toInt()),
+            // 테마 선택
+            _section('테마', theme.accent),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: AxisTheme.presets.map((t) {
+                final sel = _s.themeId == t.id;
+                return GestureDetector(
+                  onTap: () => setState(() => _s.themeId = t.id),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: t.accent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: sel ? Border.all(color: Colors.white, width: 3) : null,
                     ),
-                  ],
+                    child: sel ? const Icon(Icons.check, color: Colors.black) : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
+
+            // 폰트 선택
+            _section('폰트', theme.accent),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: AxisFont.presets.map((f) {
+                final sel = _s.fontId == f.id;
+                return ChoiceChip(
+                  label: Text(f.name),
+                  selected: sel,
+                  onSelected: (_) => setState(() => _s.fontId = f.id),
+                  selectedColor: theme.accent,
+                  labelStyle: TextStyle(
+                    color: sel ? Colors.black : Colors.white,
+                    fontFamily: f.family,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
+
+            // 크기 조절
+            _section('오버레이 크기', theme.accent),
+            _slider('너비', _s.width.toDouble(), 150, 400, (v) {
+              setState(() => _s.width = v.toInt());
+            }),
+            _slider('높이', _s.height.toDouble(), 100, 500, (v) {
+              setState(() => _s.height = v.toInt());
+            }),
+            const SizedBox(height: 24),
+
+            // 스타일 조절
+            _section('스타일', theme.accent),
+            _slider('배경 투명도', _s.bgOpacity, 0.3, 1.0, (v) {
+              setState(() => _s.bgOpacity = v);
+            }, pct: true),
+            _slider('테두리 굵기', _s.strokeWidth, 0.5, 4.0, (v) {
+              setState(() => _s.strokeWidth = v);
+            }),
+            const SizedBox(height: 24),
+
+            // 위치 선택
+            _section('오버레이 위치', theme.accent),
+            Wrap(
+              spacing: 8,
+              children: [
+                _posChip('topLeft', '좌상', theme),
+                _posChip('topRight', '우상', theme),
+                _posChip('bottomLeft', '좌하', theme),
+                _posChip('bottomRight', '우하', theme),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // 루트 이름
+            _section('루트 이름', theme.accent),
+            TextField(
+              controller: _rootCtrl,
+              style: TextStyle(color: Colors.white, fontFamily: font.family),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.grey[900],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('높이: ${_settings.height}', style: const TextStyle(color: Colors.white70)),
-                    Slider(
-                      value: _settings.height.toDouble(),
-                      min: 100,
-                      max: 400,
-                      onChanged: (v) => setState(() => _settings.height = v.toInt()),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 24),
 
-          // 스테이지 목록
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('스테이지', style: TextStyle(color: Colors.amber, fontSize: 16)),
-              IconButton(
-                icon: const Icon(Icons.add, color: Colors.amber),
-                onPressed: _addStage,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _settings.stages.length,
-            onReorder: (oldIndex, newIndex) {
-              setState(() {
-                if (newIndex > oldIndex) newIndex--;
-                final item = _settings.stages.removeAt(oldIndex);
-                _settings.stages.insert(newIndex, item);
-              });
-            },
-            itemBuilder: (context, index) {
-              return ListTile(
-                key: ValueKey('stage_$index'),
+            // 스테이지 목록
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _section('스테이지', theme.accent),
+                IconButton(
+                  icon: Icon(Icons.add, color: theme.accent),
+                  onPressed: _addStage,
+                ),
+              ],
+            ),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _s.stages.length,
+              onReorder: (old, now) {
+                setState(() {
+                  if (now > old) now--;
+                  final item = _s.stages.removeAt(old);
+                  _s.stages.insert(now, item);
+                });
+              },
+              itemBuilder: (_, i) => ListTile(
+                key: ValueKey('s_$i'),
                 tileColor: Colors.grey[900],
-                leading: const Icon(Icons.drag_handle, color: Colors.grey),
+                leading: Icon(Icons.drag_handle, color: theme.dim),
                 title: Text(
-                  _settings.stages[index],
-                  style: const TextStyle(color: Colors.white),
+                  _s.stages[i],
+                  style: TextStyle(color: Colors.white, fontFamily: font.family),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
                       icon: const Icon(Icons.edit, color: Colors.white70),
-                      onPressed: () => _editStage(index),
+                      onPressed: () => _editStage(i),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteStage(index),
+                      onPressed: () => _deleteStage(i),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-        ],
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _positionChip(String value, String label) {
-    final selected = _settings.position == value;
+  Widget _section(String t, Color c) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(t, style: TextStyle(color: c, fontSize: 16, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _slider(
+    String label,
+    double val,
+    double min,
+    double max,
+    ValueChanged<double> onChanged, {
+    bool pct = false,
+  }) {
+    final display = pct ? '${(val * 100).toInt()}%' : val.toStringAsFixed(1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: $display', style: const TextStyle(color: Colors.white70)),
+        Slider(
+          value: val,
+          min: min,
+          max: max,
+          onChanged: onChanged,
+          activeColor: AxisTheme.byId(_s.themeId).accent,
+        ),
+      ],
+    );
+  }
+
+  Widget _posChip(String val, String label, AxisTheme theme) {
+    final sel = _s.position == val;
     return ChoiceChip(
       label: Text(label),
-      selected: selected,
-      onSelected: (_) => setState(() => _settings.position = value),
-      selectedColor: Colors.amber,
-      labelStyle: TextStyle(color: selected ? Colors.black : Colors.white),
+      selected: sel,
+      onSelected: (_) => setState(() => _s.position = val),
+      selectedColor: theme.accent,
+      labelStyle: TextStyle(color: sel ? Colors.black : Colors.white),
     );
   }
 }

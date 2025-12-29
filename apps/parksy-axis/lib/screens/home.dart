@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import '../services/settings_service.dart';
+import '../models/theme.dart';
+import '../widgets/tree_view.dart';
 import 'settings.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -11,9 +13,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  bool _hasPermission = false;
-  bool _isShowing = false;
-  AxisSettings? _settings;
+  bool _hasPerm = false;
+  bool _showing = false;
+  AxisSettings? _s;
 
   @override
   void initState() {
@@ -31,55 +33,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _checkPermission();
+      _checkPerm();
       _loadSettings();
     }
   }
 
   Future<void> _init() async {
-    await _checkPermission();
+    await _checkPerm();
     await _loadSettings();
     final active = await FlutterOverlayWindow.isActive();
-    setState(() => _isShowing = active);
+    setState(() => _showing = active);
   }
 
   Future<void> _loadSettings() async {
     SettingsService.clearCache();
-    _settings = await SettingsService.load();
+    _s = await SettingsService.load();
     if (mounted) setState(() {});
   }
 
-  Future<void> _checkPermission() async {
-    final granted = await FlutterOverlayWindow.isPermissionGranted();
-    setState(() => _hasPermission = granted);
+  Future<void> _checkPerm() async {
+    final ok = await FlutterOverlayWindow.isPermissionGranted();
+    setState(() => _hasPerm = ok);
   }
 
-  Future<void> _requestPermission() async {
+  Future<void> _reqPerm() async {
     await FlutterOverlayWindow.requestPermission();
-    await _checkPermission();
+    await _checkPerm();
   }
 
-  OverlayAlignment _getAlignment() {
-    switch (_settings?.position ?? 'bottomLeft') {
-      case 'topLeft':
-        return OverlayAlignment.topLeft;
-      case 'topRight':
-        return OverlayAlignment.topRight;
-      case 'bottomRight':
-        return OverlayAlignment.bottomRight;
-      default:
-        return OverlayAlignment.bottomLeft;
+  OverlayAlignment _align() {
+    switch (_s?.position ?? 'bottomLeft') {
+      case 'topLeft': return OverlayAlignment.topLeft;
+      case 'topRight': return OverlayAlignment.topRight;
+      case 'bottomRight': return OverlayAlignment.bottomRight;
+      default: return OverlayAlignment.bottomLeft;
     }
   }
 
-  Future<void> _toggleOverlay() async {
-    if (_isShowing) {
+  Future<void> _toggle() async {
+    if (_showing) {
       await FlutterOverlayWindow.closeOverlay();
     } else {
       await FlutterOverlayWindow.showOverlay(
-        height: _settings?.height ?? 300,
-        width: _settings?.width ?? 260,
-        alignment: _getAlignment(),
+        height: _s?.height ?? 300,
+        width: _s?.width ?? 260,
+        alignment: _align(),
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
         overlayTitle: 'Parksy Axis',
@@ -87,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
     final active = await FlutterOverlayWindow.isActive();
-    setState(() => _isShowing = active);
+    setState(() => _showing = active);
   }
 
   void _openSettings() async {
@@ -95,112 +93,121 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context,
       MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
-    if (result == true) {
-      await _loadSettings();
-    }
+    if (result == true) await _loadSettings();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = _s != null ? AxisTheme.byId(_s!.themeId) : AxisTheme.presets.first;
+    final font = _s != null ? AxisFont.byId(_s!.fontId) : AxisFont.presets.first;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Spacer(flex: 2),
+            const Spacer(flex: 1),
             // 앱 아이콘
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
+                color: theme.accent.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.account_tree_rounded,
-                color: Colors.amber,
+                color: theme.accent,
                 size: 64,
               ),
             ),
-            const SizedBox(height: 24),
-            // 타이틀
-            const Text(
+            const SizedBox(height: 20),
+            Text(
               'Parksy Axis',
               style: TextStyle(
-                color: Colors.amber,
+                color: theme.accent,
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
+                fontFamily: font.family,
               ),
             ),
-            const SizedBox(height: 12),
-            // 버전 뱃지
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[800]!),
               ),
-              child: Text(
-                'v3.0.0',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+              child: const Text(
+                'v4.0.0 Pro',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ),
+            const Spacer(flex: 1),
+            // 미리보기
+            if (_s != null)
+              SizedBox(
+                width: 200,
+                height: 200,
+                child: TreeView(
+                  active: 0,
+                  onTap: () {},
+                  rootName: _s!.rootName,
+                  stages: _s!.stages,
+                  theme: theme,
+                  font: font,
+                  bgOpacity: _s!.bgOpacity,
+                  strokeWidth: _s!.strokeWidth,
                 ),
               ),
-            ),
-            const Spacer(flex: 2),
-            // 버튼 영역
-            Center(
-              child: !_hasPermission
-                  ? ElevatedButton.icon(
-                      onPressed: _requestPermission,
-                      icon: const Icon(Icons.security),
-                      label: const Text('권한 허용'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
+            const Spacer(flex: 1),
+            // 버튼
+            if (!_hasPerm)
+              ElevatedButton.icon(
+                onPressed: _reqPerm,
+                icon: const Icon(Icons.security),
+                label: const Text('권한 허용'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.accent,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+              )
+            else
+              Column(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _toggle,
+                    icon: Icon(_showing ? Icons.stop : Icons.play_arrow),
+                    label: Text(_showing ? '오버레이 닫기' : '오버레이 시작'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _showing ? Colors.red : theme.accent,
+                      foregroundColor: _showing ? Colors.white : Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                    )
-                  : Column(
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _toggleOverlay,
-                          icon: Icon(_isShowing ? Icons.stop_rounded : Icons.play_arrow_rounded),
-                          label: Text(_isShowing ? '오버레이 닫기' : '오버레이 시작'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isShowing ? Colors.red : Colors.amber,
-                            foregroundColor: _isShowing ? Colors.white : Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        OutlinedButton.icon(
-                          onPressed: _openSettings,
-                          icon: const Icon(Icons.edit_rounded),
-                          label: const Text('트리 편집'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.amber,
-                            side: const BorderSide(color: Colors.amber, width: 1.5),
-                            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
-            ),
-            const Spacer(flex: 3),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: _openSettings,
+                    icon: const Icon(Icons.palette),
+                    label: const Text('커스터마이징'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.accent,
+                      side: BorderSide(color: theme.accent, width: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            const Spacer(flex: 2),
           ],
         ),
       ),

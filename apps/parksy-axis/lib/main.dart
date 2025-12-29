@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'app.dart';
 import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
+import 'models/theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,50 +24,38 @@ class _OverlayApp extends StatefulWidget {
 
 class _OverlayAppState extends State<_OverlayApp> {
   int _stage = 0;
-  AxisSettings? _settings;
+  AxisSettings? _s;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _load();
   }
 
-  Future<void> _loadSettings() async {
-    _settings = await SettingsService.load();
+  Future<void> _load() async {
+    _s = await SettingsService.load();
     setState(() => _loading = false);
   }
 
   void _next() {
-    final max = _settings?.stages.length ?? 5;
+    final max = _s?.stages.length ?? 5;
     setState(() => _stage = (_stage + 1) % max);
   }
 
-  void _jumpTo(int index) {
-    setState(() => _stage = index);
-  }
-
-  Alignment _getAlignment() {
-    switch (_settings?.position ?? 'bottomLeft') {
-      case 'topLeft':
-        return Alignment.topLeft;
-      case 'topRight':
-        return Alignment.topRight;
-      case 'bottomRight':
-        return Alignment.bottomRight;
-      default:
-        return Alignment.bottomLeft;
-    }
-  }
+  void _jump(int i) => setState(() => _stage = i);
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (_loading || _s == null) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Container(color: Colors.transparent),
       );
     }
+
+    final theme = AxisTheme.byId(_s!.themeId);
+    final font = AxisFont.byId(_s!.fontId);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -75,9 +64,13 @@ class _OverlayAppState extends State<_OverlayApp> {
         child: TreeView(
           active: _stage,
           onTap: _next,
-          onStageTap: _jumpTo,
-          rootName: _settings?.rootName ?? '[Idea]',
-          stages: _settings?.stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'],
+          onStageTap: _jump,
+          rootName: _s!.rootName,
+          stages: _s!.stages,
+          theme: theme,
+          font: font,
+          bgOpacity: _s!.bgOpacity,
+          strokeWidth: _s!.strokeWidth,
         ),
       ),
     );
