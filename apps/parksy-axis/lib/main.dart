@@ -4,7 +4,8 @@ import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
-// v4.0.0 Pro Edition - Force rebuild trigger
+/// Parksy Axis v5.0.0
+/// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,9 +26,9 @@ class _OverlayApp extends StatefulWidget {
 }
 
 class _OverlayAppState extends State<_OverlayApp> {
-  int _stage = 0;
-  AxisSettings? _s;
-  bool _loading = true;
+  int _idx = 0;
+  AxisSettings? _cfg;
+  bool _init = true;
 
   @override
   void initState() {
@@ -36,43 +37,45 @@ class _OverlayAppState extends State<_OverlayApp> {
   }
 
   Future<void> _load() async {
-    _s = await SettingsService.load();
-    setState(() => _loading = false);
+    _cfg = await SettingsService.load();
+    setState(() => _init = false);
   }
 
+  /// FSM: s → (s+1) mod n
   void _next() {
-    final max = _s?.stages.length ?? 5;
-    setState(() => _stage = (_stage + 1) % max);
+    final n = _cfg?.stages.length ?? 5;
+    setState(() => _idx = (_idx + 1) % n);
   }
 
-  void _jump(int i) => setState(() => _stage = i);
+  /// Direct jump: s → i
+  void _jump(int i) => setState(() => _idx = i);
 
   @override
   Widget build(BuildContext context) {
-    if (_loading || _s == null) {
+    if (_init || _cfg == null) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Container(color: Colors.transparent),
       );
     }
 
-    final theme = AxisTheme.byId(_s!.themeId);
-    final font = AxisFont.byId(_s!.fontId);
+    final t = AxisTheme.byId(_cfg!.themeId);
+    final f = AxisFont.byId(_cfg!.fontId);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Material(
         color: Colors.transparent,
         child: TreeView(
-          active: _stage,
+          active: _idx,
           onTap: _next,
-          onStageTap: _jump,
-          rootName: _s!.rootName,
-          stages: _s!.stages,
-          theme: theme,
-          font: font,
-          bgOpacity: _s!.bgOpacity,
-          strokeWidth: _s!.strokeWidth,
+          onJump: _jump,
+          root: _cfg!.rootName,
+          items: _cfg!.stages,
+          theme: t,
+          font: f,
+          opacity: _cfg!.bgOpacity,
+          stroke: _cfg!.strokeWidth,
         ),
       ),
     );

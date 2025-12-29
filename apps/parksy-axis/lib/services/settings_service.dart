@@ -1,14 +1,13 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// 설정 모델 - v5 스키마
 class AxisSettings {
   String rootName;
   List<String> stages;
   String position;
   int width;
   int height;
-  
-  // v4.0 새 필드
   String themeId;
   String fontId;
   double bgOpacity;
@@ -27,33 +26,30 @@ class AxisSettings {
   }) : stages = stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'];
 
   Map<String, dynamic> toJson() => {
-    'rootName': rootName,
-    'stages': stages,
-    'position': position,
-    'width': width,
-    'height': height,
-    'themeId': themeId,
-    'fontId': fontId,
-    'bgOpacity': bgOpacity,
-    'strokeWidth': strokeWidth,
-  };
+        'root': rootName,
+        'stages': stages,
+        'pos': position,
+        'w': width,
+        'h': height,
+        'theme': themeId,
+        'font': fontId,
+        'opacity': bgOpacity,
+        'stroke': strokeWidth,
+      };
 
-  factory AxisSettings.fromJson(Map<String, dynamic> j) {
-    final list = j['stages'] as List?;
-    return AxisSettings(
-      rootName: j['rootName'] ?? '[Idea]',
-      stages: list != null ? List<String>.from(list) : null,
-      position: j['position'] ?? 'bottomLeft',
-      width: j['width'] ?? 260,
-      height: j['height'] ?? 300,
-      themeId: j['themeId'] ?? 'amber',
-      fontId: j['fontId'] ?? 'mono',
-      bgOpacity: (j['bgOpacity'] ?? 0.9).toDouble(),
-      strokeWidth: (j['strokeWidth'] ?? 1.5).toDouble(),
-    );
-  }
+  factory AxisSettings.fromJson(Map<String, dynamic> j) => AxisSettings(
+        rootName: j['root'] ?? '[Idea]',
+        stages: j['stages'] != null ? List<String>.from(j['stages']) : null,
+        position: j['pos'] ?? 'bottomLeft',
+        width: j['w'] ?? 260,
+        height: j['h'] ?? 300,
+        themeId: j['theme'] ?? 'amber',
+        fontId: j['font'] ?? 'mono',
+        bgOpacity: (j['opacity'] ?? 0.9).toDouble(),
+        strokeWidth: (j['stroke'] ?? 1.5).toDouble(),
+      );
 
-  AxisSettings copyWith({
+  AxisSettings copy({
     String? rootName,
     List<String>? stages,
     String? position,
@@ -63,46 +59,46 @@ class AxisSettings {
     String? fontId,
     double? bgOpacity,
     double? strokeWidth,
-  }) {
-    return AxisSettings(
-      rootName: rootName ?? this.rootName,
-      stages: stages ?? List.from(this.stages),
-      position: position ?? this.position,
-      width: width ?? this.width,
-      height: height ?? this.height,
-      themeId: themeId ?? this.themeId,
-      fontId: fontId ?? this.fontId,
-      bgOpacity: bgOpacity ?? this.bgOpacity,
-      strokeWidth: strokeWidth ?? this.strokeWidth,
-    );
-  }
+  }) =>
+      AxisSettings(
+        rootName: rootName ?? this.rootName,
+        stages: stages ?? List.from(this.stages),
+        position: position ?? this.position,
+        width: width ?? this.width,
+        height: height ?? this.height,
+        themeId: themeId ?? this.themeId,
+        fontId: fontId ?? this.fontId,
+        bgOpacity: bgOpacity ?? this.bgOpacity,
+        strokeWidth: strokeWidth ?? this.strokeWidth,
+      );
 }
 
+/// 설정 저장소 - SharedPreferences 래퍼
 class SettingsService {
-  static const _key = 'axis_settings_v4';
-  static AxisSettings? _cached;
+  static const _key = 'axis_v5';
+  static AxisSettings? _cache;
 
   static Future<AxisSettings> load() async {
-    if (_cached != null) return _cached!;
+    if (_cache != null) return _cache!;
     final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_key);
-    if (json != null) {
+    final raw = prefs.getString(_key);
+    if (raw != null) {
       try {
-        _cached = AxisSettings.fromJson(jsonDecode(json));
+        _cache = AxisSettings.fromJson(jsonDecode(raw));
       } catch (_) {
-        _cached = AxisSettings();
+        _cache = AxisSettings();
       }
     } else {
-      _cached = AxisSettings();
+      _cache = AxisSettings();
     }
-    return _cached!;
+    return _cache!;
   }
 
   static Future<void> save(AxisSettings s) async {
-    _cached = s;
+    _cache = s;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, jsonEncode(s.toJson()));
   }
 
-  static void clearCache() => _cached = null;
+  static void clear() => _cache = null;
 }

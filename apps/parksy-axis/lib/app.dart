@@ -9,9 +9,7 @@ class AxisApp extends StatelessWidget {
     return MaterialApp(
       title: 'Parksy Axis',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        colorScheme: ColorScheme.dark(primary: Colors.amber),
-      ),
+      theme: ThemeData.dark(),
       home: const HomeScreen(),
     );
   }

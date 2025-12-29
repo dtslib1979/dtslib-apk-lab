@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 테마 프리셋 정의
+/// 테마 프리셋 - 6개 색상 팔레트
 class AxisTheme {
   final String id;
   final String name;
@@ -44,16 +44,16 @@ class AxisTheme {
       dim: Color(0xFFAED581),
     ),
     AxisTheme(
-      id: 'pink',
-      name: 'Pink',
+      id: 'rose',
+      name: 'Rose',
       accent: Color(0xFFFF4081),
       bg: Color(0xFF1A0A0F),
       text: Color(0xFFF8BBD9),
       dim: Color(0xFFF06292),
     ),
     AxisTheme(
-      id: 'purple',
-      name: 'Purple',
+      id: 'violet',
+      name: 'Violet',
       accent: Color(0xFFB388FF),
       bg: Color(0xFF12071F),
       text: Color(0xFFD1C4E9),
@@ -69,25 +69,17 @@ class AxisTheme {
     ),
   ];
 
-  static AxisTheme byId(String id) {
-    return presets.firstWhere(
-      (t) => t.id == id,
-      orElse: () => presets.first,
-    );
-  }
+  static AxisTheme byId(String id) =>
+      presets.firstWhere((t) => t.id == id, orElse: () => presets.first);
 }
 
-/// 폰트 프리셋
+/// 폰트 프리셋 - 5개 타입페이스
 class AxisFont {
   final String id;
   final String name;
   final String family;
 
-  const AxisFont({
-    required this.id,
-    required this.name,
-    required this.family,
-  });
+  const AxisFont({required this.id, required this.name, required this.family});
 
   static const presets = [
     AxisFont(id: 'mono', name: 'Mono', family: 'monospace'),
@@ -97,10 +89,6 @@ class AxisFont {
     AxisFont(id: 'round', name: 'Rounded', family: 'sans-serif-medium'),
   ];
 
-  static AxisFont byId(String id) {
-    return presets.firstWhere(
-      (f) => f.id == id,
-      orElse: () => presets.first,
-    );
-  }
+  static AxisFont byId(String id) =>
+      presets.firstWhere((f) => f.id == id, orElse: () => presets.first);
 }
