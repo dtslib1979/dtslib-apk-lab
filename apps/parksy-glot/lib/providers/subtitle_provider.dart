@@ -6,6 +6,7 @@ import '../services/audio_capture_service.dart';
 import '../services/whisper_service.dart';
 import '../services/translation_service.dart';
 import '../services/overlay_service.dart';
+import '../services/storage_service.dart';
 import '../config/app_config.dart';
 
 enum CaptureState { idle, preparing, capturing, paused, error }
@@ -22,6 +23,10 @@ class SubtitleProvider extends ChangeNotifier {
   bool _showOriginal = false;
   String? _errorMessage;
 
+  // Session management
+  String? _currentSessionId;
+  bool _autoSave = true;
+
   StreamSubscription? _audioSubscription;
   StreamSubscription? _transcriptionSubscription;
 
@@ -32,6 +37,8 @@ class SubtitleProvider extends ChangeNotifier {
   Language get sourceLanguage => _sourceLanguage;
   bool get showOriginal => _showOriginal;
   String? get errorMessage => _errorMessage;
+  String? get currentSessionId => _currentSessionId;
+  bool get hasUnsavedData => _history.isNotEmpty;
 
   bool get isCapturing => _state == CaptureState.capturing;
   bool get isPreparing => _state == CaptureState.preparing;
@@ -68,6 +75,10 @@ class SubtitleProvider extends ChangeNotifier {
 
     _setState(CaptureState.preparing);
     _errorMessage = null;
+
+    // Create new session
+    _currentSessionId = StorageService.createSessionId();
+    _history.clear();
 
     try {
       // Check permissions
@@ -108,8 +119,8 @@ class SubtitleProvider extends ChangeNotifier {
     }
   }
 
-  /// Stop capture
-  Future<void> stopCapture() async {
+  /// Stop capture and optionally save
+  Future<String?> stopCapture({bool save = true}) async {
     _audioSubscription?.cancel();
     _transcriptionSubscription?.cancel();
 
@@ -117,7 +128,59 @@ class SubtitleProvider extends ChangeNotifier {
     await OverlayService.hideOverlay();
     await OverlayService.stopService();
 
+    String? savedPath;
+
+    // Auto-save if enabled and we have data
+    if (save && _autoSave && _history.isNotEmpty && _currentSessionId != null) {
+      savedPath = await saveCurrentSession();
+    }
+
     _setState(CaptureState.idle);
+    return savedPath;
+  }
+
+  /// Save current session
+  Future<String?> saveCurrentSession({String? title}) async {
+    if (_history.isEmpty) return null;
+
+    final sessionId = _currentSessionId ?? StorageService.createSessionId();
+
+    try {
+      final path = await StorageService.saveSession(
+        sessionId: sessionId,
+        subtitles: _history.reversed.toList(), // Chronological order
+        title: title,
+      );
+      return path;
+    } catch (e) {
+      print('Save error: $e');
+      return null;
+    }
+  }
+
+  /// Export current session
+  Future<String?> exportSession(ExportFormat format, {String? filename}) async {
+    if (_history.isEmpty) return null;
+
+    String content;
+    switch (format) {
+      case ExportFormat.txt:
+        content = await StorageService.exportAsText(_history.reversed.toList());
+        break;
+      case ExportFormat.srt:
+        content = await StorageService.exportAsSrt(_history.reversed.toList());
+        break;
+      case ExportFormat.json:
+        content = await StorageService.exportAsJson(_history.reversed.toList());
+        break;
+    }
+
+    final name = filename ?? _currentSessionId ?? StorageService.createSessionId();
+    return StorageService.saveExport(
+      content: content,
+      filename: name,
+      format: format,
+    );
   }
 
   /// Start the transcription and translation pipeline
@@ -164,8 +227,8 @@ class SubtitleProvider extends ChangeNotifier {
       _history.insert(0, subtitle);
 
       // Keep history limited
-      if (_history.length > 100) {
-        _history = _history.sublist(0, 100);
+      if (_history.length > 500) {
+        _history = _history.sublist(0, 500);
       }
 
       // Update overlay
@@ -186,6 +249,7 @@ class SubtitleProvider extends ChangeNotifier {
   void clearHistory() {
     _history.clear();
     _currentSubtitle = Subtitle.empty();
+    _currentSessionId = null;
     notifyListeners();
   }
 
@@ -196,7 +260,7 @@ class SubtitleProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    stopCapture();
+    stopCapture(save: true);
     _audioCaptureService.dispose();
     super.dispose();
   }

@@ -4,11 +4,13 @@ import '../providers/subtitle_provider.dart';
 import '../models/language.dart';
 import '../config/app_config.dart';
 import '../services/overlay_service.dart';
+import '../services/storage_service.dart';
 import '../widgets/language_selector.dart';
 import '../widgets/dual_subtitle.dart';
 import '../widgets/source_accordion.dart';
 import '../utils/constants.dart';
 import 'settings_screen.dart';
+import 'history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -81,6 +83,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const Spacer(),
+          // History button
+          IconButton(
+            icon: const Icon(Icons.history),
+            color: Colors.white.withOpacity(0.7),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+            ),
+          ),
           // Settings button
           IconButton(
             icon: const Icon(Icons.settings_outlined),
