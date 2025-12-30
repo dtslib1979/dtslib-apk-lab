@@ -1,5 +1,6 @@
 """TTS Factory Server - FastAPI Application."""
 from fastapi import FastAPI, Header, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pathlib import Path
 
@@ -11,6 +12,15 @@ from services.job_runner import gen_job_id, run_job, get_job, cleanup_job, JOBS
 init_google_creds()
 
 app = FastAPI(title="TTS Factory", version="1.0.0")
+
+# CORS 미들웨어 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def verify_secret(x_app_secret: str = Header(...)):
