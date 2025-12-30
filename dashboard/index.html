@@ -50,6 +50,7 @@
             border-radius: 12px;
             padding: 14px;
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             gap: 12px;
             transition: transform 0.2s, box-shadow 0.2s;
@@ -58,6 +59,13 @@
         .app-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        .app-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 200px;
         }
         .app-icon {
             font-size: 1.8rem;
@@ -88,15 +96,12 @@
             color: #aaa;
             font-size: 0.8rem;
             line-height: 1.3;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         .download-btn {
             background: linear-gradient(135deg, #00d4ff, #7b2cbf);
             color: #fff;
             border: none;
-            padding: 8px 14px;
+            padding: 10px 20px;
             border-radius: 8px;
             font-size: 0.85rem;
             font-weight: 600;
@@ -104,6 +109,13 @@
             text-decoration: none;
             transition: opacity 0.2s;
             white-space: nowrap;
+            width: 100%;
+            text-align: center;
+        }
+        @media (min-width: 400px) {
+            .download-btn {
+                width: auto;
+            }
         }
         .download-btn:hover {
             opacity: 0.9;
@@ -152,11 +164,13 @@
                 const grid = document.getElementById('appGrid');
                 grid.innerHTML = apps.map(app => `
                     <div class="app-card">
-                        <div class="app-icon">${app.icon}</div>
-                        <div class="app-info">
-                            <div class="app-name">${app.name}</div>
-                            <div class="app-version">${app.version}</div>
-                            <div class="app-desc">${app.description}</div>
+                        <div class="app-header">
+                            <div class="app-icon">${app.icon}</div>
+                            <div class="app-info">
+                                <div class="app-name">${app.name}</div>
+                                <div class="app-version">${app.version}</div>
+                                <div class="app-desc">${app.description}</div>
+                            </div>
                         </div>
                         <a href="${app.downloadUrl}" class="download-btn">Download</a>
                     </div>
