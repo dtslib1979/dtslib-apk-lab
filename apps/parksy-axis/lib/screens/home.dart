@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
         overlayTitle: 'Parksy Axis',
-        overlayContent: 'v5.1.0',
+        overlayContent: 'v5.2.0',
       );
     }
     _on = await FlutterOverlayWindow.isActive();
@@ -139,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'v5.1.0',
+                'v5.2.0',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ),

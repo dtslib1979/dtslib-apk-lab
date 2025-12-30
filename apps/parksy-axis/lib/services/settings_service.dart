@@ -37,7 +37,7 @@ class AxisSettings {
         'font': fontId,
         'opacity': bgOpacity,
         'stroke': strokeWidth,
-        'scale': overlayScale,
+        'overlayScale': overlayScale,
       };
 
   factory AxisSettings.fromJson(Map<String, dynamic> j) => AxisSettings(
@@ -50,7 +50,7 @@ class AxisSettings {
         fontId: j['font'] ?? 'mono',
         bgOpacity: (j['opacity'] ?? 0.9).toDouble(),
         strokeWidth: (j['stroke'] ?? 1.5).toDouble(),
-        overlayScale: (j['scale'] ?? 1.0).toDouble(),
+        overlayScale: (j['overlayScale'] ?? 1.0).toDouble(),
       );
 
   AxisSettings copy({

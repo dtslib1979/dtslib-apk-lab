@@ -5,7 +5,7 @@ import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
-/// Parksy Axis v5.1.0
+/// Parksy Axis v5.2.0
 /// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 
 void main() {
@@ -30,7 +30,10 @@ class _OverlayAppState extends State<_OverlayApp> {
   int _idx = 0;
   AxisSettings? _cfg;
   bool _init = true;
-  double _scale = 1.0;
+  double _baseScale = 1.0;
+  double _currentScale = 1.0;
+  int _currentW = 260;
+  int _currentH = 300;
 
   @override
   void initState() {
@@ -40,7 +43,9 @@ class _OverlayAppState extends State<_OverlayApp> {
 
   Future<void> _load() async {
     _cfg = await SettingsService.load();
-    _scale = _cfg?.overlayScale ?? 1.0;
+    _currentScale = _cfg!.overlayScale;
+    _currentW = (_cfg!.width * _currentScale).toInt();
+    _currentH = (_cfg!.height * _currentScale).toInt();
     setState(() => _init = false);
   }
 
@@ -53,22 +58,25 @@ class _OverlayAppState extends State<_OverlayApp> {
   /// Direct jump: s → i
   void _jump(int i) => setState(() => _idx = i);
 
-  /// 핀치 줌 처리
-  void _onScaleUpdate(ScaleUpdateDetails d) {
-    setState(() {
-      _scale = (_scale * d.scale).clamp(0.5, 2.0);
-    });
+  /// 핀치 줌 시작
+  void _onScaleStart(ScaleStartDetails d) {
+    _baseScale = _currentScale;
   }
 
-  /// 핀치 줌 종료 시 저장 및 리사이즈
+  /// 핀치 줌 처리 (창 크기 조절 방식)
+  void _onScaleUpdate(ScaleUpdateDetails d) {
+    final target = (_baseScale * d.scale).clamp(0.5, 2.5);
+    _currentScale = _currentScale + (target - _currentScale) * 0.3;
+    _currentW = (_cfg!.width * _currentScale).toInt();
+    _currentH = (_cfg!.height * _currentScale).toInt();
+    FlutterOverlayWindow.resizeOverlay(_currentW, _currentH, true);
+    setState(() {});
+  }
+
+  /// 핀치 줌 종료 시 저장
   Future<void> _onScaleEnd(ScaleEndDetails d) async {
-    if (_cfg != null) {
-      _cfg!.overlayScale = _scale;
-      await SettingsService.save(_cfg!);
-      final w = (_cfg!.width * _scale).toInt();
-      final h = (_cfg!.height * _scale).toInt();
-      await FlutterOverlayWindow.resizeOverlay(w, h, true);
-    }
+    _cfg!.overlayScale = _currentScale;
+    await SettingsService.save(_cfg!);
   }
 
   @override
@@ -88,10 +96,12 @@ class _OverlayAppState extends State<_OverlayApp> {
       home: Material(
         color: Colors.transparent,
         child: GestureDetector(
+          onScaleStart: _onScaleStart,
           onScaleUpdate: _onScaleUpdate,
           onScaleEnd: _onScaleEnd,
-          child: Transform.scale(
-            scale: _scale,
+          child: SizedBox(
+            width: _currentW.toDouble(),
+            height: _currentH.toDouble(),
             child: TreeView(
               active: _idx,
               onTap: _next,
