@@ -43,3 +43,6 @@ GitHub Actions 자동 배포 (main push 시).
 - 최대 25개 유닛/요청
 - 유닛당 최대 1100자
 - ZIP 다운로드 완료 후 서버 파일 즉시 삭제
+
+---
+Last deploy trigger: 2025-12-30T16:45:00+09:00
