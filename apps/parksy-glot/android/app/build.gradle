@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.dtslib.overlay_dual_sub"
+    namespace "com.dtslib.parksy_glot"
     compileSdk 35
     ndkVersion flutter.ndkVersion
 
@@ -41,8 +41,8 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.dtslib.overlay_dual_sub"
-        minSdk 24
+        applicationId "com.dtslib.parksy_glot"
+        minSdk 29  // Android 10+ required for AudioPlaybackCapture
         targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

@@ -1,0 +1,9 @@
+{
+  "name": "Parksy Glot",
+  "package": "com.dtslib.parksy_glot",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "minSdk": 29,
+  "targetSdk": 34,
+  "description": "Real-time multilingual subtitle overlay powered by OpenAI Whisper + GPT-4o"
+}

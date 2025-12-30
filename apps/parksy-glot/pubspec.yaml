@@ -1,5 +1,5 @@
-name: overlay_dual_sub
-description: S Pen web overlay drawing app with fade-out effect
+name: parksy_glot
+description: Real-time multilingual subtitle overlay with AI translation
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  provider: ^6.1.1
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
   permission_handler: ^11.3.0
 
 dev_dependencies:
