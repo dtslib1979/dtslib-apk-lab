@@ -350,26 +350,38 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            provider.isCapturing
-                ? Icons.mic
-                : Icons.subtitles_outlined,
-            size: 64,
-            color: provider.isCapturing
-                ? AppColors.success
-                : Colors.white.withOpacity(0.3),
-          ),
+          // 상태 아이콘 (처리 중이면 애니메이션)
+          _buildStatusIcon(provider),
           const SizedBox(height: 20),
+          // 상태 메시지
           Text(
-            provider.isCapturing
-                ? '음성을 기다리는 중...'
-                : '시작 버튼을 눌러\n실시간 자막을 시작하세요',
+            _getStatusMessage(provider),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.6),
               fontSize: 16,
             ),
           ),
+          // 처리 통계 표시
+          if (provider.isCapturing && provider.processedCount > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${provider.processedCount}개 자막 처리됨',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+          // 에러 표시
           if (provider.hasError && provider.errorMessage != null) ...[
             const SizedBox(height: 16),
             Container(
@@ -378,18 +390,77 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: AppColors.error.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                provider.errorMessage!,
-                style: const TextStyle(
-                  color: AppColors.error,
-                  fontSize: 13,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      provider.errorMessage!,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ],
       ),
     );
+  }
+
+  Widget _buildStatusIcon(SubtitleProvider provider) {
+    if (provider.isProcessing) {
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          const SizedBox(
+            width: 72,
+            height: 72,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: AppColors.primary,
+            ),
+          ),
+          const Icon(
+            Icons.translate,
+            size: 32,
+            color: AppColors.primary,
+          ),
+        ],
+      );
+    }
+
+    if (provider.isCapturing) {
+      return const Icon(
+        Icons.mic,
+        size: 64,
+        color: AppColors.success,
+      );
+    }
+
+    return Icon(
+      Icons.subtitles_outlined,
+      size: 64,
+      color: Colors.white.withOpacity(0.3),
+    );
+  }
+
+  String _getStatusMessage(SubtitleProvider provider) {
+    if (provider.isProcessing) {
+      return '번역 중...';
+    }
+    if (provider.isCapturing) {
+      if (provider.processedCount == 0) {
+        return '음성을 기다리는 중...';
+      }
+      return '다음 음성을 기다리는 중...';
+    }
+    return '시작 버튼을 눌러\n실시간 자막을 시작하세요';
   }
 
   Widget _buildBottomControls() {

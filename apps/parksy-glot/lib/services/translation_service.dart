@@ -3,34 +3,88 @@ import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../models/subtitle.dart';
 import '../models/language.dart';
+import '../utils/error_handler.dart';
+import 'translation_cache.dart';
 
 class TranslationService {
   static const String _baseUrl = 'https://api.openai.com/v1/chat/completions';
+  static const Duration _timeout = Duration(seconds: 30);
+
+  // 싱글톤 캐시
+  static final TranslationCache _cache = TranslationCache(maxSize: 500);
+
+  // 통계
+  int _apiCalls = 0;
+  int _cachedResults = 0;
+
+  /// 캐시 통계
+  String get cacheStats =>
+      'API: $_apiCalls, Cached: $_cachedResults, ${_cache.toString()}';
 
   /// Translate text to Korean and English using GPT-4o
   Future<TranslationResult> translate(
     String text, {
     Language sourceLanguage = Language.auto,
     bool includeNativeNote = false,
+    bool useCache = true,
   }) async {
-    if (text.trim().isEmpty) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
       return TranslationResult(korean: '', english: '');
     }
 
+    // 1. 캐시 확인
+    if (useCache) {
+      final cached = _cache.get(trimmed);
+      if (cached != null) {
+        _cachedResults++;
+        return cached;
+      }
+
+      // 유사 텍스트 검색 (85% 이상 유사)
+      final similar = _cache.findSimilar(trimmed, threshold: 0.85);
+      if (similar != null) {
+        _cachedResults++;
+        return similar;
+      }
+    }
+
+    // 2. API 호출 (재시도 포함)
+    final result = await RetryHelper.retry(
+      action: () => _callApi(trimmed, sourceLanguage, includeNativeNote),
+      maxAttempts: 3,
+      initialDelay: const Duration(seconds: 1),
+    );
+
+    // 3. 캐시에 저장
+    if (useCache && result.korean.isNotEmpty) {
+      _cache.put(trimmed, result);
+    }
+
+    _apiCalls++;
+    return result;
+  }
+
+  Future<TranslationResult> _callApi(
+    String text,
+    Language sourceLanguage,
+    bool includeNativeNote,
+  ) async {
     final prompt = _buildPrompt(text, sourceLanguage, includeNativeNote);
 
-    final response = await http.post(
-      Uri.parse(_baseUrl),
-      headers: {
-        'Authorization': 'Bearer ${AppConfig.apiKey}',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': 'gpt-4o',
-        'messages': [
-          {
-            'role': 'system',
-            'content': '''You are an expert polyglot translator specializing in natural, native-sounding translations.
+    final response = await http
+        .post(
+          Uri.parse(_baseUrl),
+          headers: {
+            'Authorization': 'Bearer ${AppConfig.apiKey}',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'model': 'gpt-4o',
+            'messages': [
+              {
+                'role': 'system',
+                'content': '''You are an expert polyglot translator specializing in natural, native-sounding translations.
 Your task is to translate spoken language into Korean and English.
 - Preserve the original tone, nuance, and colloquial expressions
 - Use natural conversational language, not formal/written style
@@ -38,21 +92,23 @@ Your task is to translate spoken language into Korean and English.
 - Keep translations concise for subtitle display
 
 IMPORTANT: Respond ONLY in valid JSON format, no markdown.''',
-          },
-          {
-            'role': 'user',
-            'content': prompt,
-          },
-        ],
-        'temperature': 0.3,
-        'max_tokens': 500,
-      }),
-    );
+              },
+              {
+                'role': 'user',
+                'content': prompt,
+              },
+            ],
+            'temperature': 0.3,
+            'max_tokens': 500,
+          }),
+        )
+        .timeout(_timeout);
 
     if (response.statusCode != 200) {
-      throw TranslationException(
-        'Translation failed: ${response.statusCode}',
-        response.body,
+      throw ApiException(
+        'Translation failed',
+        statusCode: response.statusCode,
+        details: response.body,
       );
     }
 
@@ -109,28 +165,10 @@ Respond in JSON format:
     return match?.group(1) ?? '';
   }
 
-  /// Batch translate multiple texts
-  Future<List<TranslationResult>> translateBatch(
-    List<String> texts, {
-    Language sourceLanguage = Language.auto,
-  }) async {
-    final results = <TranslationResult>[];
-
-    for (final text in texts) {
-      final result = await translate(text, sourceLanguage: sourceLanguage);
-      results.add(result);
-    }
-
-    return results;
+  /// 캐시 초기화
+  void clearCache() {
+    _cache.clear();
+    _apiCalls = 0;
+    _cachedResults = 0;
   }
-}
-
-class TranslationException implements Exception {
-  final String message;
-  final String? details;
-
-  TranslationException(this.message, [this.details]);
-
-  @override
-  String toString() => 'TranslationException: $message';
 }

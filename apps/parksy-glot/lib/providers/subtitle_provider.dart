@@ -8,6 +8,7 @@ import '../services/translation_service.dart';
 import '../services/overlay_service.dart';
 import '../services/storage_service.dart';
 import '../config/app_config.dart';
+import '../utils/error_handler.dart';
 
 enum CaptureState { idle, preparing, capturing, paused, error }
 
@@ -22,6 +23,11 @@ class SubtitleProvider extends ChangeNotifier {
   Language _sourceLanguage = Language.auto;
   bool _showOriginal = false;
   String? _errorMessage;
+
+  // Processing states
+  bool _isProcessing = false;
+  int _processedCount = 0;
+  DateTime? _lastProcessedTime;
 
   // Session management
   String? _currentSessionId;
@@ -44,6 +50,15 @@ class SubtitleProvider extends ChangeNotifier {
   bool get isPreparing => _state == CaptureState.preparing;
   bool get isIdle => _state == CaptureState.idle;
   bool get hasError => _state == CaptureState.error;
+  bool get isProcessing => _isProcessing;
+  int get processedCount => _processedCount;
+  DateTime? get lastProcessedTime => _lastProcessedTime;
+
+  /// 마지막 처리 이후 경과 시간 (초)
+  int get secondsSinceLastProcess {
+    if (_lastProcessedTime == null) return 0;
+    return DateTime.now().difference(_lastProcessedTime!).inSeconds;
+  }
 
   SubtitleProvider() {
     _loadSettings();
@@ -113,7 +128,8 @@ class SubtitleProvider extends ChangeNotifier {
       _setState(CaptureState.capturing);
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      ErrorHandler.log(e);
+      _errorMessage = ErrorHandler.getUserMessage(e);
       _setState(CaptureState.error);
       return false;
     }
@@ -195,7 +211,8 @@ class SubtitleProvider extends ChangeNotifier {
         await _processTranscription(transcription);
       },
       onError: (error) {
-        _errorMessage = error.toString();
+        ErrorHandler.log(error);
+        _errorMessage = ErrorHandler.getUserMessage(error);
         notifyListeners();
       },
     );
@@ -204,6 +221,9 @@ class SubtitleProvider extends ChangeNotifier {
   /// Process transcription result
   Future<void> _processTranscription(TranscriptionResult transcription) async {
     if (transcription.text.trim().isEmpty) return;
+
+    _isProcessing = true;
+    notifyListeners();
 
     try {
       // Detect language from Whisper response
@@ -225,6 +245,8 @@ class SubtitleProvider extends ChangeNotifier {
 
       _currentSubtitle = subtitle;
       _history.insert(0, subtitle);
+      _processedCount++;
+      _lastProcessedTime = DateTime.now();
 
       // Keep history limited
       if (_history.length > 500) {
@@ -238,10 +260,12 @@ class SubtitleProvider extends ChangeNotifier {
         original: subtitle.original,
         showOriginal: _showOriginal,
       );
-
-      notifyListeners();
     } catch (e) {
-      print('Translation error: $e');
+      ErrorHandler.log(e);
+      // Don't show translation errors to user, just log them
+    } finally {
+      _isProcessing = false;
+      notifyListeners();
     }
   }
 
