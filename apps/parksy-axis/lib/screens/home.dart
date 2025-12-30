@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
         overlayTitle: 'Parksy Axis',
-        overlayContent: 'v5.0.0',
+        overlayContent: 'v5.1.0',
       );
     }
     _on = await FlutterOverlayWindow.isActive();
@@ -109,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Spacer(),
             // 아이콘
@@ -138,16 +139,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'v5.0.0',
+                'v5.1.0',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ),
             const Spacer(),
             // 미리보기
             if (_cfg != null)
-              SizedBox(
+              Container(
                 width: 200,
                 height: 200,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: t.accent.withOpacity(0.2),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
                 child: TreeView(
                   active: 0,
                   onTap: () {},
@@ -162,31 +173,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const Spacer(),
             // 버튼
             if (!_perm)
-              _btn('권한 허용', Icons.security, t.accent, _reqPerm)
+              Center(child: _btn('권한 허용', Icons.security, t.accent, _reqPerm))
             else
-              Column(
-                children: [
-                  _btn(
-                    _on ? '오버레이 닫기' : '오버레이 시작',
-                    _on ? Icons.stop : Icons.play_arrow,
-                    _on ? Colors.red : t.accent,
-                    _toggle,
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: _settings,
-                    icon: const Icon(Icons.palette),
-                    label: const Text('커스터마이징'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: t.accent,
-                      side: BorderSide(color: t.accent, width: 1.5),
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
+              Center(
+                child: Column(
+                  children: [
+                    _btn(
+                      _on ? '오버레이 닫기' : '오버레이 시작',
+                      _on ? Icons.stop : Icons.play_arrow,
+                      _on ? Colors.red : t.accent,
+                      _toggle,
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _settings,
+                      icon: const Icon(Icons.palette),
+                      label: const Text('커스터마이징'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: t.accent,
+                        side: BorderSide(color: t.accent, width: 1.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             const Spacer(flex: 2),
           ],
@@ -203,8 +216,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       style: ElevatedButton.styleFrom(
         backgroundColor: c,
         foregroundColor: c == Colors.red ? Colors.white : Colors.black,
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
       ),
     );
   }

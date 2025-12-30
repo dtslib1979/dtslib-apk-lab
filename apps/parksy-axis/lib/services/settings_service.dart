@@ -12,6 +12,7 @@ class AxisSettings {
   String fontId;
   double bgOpacity;
   double strokeWidth;
+  double overlayScale;
 
   AxisSettings({
     this.rootName = '[Idea]',
@@ -23,6 +24,7 @@ class AxisSettings {
     this.fontId = 'mono',
     this.bgOpacity = 0.9,
     this.strokeWidth = 1.5,
+    this.overlayScale = 1.0,
   }) : stages = stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'];
 
   Map<String, dynamic> toJson() => {
@@ -35,6 +37,7 @@ class AxisSettings {
         'font': fontId,
         'opacity': bgOpacity,
         'stroke': strokeWidth,
+        'scale': overlayScale,
       };
 
   factory AxisSettings.fromJson(Map<String, dynamic> j) => AxisSettings(
@@ -47,6 +50,7 @@ class AxisSettings {
         fontId: j['font'] ?? 'mono',
         bgOpacity: (j['opacity'] ?? 0.9).toDouble(),
         strokeWidth: (j['stroke'] ?? 1.5).toDouble(),
+        overlayScale: (j['scale'] ?? 1.0).toDouble(),
       );
 
   AxisSettings copy({
@@ -59,6 +63,7 @@ class AxisSettings {
     String? fontId,
     double? bgOpacity,
     double? strokeWidth,
+    double? overlayScale,
   }) =>
       AxisSettings(
         rootName: rootName ?? this.rootName,
@@ -70,6 +75,7 @@ class AxisSettings {
         fontId: fontId ?? this.fontId,
         bgOpacity: bgOpacity ?? this.bgOpacity,
         strokeWidth: strokeWidth ?? this.strokeWidth,
+        overlayScale: overlayScale ?? this.overlayScale,
       );
 }
 
