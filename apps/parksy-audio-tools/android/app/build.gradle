@@ -42,7 +42,8 @@ android {
 
     defaultConfig {
         applicationId "kr.parksy.audio_tools"
-        minSdk 24
+        // Android 10 (API 29) required for system audio capture
+        minSdk 29
         targetSdk 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
