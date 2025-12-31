@@ -1,7 +1,7 @@
 name: parksy_audio_tools
-description: Audio trimmer + MIDI converter for personal use
+description: Screen Audio Capture + MIDI Converter for AIVA
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -9,17 +9,26 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Shared
+  
+  # === CORE: File & Share ===
   file_picker: ^8.0.0
   path_provider: ^2.1.1
   share_plus: ^7.2.1
-  # Trimmer
+  permission_handler: ^11.1.0
+  
+  # === AUDIO: Playback & Processing ===
   just_audio: ^0.9.36
   ffmpeg_kit_flutter_audio: ^6.0.3
-  intl: ^0.19.0
-  # Converter
+  
+  # === SCREEN RECORDING ===
+  system_audio_recorder: ^0.0.6
+  flutter_overlay_window: ^0.4.3
+  
+  # === NETWORK: MIDI Server ===
   dio: ^5.4.0
-  permission_handler: ^11.1.0
+  
+  # === UTILS ===
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:

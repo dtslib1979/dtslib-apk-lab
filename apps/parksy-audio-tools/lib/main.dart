@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 
-void main() => runApp(const App());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ParksyAudioApp());
+}
 
-class App extends StatelessWidget {
-  const App({super.key});
+class ParksyAudioApp extends StatelessWidget {
+  const ParksyAudioApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Parksy Audio',
-      theme: ThemeData.dark(useMaterial3: true),
-      home: const HomeScreen(),
+      title: 'Parksy Audio Tools',
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: const HomeScreen(),
     );
   }
 }

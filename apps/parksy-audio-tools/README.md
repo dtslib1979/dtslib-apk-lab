@@ -1,33 +1,79 @@
-# Parksy Audio Tools
+# Parksy Audio Tools v2
 
-> **Personal use only. No distribution.**
-
-Audio Trimmer + MIDI Converter 통합 앱.
+**Screen Audio Capture + MIDI Converter for AIVA**
 
 ## 기능
 
-### Trimmer 탭
-- 오디오 파일 불러오기 (mp3, wav, m4a)
-- IN/OUT 마킹
-- 프리셋 길이 (30s / 60s / 120s / 180s)
-- 자동 페이드 인/아웃
-- WAV 내보내기 + 공유
+### 🎬 Track A: 화면 녹음 → MIDI
+- 내부 오디오 캡처 (MediaProjection)
+- 1/2/3분 프리셋
+- 자동 타이머 종료
+- MP3 → MIDI 자동 변환
 
-### MIDI 탭
-- MP3 → MIDI 변환 (Cloud Run 서버)
-- 결과 다운로드 + 공유
+### 📁 Track B: 파일 → MIDI  
+- MP3/WAV/M4A 파일 선택
+- 시작점 설정
+- 프리셋 구간 트림
+- MIDI 변환
 
-## 설치
+### ✂️ Legacy: 오디오 트림
+- 자유 구간 선택
+- WAV 출력
 
-### 빠른 다운로드 (로그인 불필요)
+## 기술 스택
 
-👉 [**parksy-audio-tools-debug.apk**](https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-audio-tools/main/parksy-audio-tools-debug.zip)
+| Component | Library |
+|-----------|--------|
+| Screen Recording | system_audio_recorder |
+| Audio Processing | ffmpeg_kit_flutter_audio |
+| MIDI Conversion | Cloud Run (Basic Pitch) |
+| File Picker | file_picker |
+| Sharing | share_plus |
 
-## Tech Stack
+## 권한
 
-- Flutter 3.24
-- ffmpeg_kit_flutter_audio
-- just_audio
-- dio
-- file_picker
-- share_plus
+- `FOREGROUND_SERVICE_MEDIA_PROJECTION` - 화면 녹음
+- `RECORD_AUDIO` - 마이크 (선택)
+- `SYSTEM_ALERT_WINDOW` - 오버레이 (향후)
+- `INTERNET` - MIDI 서버 통신
+
+## AIVA 호환
+
+- 최대 3분 제한 준수
+- MIDI 출력 → AIVA 직접 업로드 가능
+
+## 빌드
+
+```bash
+cd apps/parksy-audio-tools
+flutter pub get
+flutter build apk --release
+```
+
+## 아키텍처
+
+```
+┌─────────────┐     ┌─────────────┐
+│  Screen     │     │  File       │
+│  Capture    │     │  Import     │
+└──────┬──────┘     └──────┬──────┘
+       │                   │
+       └─────────┬─────────┘
+                 │
+       ┌─────────┴─────────┐
+       │  Preset Trim      │
+       │  (1/2/3 min)      │
+       └─────────┬─────────┘
+                 │
+       ┌─────────┴─────────┐
+       │  MP3 Encode       │
+       └─────────┬─────────┘
+                 │
+       ┌─────────┴─────────┐
+       │  MIDI Convert     │
+       │  (Basic Pitch)    │
+       └─────────┬─────────┘
+                 │
+                 ▼
+         AIVA Ready MIDI
+```

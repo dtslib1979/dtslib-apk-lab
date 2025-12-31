@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'trimmer/trimmer_home.dart';
-import 'converter/converter_home.dart';
+import 'capture/capture_screen.dart';
+import 'converter/converter_screen.dart';
+import 'trimmer/trimmer_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,26 +13,34 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _idx = 0;
 
-  static const _pages = [
-    TrimmerHome(),
-    ConverterHome(),
+  final _screens = const [
+    CaptureScreen(),   // Track A: Overlay Recording
+    ConverterScreen(), // Track B: File → MIDI
+    TrimmerScreen(),   // Legacy: File → WAV
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_idx],
+      body: _screens[_idx],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _idx,
         onDestinationSelected: (i) => setState(() => _idx = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.content_cut),
-            label: 'Trimmer',
+            icon: Icon(Icons.mic),
+            selectedIcon: Icon(Icons.mic_rounded),
+            label: '녹음→MIDI',
           ),
           NavigationDestination(
-            icon: Icon(Icons.transform),
-            label: 'MIDI',
+            icon: Icon(Icons.folder_open),
+            selectedIcon: Icon(Icons.folder),
+            label: '파일→MIDI',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.content_cut),
+            selectedIcon: Icon(Icons.content_cut_rounded),
+            label: '트림',
           ),
         ],
       ),
