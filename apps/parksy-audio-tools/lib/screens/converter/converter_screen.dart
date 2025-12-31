@@ -1,12 +1,16 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:just_audio/just_audio.dart';
+import '../../core/config/app_config.dart';
+import '../../core/utils/duration_utils.dart';
 import '../../services/audio_service.dart';
+import '../../services/file_manager.dart';
 import '../../services/midi_service.dart';
 import '../../widgets/preset_selector.dart';
 import '../../widgets/result_card.dart';
 
+/// File → MIDI converter screen
+/// Pick audio file, select start point, convert to MIDI
 class ConverterScreen extends StatefulWidget {
   const ConverterScreen({super.key});
 
@@ -15,15 +19,25 @@ class ConverterScreen extends StatefulWidget {
 }
 
 class _ConverterScreenState extends State<ConverterScreen> {
-  String? _srcPath;
-  String? _srcName;
-  Duration _srcDur = Duration.zero;
-  Duration _startPos = Duration.zero;
-  int _preset = 60;
-  bool _proc = false;
+  // Services
+  final _audioService = AudioService.instance;
+  final _midiService = MidiService.instance;
+  final _fileManager = FileManager.instance;
+
+  // Source file
+  String? _sourcePath;
+  String? _sourceName;
+  Duration _sourceDuration = Duration.zero;
+  Duration _startPosition = Duration.zero;
+
+  // Processing
+  int _presetSeconds = AppConfig.defaultPreset;
+  bool _isProcessing = false;
+  String _statusMessage = '파일 선택';
+
+  // Results
   String? _mp3Path;
   String? _midiPath;
-  String _status = '파일 선택';
 
   final _player = AudioPlayer();
 
@@ -34,155 +48,242 @@ class _ConverterScreenState extends State<ConverterScreen> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['mp3', 'wav', 'm4a', 'aac'],
-    );
-
-    if (result == null) return;
-
-    final path = result.files.single.path!;
-    final name = result.files.single.name;
-
-    await _player.setFilePath(path);
-    final dur = _player.duration ?? Duration.zero;
-
-    setState(() {
-      _srcPath = path;
-      _srcName = name;
-      _srcDur = dur;
-      _startPos = Duration.zero;
-      _mp3Path = null;
-      _midiPath = null;
-      _status = '시작점 설정 후 변환';
-    });
-  }
-
-  Future<void> _convert() async {
-    if (_srcPath == null) return;
-
-    setState(() {
-      _proc = true;
-      _status = '트림 중...';
-    });
-
     try {
-      // Trim
-      final trimmed = await AudioService.trim(
-        _srcPath!,
-        _startPos,
-        Duration(seconds: _preset),
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: AppConfig.supportedAudioFormats,
       );
 
-      // To MP3
-      setState(() => _status = 'MP3 변환 중...');
-      final mp3 = await AudioService.toMp3(trimmed);
+      if (result == null || result.files.isEmpty) return;
 
-      // To MIDI
-      setState(() => _status = 'MIDI 변환 중...');
-      final midi = await MidiService.convert(mp3);
+      final file = result.files.single;
+      if (file.path == null) {
+        _showMessage('파일 경로를 가져올 수 없습니다');
+        return;
+      }
 
-      // Cleanup trimmed temp
-      await File(trimmed).delete();
+      final path = file.path!;
+      final name = file.name;
 
-      setState(() {
-        _mp3Path = mp3;
-        _midiPath = midi;
-        _proc = false;
-        _status = '완료!';
-      });
+      // Get duration using just_audio
+      try {
+        await _player.setFilePath(path);
+        final duration = _player.duration ?? Duration.zero;
+
+        setState(() {
+          _sourcePath = path;
+          _sourceName = name;
+          _sourceDuration = duration;
+          _startPosition = Duration.zero;
+          _mp3Path = null;
+          _midiPath = null;
+          _statusMessage = '시작점 설정 후 변환';
+        });
+      } catch (e) {
+        _showMessage('오디오 파일을 읽을 수 없습니다');
+      }
     } catch (e) {
-      setState(() {
-        _proc = false;
-        _status = '변환 실패: $e';
-      });
+      _showMessage('파일 선택 실패: $e');
     }
   }
 
-  String _fmtDur(Duration d) {
-    final m = d.inMinutes;
-    final s = d.inSeconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
+  Future<void> _convert() async {
+    if (_sourcePath == null) return;
+
+    setState(() {
+      _isProcessing = true;
+      _statusMessage = '트림 중...';
+    });
+
+    // Step 1: Trim
+    final trimResult = await _audioService.trim(
+      inputPath: _sourcePath!,
+      start: _startPosition,
+      duration: Duration(seconds: _presetSeconds),
+    );
+
+    if (trimResult.isFailure) {
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = trimResult.errorOrNull ?? '트림 실패';
+      });
+      return;
+    }
+
+    final trimmedPath = trimResult.valueOrNull!;
+
+    // Step 2: MP3
+    setState(() => _statusMessage = 'MP3 변환 중...');
+
+    final mp3Result = await _audioService.toMp3(trimmedPath);
+    if (mp3Result.isFailure) {
+      await _fileManager.delete(trimmedPath);
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = mp3Result.errorOrNull ?? 'MP3 변환 실패';
+      });
+      return;
+    }
+
+    final mp3Path = mp3Result.valueOrNull!;
+
+    // Cleanup trimmed temp
+    await _fileManager.delete(trimmedPath);
+
+    // Step 3: MIDI
+    setState(() => _statusMessage = 'MIDI 변환 중...');
+
+    final midiResult = await _midiService.convert(mp3Path);
+    if (midiResult.isFailure) {
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = midiResult.errorOrNull ?? 'MIDI 변환 실패';
+        _mp3Path = mp3Path; // Keep MP3 even if MIDI fails
+      });
+      return;
+    }
+
+    // Success!
+    setState(() {
+      _mp3Path = mp3Path;
+      _midiPath = midiResult.valueOrNull;
+      _isProcessing = false;
+      _statusMessage = '완료!';
+    });
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _reset() {
+    setState(() {
+      _sourcePath = null;
+      _sourceName = null;
+      _sourceDuration = Duration.zero;
+      _startPosition = Duration.zero;
+      _mp3Path = null;
+      _midiPath = null;
+      _statusMessage = '파일 선택';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final maxStart = (_sourceDuration.inSeconds - _presetSeconds).clamp(0, 9999);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('📁 파일 → MIDI'),
+        title: const Text('파일 → MIDI'),
         centerTitle: true,
+        actions: [
+          if (_midiPath != null)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _reset,
+              tooltip: '초기화',
+            ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // File Picker
-            ElevatedButton.icon(
-              onPressed: _proc ? null : _pickFile,
-              icon: const Icon(Icons.folder_open),
-              label: Text(_srcName ?? '파일 선택 (MP3/WAV/M4A)'),
-            ),
-            const SizedBox(height: 16),
-
-            // Source Info
-            if (_srcPath != null) ...[
-              Text('길이: ${_fmtDur(_srcDur)}'),
-              const SizedBox(height: 16),
-
-              // Start Position Slider
-              Text('시작점: ${_fmtDur(_startPos)}'),
-              Slider(
-                value: _startPos.inSeconds.toDouble(),
-                max: (_srcDur.inSeconds - _preset).clamp(0, 9999).toDouble(),
-                onChanged: _proc ? null : (v) {
-                  setState(() => _startPos = Duration(seconds: v.toInt()));
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Preset Selector
-            PresetSelector(
-              value: _preset,
-              enabled: !_proc,
-              onChanged: (v) => setState(() => _preset = v),
-            ),
-            const SizedBox(height: 24),
-
-            // Status
-            Center(
-              child: Text(
-                _status,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Progress
-            if (_proc)
-              const Center(child: CircularProgressIndicator()),
-
-            // Convert Button
-            if (_srcPath != null && !_proc)
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // File Picker Button
               ElevatedButton.icon(
-                onPressed: _convert,
-                icon: const Icon(Icons.music_note),
-                label: const Text('MIDI 변환'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
+                onPressed: _isProcessing ? null : _pickFile,
+                icon: const Icon(Icons.folder_open),
+                label: Text(
+                  _sourceName ?? '파일 선택 (${AppConfig.supportedAudioFormats.join("/")})',
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(height: 16),
 
-            const Spacer(),
+              // Source Info & Start Position
+              if (_sourcePath != null) ...[
+                Text('전체 길이: ${_sourceDuration.toMmSs()}'),
+                const SizedBox(height: 16),
 
-            // Result
-            if (_midiPath != null)
-              ResultCard(
-                mp3Path: _mp3Path,
-                midiPath: _midiPath,
+                Text('시작점: ${_startPosition.toMmSs()}'),
+                Slider(
+                  value: _startPosition.inSeconds.toDouble(),
+                  max: maxStart.toDouble(),
+                  divisions: maxStart > 0 ? maxStart : null,
+                  onChanged: _isProcessing
+                      ? null
+                      : (v) => setState(
+                            () => _startPosition = Duration(seconds: v.toInt()),
+                          ),
+                ),
+                Text(
+                  '선택 구간: ${_startPosition.toMmSs()} ~ ${(_startPosition + Duration(seconds: _presetSeconds)).toMmSs()}',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Preset Selector
+              PresetSelector(
+                value: _presetSeconds,
+                enabled: !_isProcessing,
+                onChanged: (v) {
+                  setState(() {
+                    _presetSeconds = v;
+                    // Adjust start position if needed
+                    final maxStart = (_sourceDuration.inSeconds - v).clamp(0, 9999);
+                    if (_startPosition.inSeconds > maxStart) {
+                      _startPosition = Duration(seconds: maxStart);
+                    }
+                  });
+                },
               ),
-          ],
+              const SizedBox(height: 24),
+
+              // Status
+              Center(
+                child: Text(
+                  _statusMessage,
+                  style: theme.textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Progress Indicator
+              if (_isProcessing)
+                const Center(child: CircularProgressIndicator()),
+
+              // Convert Button
+              if (_sourcePath != null && !_isProcessing && _midiPath == null)
+                ElevatedButton.icon(
+                  onPressed: _convert,
+                  icon: const Icon(Icons.music_note),
+                  label: const Text('MIDI 변환'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                  ),
+                ),
+
+              const Spacer(),
+
+              // Result Card
+              if (_midiPath != null)
+                ResultCard(
+                  mp3Path: _mp3Path,
+                  midiPath: _midiPath,
+                ),
+            ],
+          ),
         ),
       ),
     );
