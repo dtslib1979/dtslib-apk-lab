@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:system_audio_recorder/system_audio_recorder.dart';
-import 'package:path_provider/path_provider.dart';
+import '../../core/config/app_config.dart';
+import '../../core/utils/duration_utils.dart';
 import '../../services/audio_service.dart';
+import '../../services/file_manager.dart';
 import '../../services/midi_service.dart';
+import '../../services/permission_service.dart';
 import '../../widgets/preset_selector.dart';
 import '../../widgets/result_card.dart';
 
+/// Screen audio capture → MIDI conversion
+/// Uses MediaProjection for system audio recording
 class CaptureScreen extends StatefulWidget {
   const CaptureScreen({super.key});
 
@@ -17,15 +21,24 @@ class CaptureScreen extends StatefulWidget {
 }
 
 class _CaptureScreenState extends State<CaptureScreen> {
-  bool _rec = false;
-  bool _proc = false;
-  int _preset = 60; // seconds
-  int _elapsed = 0;
+  // Services
+  final _audioService = AudioService.instance;
+  final _midiService = MidiService.instance;
+  final _fileManager = FileManager.instance;
+  final _permissionService = PermissionService.instance;
+
+  // State
+  bool _isRecording = false;
+  bool _isProcessing = false;
+  int _presetSeconds = AppConfig.defaultPreset;
+  int _elapsedSeconds = 0;
   Timer? _timer;
+
+  // Results
   String? _mp3Path;
   String? _midiPath;
-  String _status = '녹음 준비';
-  String? _recPath;
+  String _statusMessage = '녹음 준비';
+  String? _recordingPath;
 
   @override
   void dispose() {
@@ -33,141 +46,170 @@ class _CaptureScreenState extends State<CaptureScreen> {
     super.dispose();
   }
 
-  Future<bool> _checkPerms() async {
-    final mic = await Permission.microphone.request();
-    return mic.isGranted;
-  }
+  /// Start recording with permission check
+  Future<void> _startRecording() async {
+    // Check permissions
+    final permResult = await _permissionService.requestCapturePermissions();
+    if (!mounted) return;
 
-  Future<void> _startRec() async {
-    if (!await _checkPerms()) {
-      _showSnack('권한 필요');
-      return;
-    }
+    final hasPermission = await _permissionService.handlePermissionResult(
+      context,
+      permResult,
+    );
+    if (!hasPermission) return;
 
     try {
       // Request MediaProjection permission
       final confirmed = await SystemAudioRecorder.requestRecord(
-        titleNotification: 'Parksy Audio',
-        messageNotification: '시스템 오디오 녹음 중...',
+        titleNotification: AppConfig.recordingNotificationTitle,
+        messageNotification: AppConfig.recordingNotificationMessage,
       );
 
       if (!confirmed) {
-        _showSnack('녹음 권한 거부됨');
+        _showMessage('녹음 권한이 거부되었습니다');
         return;
       }
 
-      // Prepare file path
-      final dir = await getExternalStorageDirectory();
-      final ts = DateTime.now().millisecondsSinceEpoch;
-      _recPath = '${dir?.parent.path}/capture_$ts.wav';
+      // Get recording path
+      final pathResult = await _fileManager.getRecordingPath();
+      if (pathResult.isFailure) {
+        _showMessage(pathResult.errorOrNull ?? '경로 생성 실패');
+        return;
+      }
+      _recordingPath = pathResult.valueOrNull;
 
-      // Delete if exists
-      final outFile = File(_recPath!);
-      if (outFile.existsSync()) {
-        await outFile.delete();
+      // Delete existing file if any
+      if (_recordingPath != null) {
+        final file = File(_recordingPath!);
+        if (await file.exists()) {
+          await file.delete();
+        }
       }
 
-      // Start recording to file
+      // Start recording
       final started = await SystemAudioRecorder.startRecord(
         toFile: true,
         toStream: false,
-        filePath: _recPath,
+        filePath: _recordingPath,
       );
 
       if (!started) {
-        _showSnack('녹음 시작 실패');
+        _showMessage('녹음 시작에 실패했습니다');
         return;
       }
 
       setState(() {
-        _rec = true;
-        _elapsed = 0;
-        _status = '녹음 중... 0:00';
+        _isRecording = true;
+        _elapsedSeconds = 0;
+        _statusMessage = '녹음 중... 0:00';
       });
 
-      _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-        setState(() {
-          _elapsed++;
-          _status = '녹음 중... ${_fmtTime(_elapsed)}';
-        });
-
-        if (_elapsed >= _preset) {
-          _stopRec();
-        }
-      });
+      // Start timer
+      _timer = Timer.periodic(const Duration(seconds: 1), _onTimerTick);
     } catch (e) {
-      _showSnack('녹음 시작 실패: $e');
+      _showMessage('녹음 시작 실패: $e');
     }
   }
 
-  Future<void> _stopRec() async {
+  void _onTimerTick(Timer timer) {
+    if (!mounted) {
+      timer.cancel();
+      return;
+    }
+
+    setState(() {
+      _elapsedSeconds++;
+      _statusMessage = '녹음 중... ${_elapsedSeconds.seconds.toMmSs()}';
+    });
+
+    // Auto-stop at preset duration
+    if (_elapsedSeconds >= _presetSeconds) {
+      _stopRecording();
+    }
+  }
+
+  /// Stop recording and process
+  Future<void> _stopRecording() async {
     _timer?.cancel();
-    
+
     try {
-      final path = await SystemAudioRecorder.stopRecord();
+      final returnedPath = await SystemAudioRecorder.stopRecord();
+
       setState(() {
-        _rec = false;
-        _status = '처리 중...';
-        _proc = true;
+        _isRecording = false;
+        _isProcessing = true;
+        _statusMessage = '처리 중...';
       });
 
       // Use returned path or our saved path
-      final wavPath = path.isNotEmpty ? path : _recPath;
-      if (wavPath != null && wavPath.isNotEmpty) {
-        await _process(wavPath);
-      } else {
+      final wavPath = returnedPath.isNotEmpty ? returnedPath : _recordingPath;
+
+      if (wavPath == null || wavPath.isEmpty) {
         setState(() {
-          _proc = false;
-          _status = '녹음 파일 없음';
+          _isProcessing = false;
+          _statusMessage = '녹음 파일을 찾을 수 없습니다';
         });
+        return;
       }
+
+      await _processRecording(wavPath);
     } catch (e) {
       setState(() {
-        _rec = false;
-        _proc = false;
-        _status = '녹음 중지 실패: $e';
+        _isRecording = false;
+        _isProcessing = false;
+        _statusMessage = '녹음 중지 실패: $e';
       });
     }
   }
 
-  Future<void> _process(String wavPath) async {
-    try {
-      // WAV → MP3
-      setState(() => _status = 'MP3 변환 중...');
-      final mp3 = await AudioService.toMp3(wavPath);
-      
-      // MP3 → MIDI
-      setState(() => _status = 'MIDI 변환 중...');
-      final midi = await MidiService.convert(mp3);
+  /// Process recording: WAV → MP3 → MIDI
+  Future<void> _processRecording(String wavPath) async {
+    // Step 1: WAV → MP3
+    setState(() => _statusMessage = 'MP3 변환 중...');
 
+    final mp3Result = await _audioService.toMp3(wavPath);
+    if (mp3Result.isFailure) {
       setState(() {
-        _mp3Path = mp3;
-        _midiPath = midi;
-        _proc = false;
-        _status = '완료!';
+        _isProcessing = false;
+        _statusMessage = mp3Result.errorOrNull ?? 'MP3 변환 실패';
       });
-
-      // Cleanup WAV
-      try {
-        await File(wavPath).delete();
-      } catch (_) {}
-    } catch (e) {
-      setState(() {
-        _proc = false;
-        _status = '변환 실패: $e';
-      });
+      return;
     }
+
+    final mp3Path = mp3Result.valueOrNull!;
+
+    // Step 2: MP3 → MIDI
+    setState(() => _statusMessage = 'MIDI 변환 중...');
+
+    final midiResult = await _midiService.convert(mp3Path);
+    if (midiResult.isFailure) {
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = midiResult.errorOrNull ?? 'MIDI 변환 실패';
+        _mp3Path = mp3Path; // Keep MP3 even if MIDI fails
+      });
+      return;
+    }
+
+    // Success!
+    setState(() {
+      _mp3Path = mp3Path;
+      _midiPath = midiResult.valueOrNull;
+      _isProcessing = false;
+      _statusMessage = '완료!';
+    });
+
+    // Cleanup WAV
+    await _fileManager.delete(wavPath);
   }
 
-  String _fmtTime(int sec) {
-    final m = sec ~/ 60;
-    final s = sec % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
-  void _showSnack(String msg) {
+  void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -175,100 +217,113 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(() {
       _mp3Path = null;
       _midiPath = null;
-      _status = '녹음 준비';
+      _statusMessage = '녹음 준비';
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🎬 화면 녹음 → MIDI'),
+        title: const Text('화면 녹음 → MIDI'),
         centerTitle: true,
         actions: [
           if (_midiPath != null)
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _reset,
+              tooltip: '초기화',
             ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Preset Selector
-            PresetSelector(
-              value: _preset,
-              enabled: !_rec && !_proc,
-              onChanged: (v) => setState(() => _preset = v),
-            ),
-            const SizedBox(height: 24),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Preset Selector
+              PresetSelector(
+                value: _presetSeconds,
+                enabled: !_isRecording && !_isProcessing,
+                onChanged: (v) => setState(() => _presetSeconds = v),
+              ),
+              const SizedBox(height: 24),
 
-            // Status
-            Text(
-              _status,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-
-            // Timer Display
-            if (_rec)
+              // Status
               Text(
-                _fmtTime(_elapsed),
-                style: const TextStyle(
-                  fontSize: 72,
-                  fontWeight: FontWeight.bold,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                _statusMessage,
+                style: theme.textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+
+              // Timer Display (recording)
+              if (_isRecording)
+                Text(
+                  _elapsedSeconds.seconds.toMmSs(),
+                  style: const TextStyle(
+                    fontSize: 72,
+                    fontWeight: FontWeight.bold,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
                 ),
-              ),
 
-            // Progress
-            if (_proc)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: CircularProgressIndicator(),
-              ),
-
-            const Spacer(),
-
-            // Result
-            if (_midiPath != null)
-              ResultCard(
-                mp3Path: _mp3Path,
-                midiPath: _midiPath,
-              ),
-
-            const Spacer(),
-
-            // Record Button
-            SizedBox(
-              width: 200,
-              height: 200,
-              child: ElevatedButton(
-                onPressed: _proc ? null : (_rec ? _stopRec : _startRec),
-                style: ElevatedButton.styleFrom(
-                  shape: const CircleBorder(),
-                  backgroundColor: _rec ? Colors.red : Colors.deepPurple,
-                  foregroundColor: Colors.white,
+              // Progress Indicator (processing)
+              if (_isProcessing)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
                 ),
-                child: Icon(
-                  _rec ? Icons.stop : Icons.fiber_manual_record,
-                  size: 80,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
 
-            // Help text
-            Text(
-              _rec 
-                ? '탭하여 중지 (자동: ${_fmtTime(_preset)})'
-                : '탭하여 시스템 오디오 녹음 시작',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 32),
-          ],
+              const Spacer(),
+
+              // Result Card
+              if (_midiPath != null)
+                ResultCard(
+                  mp3Path: _mp3Path,
+                  midiPath: _midiPath,
+                ),
+
+              const Spacer(),
+
+              // Record Button
+              _buildRecordButton(),
+              const SizedBox(height: 16),
+
+              // Help Text
+              Text(
+                _isRecording
+                    ? '탭하여 중지 (자동: ${_presetSeconds.seconds.toMmSs()})'
+                    : '탭하여 시스템 오디오 녹음 시작',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecordButton() {
+    return SizedBox(
+      width: 200,
+      height: 200,
+      child: ElevatedButton(
+        onPressed: _isProcessing
+            ? null
+            : (_isRecording ? _stopRecording : _startRecording),
+        style: ElevatedButton.styleFrom(
+          shape: const CircleBorder(),
+          backgroundColor: _isRecording ? Colors.red : Colors.deepPurple,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: Colors.grey.shade700,
+        ),
+        child: Icon(
+          _isRecording ? Icons.stop : Icons.fiber_manual_record,
+          size: 80,
         ),
       ),
     );

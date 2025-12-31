@@ -1,7 +1,16 @@
 {
   "id": "parksy-audio-tools",
   "name": "Parksy Audio Tools",
-  "version": "1.0.0",
+  "version": "v2.0.0",
+  "description": "Screen Audio Capture + MIDI Converter for AIVA",
   "category": "audio",
-  "status": "active"
+  "status": "active",
+  "features": [
+    "화면 오디오 녹음 (MediaProjection)",
+    "파일 → MIDI 변환 (Basic Pitch)",
+    "오디오 트림 (WAV 출력)",
+    "1/2/3분 프리셋 (AIVA 호환)"
+  ],
+  "minSdk": 29,
+  "targetSdk": 34
 }
