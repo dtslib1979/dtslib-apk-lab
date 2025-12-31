@@ -1,0 +1,47 @@
+name: Build Parksy Glot
+
+on:
+  push:
+    branches: [main, 'claude/*']
+    paths:
+      - 'apps/parksy-glot/**'
+      - '.github/workflows/build-parksy-glot.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/parksy-glot
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Clean and get dependencies
+        run: |
+          flutter clean
+          flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parksy-glot-debug
+          path: apps/parksy-glot/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30

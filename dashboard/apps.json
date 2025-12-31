@@ -1,5 +1,14 @@
 [
   {
+    "id": "parksy-glot",
+    "name": "Parksy Glot",
+    "version": "v1.0.0",
+    "description": "다국어 실시간 자막 + AI 번역 (Whisper + GPT-4o)",
+    "icon": "🌐",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-glot/main/parksy-glot-debug.zip",
+    "lastUpdated": "2025-12-30"
+  },
+  {
     "id": "parksy-axis",
     "name": "Parksy Axis",
     "version": "v5.2.0",
@@ -24,15 +33,6 @@
     "description": "텍스트 캡처 → GitHub 자동 아카이브",
     "icon": "💾",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
-    "lastUpdated": "2025-12-30"
-  },
-  {
-    "id": "parksy-subtitle",
-    "name": "Parksy Subtitle",
-    "version": "v1.0.0",
-    "description": "이중자막 오버레이",
-    "icon": "🖊️",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/overlay-dual-sub/main/overlay-dual-sub-debug.zip",
     "lastUpdated": "2025-12-30"
   },
   {
