@@ -25,6 +25,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   String? _mp3Path;
   String? _midiPath;
   String _status = '녹음 준비';
+  String? _recPath;
 
   @override
   void dispose() {
@@ -34,8 +35,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   Future<bool> _checkPerms() async {
     final mic = await Permission.microphone.request();
-    final storage = await Permission.storage.request();
-    return mic.isGranted && storage.isGranted;
+    return mic.isGranted;
   }
 
   Future<void> _startRec() async {
@@ -44,16 +44,40 @@ class _CaptureScreenState extends State<CaptureScreen> {
       return;
     }
 
-    final dir = await getApplicationDocumentsDirectory();
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final path = '${dir.path}/capture_$ts.wav';
-
     try {
-      await SystemAudioRecorder.startRecord(
-        path,
+      // Request MediaProjection permission
+      final confirmed = await SystemAudioRecorder.requestRecord(
         titleNotification: 'Parksy Audio',
-        messageNotification: '녹음 중...',
+        messageNotification: '시스템 오디오 녹음 중...',
       );
+
+      if (!confirmed) {
+        _showSnack('녹음 권한 거부됨');
+        return;
+      }
+
+      // Prepare file path
+      final dir = await getExternalStorageDirectory();
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      _recPath = '${dir?.parent.path}/capture_$ts.wav';
+
+      // Delete if exists
+      final outFile = File(_recPath!);
+      if (outFile.existsSync()) {
+        await outFile.delete();
+      }
+
+      // Start recording to file
+      final started = await SystemAudioRecorder.startRecord(
+        toFile: true,
+        toStream: false,
+        filePath: _recPath,
+      );
+
+      if (!started) {
+        _showSnack('녹음 시작 실패');
+        return;
+      }
 
       setState(() {
         _rec = true;
@@ -87,14 +111,21 @@ class _CaptureScreenState extends State<CaptureScreen> {
         _proc = true;
       });
 
-      if (path != null) {
-        await _process(path);
+      // Use returned path or our saved path
+      final wavPath = path.isNotEmpty ? path : _recPath;
+      if (wavPath != null && wavPath.isNotEmpty) {
+        await _process(wavPath);
+      } else {
+        setState(() {
+          _proc = false;
+          _status = '녹음 파일 없음';
+        });
       }
     } catch (e) {
       setState(() {
         _rec = false;
         _proc = false;
-        _status = '녹음 중지 실패';
+        _status = '녹음 중지 실패: $e';
       });
     }
   }
@@ -117,7 +148,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
       });
 
       // Cleanup WAV
-      await File(wavPath).delete();
+      try {
+        await File(wavPath).delete();
+      } catch (_) {}
     } catch (e) {
       setState(() {
         _proc = false;
@@ -138,12 +171,27 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
+  void _reset() {
+    setState(() {
+      _mp3Path = null;
+      _midiPath = null;
+      _status = '녹음 준비';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('🎬 화면 녹음 → MIDI'),
         centerTitle: true,
+        actions: [
+          if (_midiPath != null)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _reset,
+            ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -209,6 +257,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   size: 80,
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+
+            // Help text
+            Text(
+              _rec 
+                ? '탭하여 중지 (자동: ${_fmtTime(_preset)})'
+                : '탭하여 시스템 오디오 녹음 시작',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 32),
           ],
