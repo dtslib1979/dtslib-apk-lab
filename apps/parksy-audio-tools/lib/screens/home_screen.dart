@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/file_manager.dart';
 import '../services/analytics_service.dart';
+import '../services/midi_service.dart';
 import '../widgets/offline_banner.dart';
 import 'capture/capture_screen.dart';
 import 'converter/converter_screen.dart';
@@ -17,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  bool _serverHealthy = true;
 
   // Lazy-initialized screens to preserve state
   final List<Widget> _screens = const [
@@ -31,8 +33,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _cleanupOnStart();
-    _logScreenView();
+    _initApp();
   }
 
   @override
@@ -43,12 +44,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      // App going to background - could save state here
-    } else if (state == AppLifecycleState.resumed) {
-      // App returning to foreground
+    if (state == AppLifecycleState.resumed) {
       _logScreenView();
+      _checkServerHealth();
     }
+  }
+
+  Future<void> _initApp() async {
+    _logScreenView();
+    await Future.wait([
+      _cleanupOnStart(),
+      _checkServerHealth(),
+    ]);
   }
 
   /// Cleanup old temp files on app start
@@ -57,6 +64,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (deleted > 0) {
       debugPrint('Cleaned up $deleted old temp files');
     }
+  }
+
+  /// Check MIDI server health on startup
+  Future<void> _checkServerHealth() async {
+    final healthy = await MidiService.instance.healthCheck();
+    if (mounted && !healthy && _serverHealthy) {
+      setState(() => _serverHealthy = false);
+      _showServerWarning();
+    } else if (mounted && healthy && !_serverHealthy) {
+      setState(() => _serverHealthy = true);
+    }
+  }
+
+  void _showServerWarning() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('MIDI 서버 연결 불안정. 변환 지연될 수 있습니다.'),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 4),
+      ),
+    );
   }
 
   void _logScreenView() {
