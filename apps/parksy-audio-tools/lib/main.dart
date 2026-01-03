@@ -1,51 +1,17 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/connectivity_service.dart';
 
-/// Firebase enabled flag - set to true when google-services.json is added
-const bool kFirebaseEnabled = false;
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase if enabled
-  if (kFirebaseEnabled) {
-    await _initFirebase();
-  }
-
-  // Initialize core services (always)
+  // Initialize core services
   await ConnectivityService.instance.init();
-  
-  // Analytics init is safe even without Firebase
   await AnalyticsService.instance.init();
 
   runApp(const ParksyAudioApp());
-}
-
-Future<void> _initFirebase() async {
-  try {
-    // Dynamic import to avoid build errors
-    final firebase = await _loadFirebase();
-    if (firebase != null) {
-      await firebase.initializeApp();
-      debugPrint('[Firebase] Initialized');
-    }
-  } catch (e) {
-    debugPrint('[Firebase] Not available: $e');
-  }
-}
-
-Future<dynamic> _loadFirebase() async {
-  try {
-    // This will fail at runtime if google-services.json is missing
-    final module = await import('package:firebase_core/firebase_core.dart');
-    return module.Firebase;
-  } catch (e) {
-    return null;
-  }
 }
 
 class ParksyAudioApp extends StatelessWidget {
@@ -65,7 +31,6 @@ class ParksyAudioApp extends StatelessWidget {
       ),
       home: const HomeScreen(),
       builder: (context, child) {
-        // Global error boundary
         ErrorWidget.builder = (details) => _ErrorScreen(details: details);
         return child ?? const SizedBox.shrink();
       },
