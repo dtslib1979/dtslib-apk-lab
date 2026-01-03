@@ -1,9 +1,9 @@
-Build trigger: 2026-01-03T15:06:30Z
-Cycle: 4
-Version: 2.1.0+4
+Build trigger: 2026-01-04T00:15:00Z
+Cycle: 5
+Version: 2.1.0+5
 Changes:
-- Firebase disabled (stub analytics)
-- Connectivity service for offline handling
-- OfflineBanner UI component
-- Unit tests added
-- MIDI server v1.2.0 with rate limiting
+- OfflineAwareMixin integrated to CaptureScreen, ConverterScreen
+- Analytics tracking on all screens and actions
+- ResultCard share analytics
+- Service unit tests (ConnectivityService, AnalyticsService)
+- CHANGELOG updated
