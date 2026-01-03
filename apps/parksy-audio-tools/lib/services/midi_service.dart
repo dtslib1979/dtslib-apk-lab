@@ -31,7 +31,7 @@ class MidiService {
       final response = await _dio.get(
         '/health',
         options: Options(
-          receiveTimeout: const Duration(seconds: 5),
+          receiveTimeout: AppConfig.healthCheckTimeout,
         ),
       );
       return response.statusCode == 200;
@@ -40,14 +40,18 @@ class MidiService {
     }
   }
 
-  /// Convert MP3 to MIDI via server
+  /// Convert MP3 to MIDI via server with retry support
   /// [source] is for analytics: 'capture' or 'file'
-  Future<Result<String>> convert(String mp3Path, {String source = 'file'}) async {
+  Future<Result<String>> convert(
+    String mp3Path, {
+    String source = 'file',
+    int retryCount = 0,
+  }) async {
     // Check connectivity first
     if (!ConnectivityService.instance.isOnline) {
       return const Failure(
         '인터넷 연결이 필요합니다',
-        code: ErrorCode.networkError,
+        code: ErrorCode.offline,
       );
     }
 
@@ -59,7 +63,7 @@ class MidiService {
       );
     }
 
-    // Check file size for debugging
+    // Check file size
     final fileSize = await _fileManager.getSize(mp3Path);
     if (fileSize == null) {
       return const Failure(
@@ -68,8 +72,19 @@ class MidiService {
       );
     }
 
-    // Log conversion start
-    _analytics.logMidiConversionStart(source);
+    // File size limit check
+    final maxBytes = AppConfig.maxFileSizeMb * 1024 * 1024;
+    if (fileSize > maxBytes) {
+      return Failure(
+        '파일이 너무 큽니다 (최대 ${AppConfig.maxFileSizeMb}MB)',
+        code: ErrorCode.fileTooLarge,
+      );
+    }
+
+    // Log conversion start (only on first attempt)
+    if (retryCount == 0) {
+      _analytics.logMidiConversionStart(source);
+    }
     final stopwatch = Stopwatch()..start();
 
     try {
@@ -142,6 +157,14 @@ class MidiService {
     } on DioException catch (e) {
       stopwatch.stop();
       final errorCode = _getDioErrorCode(e);
+      
+      // Retry logic for retryable errors
+      if (_shouldRetry(errorCode, retryCount)) {
+        final delay = _getRetryDelay(retryCount);
+        await Future.delayed(delay);
+        return convert(mp3Path, source: source, retryCount: retryCount + 1);
+      }
+
       _analytics.logMidiConversionError(errorCode.name);
       _analytics.recordError(e, e.stackTrace, reason: 'MIDI conversion failed');
       
@@ -156,6 +179,24 @@ class MidiService {
       
       return Failure('MIDI 변환 실패: $e', code: ErrorCode.conversionFailed);
     }
+  }
+
+  bool _shouldRetry(ErrorCode code, int retryCount) {
+    if (retryCount >= AppConfig.maxRetries) return false;
+    
+    return switch (code) {
+      ErrorCode.timeout => true,
+      ErrorCode.serverError => true,
+      ErrorCode.networkError => true,
+      _ => false,
+    };
+  }
+
+  Duration _getRetryDelay(int retryCount) {
+    final baseMs = AppConfig.retryDelay.inMilliseconds;
+    final multiplier = AppConfig.retryBackoffMultiplier;
+    final delayMs = baseMs * (multiplier * retryCount).clamp(1, 10);
+    return Duration(milliseconds: delayMs.toInt());
   }
 
   String _parseDioError(DioException e) {
@@ -187,6 +228,10 @@ class MidiService {
         return ErrorCode.timeout;
       case DioExceptionType.connectionError:
         return ErrorCode.networkError;
+      case DioExceptionType.badResponse:
+        final code = e.response?.statusCode;
+        if (code == 429) return ErrorCode.rateLimited;
+        return ErrorCode.serverError;
       default:
         return ErrorCode.serverError;
     }
