@@ -6,6 +6,7 @@ import '../../core/config/app_config.dart';
 import '../../core/utils/duration_utils.dart';
 import '../../services/audio_service.dart';
 import '../../services/file_manager.dart';
+import '../../services/analytics_service.dart';
 
 /// Legacy audio trimmer screen
 /// Free-form range selection → WAV output
@@ -20,6 +21,7 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
   // Services
   final _audioService = AudioService.instance;
   final _fileManager = FileManager.instance;
+  final _analytics = AnalyticsService.instance;
 
   // Source file
   String? _sourcePath;
@@ -36,6 +38,12 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
   String? _outputPath;
 
   final _player = AudioPlayer();
+
+  @override
+  void initState() {
+    super.initState();
+    _analytics.logScreenView('trimmer');
+  }
 
   @override
   void dispose() {
@@ -74,6 +82,10 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
           _outputPath = null;
           _statusMessage = '구간 설정 후 트림';
         });
+
+        _analytics.log('trim_file_selected', {
+          'duration_seconds': duration.inSeconds,
+        });
       } catch (e) {
         _showMessage('오디오 파일을 읽을 수 없습니다');
       }
@@ -96,11 +108,15 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
       _statusMessage = '트림 중...';
     });
 
+    final stopwatch = Stopwatch()..start();
+
     final result = await _audioService.trimToWav(
       inputPath: _sourcePath!,
       start: _startPosition,
       duration: duration,
     );
+
+    stopwatch.stop();
 
     result.fold(
       onSuccess: (outputPath) {
@@ -109,12 +125,19 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
           _isProcessing = false;
           _statusMessage = '완료!';
         });
+
+        _analytics.log('trim_success', {
+          'duration_seconds': duration.inSeconds,
+          'elapsed_ms': stopwatch.elapsedMilliseconds,
+        });
       },
       onFailure: (error, _) {
         setState(() {
           _isProcessing = false;
           _statusMessage = error;
         });
+
+        _analytics.log('trim_error', {'reason': error});
       },
     );
   }
@@ -124,6 +147,7 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
 
     try {
       await Share.shareXFiles([XFile(_outputPath!)]);
+      _analytics.logFileShare('wav');
     } catch (e) {
       _showMessage('공유 실패: $e');
     }
