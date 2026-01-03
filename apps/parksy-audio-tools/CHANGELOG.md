@@ -2,6 +2,23 @@
 
 All notable changes to Parksy Audio Tools will be documented in this file.
 
+## [2.1.0+6] - 2026-01-04
+
+### Added
+- **Server Health Check** - 앱 시작/resume 시 MIDI 서버 상태 체크
+- **MidiService.healthCheck()** - 서버 연결 상태 확인 메서드
+- **TrimmerScreen Analytics** - 트림 화면 이벤트 추적
+  - 파일 선택, 트림 성공/실패, WAV 공유
+- **ErrorCode 확장** - rateLimited, offline, fileTooLarge 추가
+- **Result 헬퍼 메서드** - getOrElse, getOrThrow, codeOrNull
+- **Failure.isRetryable** - 재시도 가능 에러 판별
+- **ErrorCodeMessage** - 모든 에러코드 한국어 메시지
+
+### Tests
+- MidiService 유닛 테스트 (singleton, healthCheck, convert)
+- FileManager 유닛 테스트 (exists, getSize, createTempPath)
+- Result 테스트 확장 (retryable, userMessage)
+
 ## [2.1.0+5] - 2026-01-04
 
 ### Added
