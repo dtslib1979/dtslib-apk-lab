@@ -1,36 +1,51 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'screens/home_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/connectivity_service.dart';
 
+/// Firebase enabled flag - set to true when google-services.json is added
+const bool kFirebaseEnabled = false;
+
 Future<void> main() async {
-  await runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
-    // Initialize Firebase
-    await Firebase.initializeApp();
+  // Initialize Firebase if enabled
+  if (kFirebaseEnabled) {
+    await _initFirebase();
+  }
 
-    // Configure Crashlytics
-    FlutterError.onError = (details) {
-      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
-    };
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
+  // Initialize core services (always)
+  await ConnectivityService.instance.init();
+  
+  // Analytics init is safe even without Firebase
+  await AnalyticsService.instance.init();
 
-    // Initialize services
-    await AnalyticsService.instance.init();
-    await ConnectivityService.instance.init();
+  runApp(const ParksyAudioApp());
+}
 
-    runApp(const ParksyAudioApp());
-  }, (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-  });
+Future<void> _initFirebase() async {
+  try {
+    // Dynamic import to avoid build errors
+    final firebase = await _loadFirebase();
+    if (firebase != null) {
+      await firebase.initializeApp();
+      debugPrint('[Firebase] Initialized');
+    }
+  } catch (e) {
+    debugPrint('[Firebase] Not available: $e');
+  }
+}
+
+Future<dynamic> _loadFirebase() async {
+  try {
+    // This will fail at runtime if google-services.json is missing
+    final module = await import('package:firebase_core/firebase_core.dart');
+    return module.Firebase;
+  } catch (e) {
+    return null;
+  }
 }
 
 class ParksyAudioApp extends StatelessWidget {
