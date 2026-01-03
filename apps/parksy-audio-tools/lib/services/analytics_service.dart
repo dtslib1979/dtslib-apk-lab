@@ -1,82 +1,52 @@
 import 'dart:async';
-import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 
-/// Analytics and crash reporting service
-/// Tracks user actions and reports errors
+/// Analytics stub service (Firebase disabled)
+/// Enable Firebase in pubspec.yaml when google-services.json is added
 class AnalyticsService {
   static final AnalyticsService _instance = AnalyticsService._();
   static AnalyticsService get instance => _instance;
   AnalyticsService._();
 
-  late final FirebaseAnalytics _analytics;
-  late final FirebaseCrashlytics _crashlytics;
   bool _initialized = false;
 
-  /// Initialize Firebase services
+  /// Initialize analytics (stub - logs to console in debug)
   Future<void> init() async {
     if (_initialized) return;
-    
-    _analytics = FirebaseAnalytics.instance;
-    _crashlytics = FirebaseCrashlytics.instance;
     _initialized = true;
+    _log('Analytics initialized (stub mode)');
   }
 
   // === SCREEN TRACKING ===
 
   Future<void> logScreenView(String name) async {
-    if (!_initialized) return;
-    await _analytics.logScreenView(screenName: name);
+    _log('Screen: $name');
   }
 
   // === CONVERSION EVENTS ===
 
   Future<void> logRecordingStart(int presetSeconds) async {
-    if (!_initialized) return;
-    await _analytics.logEvent(
-      name: 'recording_start',
-      parameters: {'preset_seconds': presetSeconds},
-    );
+    _log('Event: recording_start (preset: ${presetSeconds}s)');
   }
 
   Future<void> logRecordingComplete(int durationSeconds) async {
-    if (!_initialized) return;
-    await _analytics.logEvent(
-      name: 'recording_complete',
-      parameters: {'duration_seconds': durationSeconds},
-    );
+    _log('Event: recording_complete (duration: ${durationSeconds}s)');
   }
 
   Future<void> logMidiConversionStart(String source) async {
-    if (!_initialized) return;
-    await _analytics.logEvent(
-      name: 'midi_conversion_start',
-      parameters: {'source': source}, // 'capture' or 'file'
-    );
+    _log('Event: midi_conversion_start (source: $source)');
   }
 
   Future<void> logMidiConversionSuccess(int processingMs) async {
-    if (!_initialized) return;
-    await _analytics.logEvent(
-      name: 'midi_conversion_success',
-      parameters: {'processing_ms': processingMs},
-    );
+    _log('Event: midi_conversion_success (time: ${processingMs}ms)');
   }
 
   Future<void> logMidiConversionError(String errorCode) async {
-    if (!_initialized) return;
-    await _analytics.logEvent(
-      name: 'midi_conversion_error',
-      parameters: {'error_code': errorCode},
-    );
+    _log('Event: midi_conversion_error (code: $errorCode)');
   }
 
   Future<void> logFileShare(String fileType) async {
-    if (!_initialized) return;
-    await _analytics.logEvent(
-      name: 'file_share',
-      parameters: {'file_type': fileType}, // 'mp3' or 'midi'
-    );
+    _log('Event: file_share (type: $fileType)');
   }
 
   // === ERROR REPORTING ===
@@ -87,22 +57,21 @@ class AnalyticsService {
     String? reason,
     bool fatal = false,
   }) async {
-    if (!_initialized) return;
-    await _crashlytics.recordError(
-      error,
-      stack,
-      reason: reason,
-      fatal: fatal,
-    );
+    _log('Error: $error${reason != null ? ' ($reason)' : ''}');
+    if (kDebugMode && stack != null) {
+      debugPrintStack(stackTrace: stack, maxFrames: 5);
+    }
   }
 
   void log(String message) {
-    if (!_initialized) return;
-    _crashlytics.log(message);
+    _log('Log: $message');
   }
 
   Future<void> setUserProperty(String name, String value) async {
-    if (!_initialized) return;
-    await _analytics.setUserProperty(name: name, value: value);
+    _log('Property: $name = $value');
+  }
+
+  void _log(String msg) {
+    if (kDebugMode) debugPrint('[Analytics] $msg');
   }
 }
