@@ -1,4 +1,4 @@
-const CACHE_NAME = 'apk-store-v77';
+const CACHE_NAME = 'apk-store-v78';
 const urlsToCache = [
   '/',
   '/index.html',
