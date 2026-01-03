@@ -1,7 +1,7 @@
 name: parksy_audio_tools
 description: Screen Audio Capture + MIDI Converter for AIVA
 publish_to: 'none'
-version: 2.0.0+1
+version: 2.0.0+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -24,8 +24,14 @@ dependencies:
   system_audio_recorder: ^0.0.6
   flutter_overlay_window: ^0.4.3
   
-  # === NETWORK: MIDI Server ===
+  # === NETWORK ===
   dio: ^5.4.0
+  connectivity_plus: ^5.0.2
+  
+  # === MONITORING ===
+  firebase_core: ^2.24.2
+  firebase_crashlytics: ^3.4.9
+  firebase_analytics: ^10.7.4
   
   # === UTILS ===
   intl: ^0.19.0
@@ -34,6 +40,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  mocktail: ^1.0.1
 
 flutter:
   uses-material-design: true
