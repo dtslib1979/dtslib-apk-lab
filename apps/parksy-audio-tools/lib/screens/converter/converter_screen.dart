@@ -38,6 +38,7 @@ class _ConverterScreenState extends State<ConverterScreen>
   int _presetSeconds = AppConfig.defaultPreset;
   bool _isProcessing = false;
   String _statusMessage = '파일 선택';
+  int _currentStep = 0; // 0: idle, 1: trim, 2: mp3, 3: midi
 
   // Results
   String? _mp3Path;
@@ -88,6 +89,7 @@ class _ConverterScreenState extends State<ConverterScreen>
           _mp3Path = null;
           _midiPath = null;
           _statusMessage = '시작점 설정 후 변환';
+          _currentStep = 0;
         });
       } catch (e) {
         _showMessage('오디오 파일을 읽을 수 없습니다');
@@ -107,7 +109,8 @@ class _ConverterScreenState extends State<ConverterScreen>
 
     setState(() {
       _isProcessing = true;
-      _statusMessage = '트림 중...';
+      _currentStep = 1;
+      _statusMessage = '트림 중... (1/3)';
     });
 
     final startTime = DateTime.now();
@@ -123,6 +126,7 @@ class _ConverterScreenState extends State<ConverterScreen>
       _analytics.logMidiConversionError('trim_failed');
       setState(() {
         _isProcessing = false;
+        _currentStep = 0;
         _statusMessage = trimResult.errorOrNull ?? '트림 실패';
       });
       return;
@@ -131,7 +135,10 @@ class _ConverterScreenState extends State<ConverterScreen>
     final trimmedPath = trimResult.valueOrNull!;
 
     // Step 2: MP3
-    setState(() => _statusMessage = 'MP3 변환 중...');
+    setState(() {
+      _currentStep = 2;
+      _statusMessage = 'MP3 변환 중... (2/3)';
+    });
 
     final mp3Result = await _audioService.toMp3(trimmedPath);
     if (mp3Result.isFailure) {
@@ -139,6 +146,7 @@ class _ConverterScreenState extends State<ConverterScreen>
       _analytics.logMidiConversionError('mp3_failed');
       setState(() {
         _isProcessing = false;
+        _currentStep = 0;
         _statusMessage = mp3Result.errorOrNull ?? 'MP3 변환 실패';
       });
       return;
@@ -150,13 +158,17 @@ class _ConverterScreenState extends State<ConverterScreen>
     await _fileManager.delete(trimmedPath);
 
     // Step 3: MIDI
-    setState(() => _statusMessage = 'MIDI 변환 중...');
+    setState(() {
+      _currentStep = 3;
+      _statusMessage = 'MIDI 변환 중... (3/3)';
+    });
 
     final midiResult = await _midiService.convert(mp3Path);
     if (midiResult.isFailure) {
       _analytics.logMidiConversionError('midi_failed');
       setState(() {
         _isProcessing = false;
+        _currentStep = 0;
         _statusMessage = midiResult.errorOrNull ?? 'MIDI 변환 실패';
         _mp3Path = mp3Path; // Keep MP3 even if MIDI fails
       });
@@ -171,7 +183,8 @@ class _ConverterScreenState extends State<ConverterScreen>
       _mp3Path = mp3Path;
       _midiPath = midiResult.valueOrNull;
       _isProcessing = false;
-      _statusMessage = '완료!';
+      _currentStep = 0;
+      _statusMessage = '완료! (${(elapsed / 1000).toStringAsFixed(1)}초)';
     });
   }
 
@@ -194,6 +207,7 @@ class _ConverterScreenState extends State<ConverterScreen>
       _mp3Path = null;
       _midiPath = null;
       _statusMessage = '파일 선택';
+      _currentStep = 0;
     });
   }
 
@@ -272,12 +286,20 @@ class _ConverterScreenState extends State<ConverterScreen>
               ),
               const SizedBox(height: 24),
 
-              // Status
+              // Status with step indicator
               Center(
-                child: Text(
-                  _statusMessage,
-                  style: theme.textTheme.titleMedium,
-                  textAlign: TextAlign.center,
+                child: Column(
+                  children: [
+                    Text(
+                      _statusMessage,
+                      style: theme.textTheme.titleMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_isProcessing) ...[
+                      const SizedBox(height: 12),
+                      _buildStepIndicator(),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
@@ -309,6 +331,75 @@ class _ConverterScreenState extends State<ConverterScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildStepIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _stepDot(1, '트림'),
+        _stepLine(1),
+        _stepDot(2, 'MP3'),
+        _stepLine(2),
+        _stepDot(3, 'MIDI'),
+      ],
+    );
+  }
+
+  Widget _stepDot(int step, String label) {
+    final isActive = _currentStep >= step;
+    final isCurrent = _currentStep == step;
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive 
+              ? theme.colorScheme.primary 
+              : theme.colorScheme.surfaceContainerHighest,
+            border: isCurrent 
+              ? Border.all(color: theme.colorScheme.primary, width: 2)
+              : null,
+          ),
+          child: Center(
+            child: isActive
+              ? Icon(Icons.check, size: 14, color: theme.colorScheme.onPrimary)
+              : Text('$step', style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                )),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: isActive 
+              ? theme.colorScheme.primary 
+              : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _stepLine(int afterStep) {
+    final isActive = _currentStep > afterStep;
+    final theme = Theme.of(context);
+
+    return Container(
+      width: 32,
+      height: 2,
+      margin: const EdgeInsets.only(bottom: 18),
+      color: isActive 
+        ? theme.colorScheme.primary 
+        : theme.colorScheme.surfaceContainerHighest,
     );
   }
 }
