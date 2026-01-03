@@ -34,8 +34,21 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Analyze code
+        run: flutter analyze --no-fatal-infos
+        continue-on-error: true
+
       - name: Build Debug APK
         run: flutter build apk --debug
+
+      - name: Get APK info
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
+          APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+          echo "### Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **APK Size**: $APK_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: 2.0.0+1" >> $GITHUB_STEP_SUMMARY
+          echo "- **Flutter**: 3.24.0" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
