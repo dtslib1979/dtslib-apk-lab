@@ -2,6 +2,29 @@
 
 All notable changes to Parksy Audio Tools will be documented in this file.
 
+## [2.1.0+5] - 2026-01-04
+
+### Added
+- **OfflineAwareMixin** - CaptureScreen, ConverterScreen에 오프라인 체크 통합
+- **Analytics Events** - 모든 화면 및 주요 액션 추적
+  - 화면 전환 (capture, converter)
+  - 녹음 시작/완료
+  - MIDI 변환 시작/성공/에러
+  - 파일 공유 (MP3, MIDI)
+- **Service Unit Tests** - ConnectivityService, AnalyticsService 테스트
+
+### Changed
+- CaptureScreen - 녹음 시작 전 오프라인 체크
+- ConverterScreen - 변환 시작 전 오프라인 체크  
+- ResultCard - 공유 시 Analytics 이벤트 발생
+
+## [2.1.0+4] - 2026-01-03
+
+### Changed
+- **Firebase Graceful Degradation** - google-services.json 없이 빌드 가능
+- AnalyticsService stub 구현 (debug 모드 콘솔 로깅)
+- Firebase dependencies 주석 처리 (재활성화 용이)
+
 ## [2.1.0] - 2026-01-03
 
 ### Added
