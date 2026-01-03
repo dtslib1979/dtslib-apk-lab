@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../core/config/app_config.dart';
 import '../core/result/result.dart';
@@ -59,9 +60,29 @@ class MidiService {
         );
       }
 
-      // Validate response
+      // Validate response - handle both List<int> and Uint8List
       final data = response.data;
-      if (data == null || (data as List).isEmpty) {
+      if (data == null) {
+        return const Failure(
+          'MIDI 데이터가 비어있습니다',
+          code: ErrorCode.conversionFailed,
+        );
+      }
+
+      // Convert to Uint8List safely
+      final Uint8List midiBytes;
+      if (data is Uint8List) {
+        midiBytes = data;
+      } else if (data is List<int>) {
+        midiBytes = Uint8List.fromList(data);
+      } else {
+        return const Failure(
+          '잘못된 응답 형식입니다',
+          code: ErrorCode.conversionFailed,
+        );
+      }
+
+      if (midiBytes.isEmpty) {
         return const Failure(
           'MIDI 데이터가 비어있습니다',
           code: ErrorCode.conversionFailed,
@@ -74,7 +95,7 @@ class MidiService {
         prefix: 'output_',
       );
 
-      await File(midiPath).writeAsBytes(data);
+      await File(midiPath).writeAsBytes(midiBytes);
       return Success(midiPath);
     } on DioException catch (e) {
       return Failure(
