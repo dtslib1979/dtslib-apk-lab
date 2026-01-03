@@ -37,6 +37,7 @@ class _CaptureScreenState extends State<CaptureScreen>
   int _presetSeconds = AppConfig.defaultPreset;
   int _elapsedSeconds = 0;
   Timer? _timer;
+  int _currentStep = 0; // 0: idle, 1: mp3, 2: midi
 
   // Results
   String? _mp3Path;
@@ -120,6 +121,7 @@ class _CaptureScreenState extends State<CaptureScreen>
         _isRecording = true;
         _elapsedSeconds = 0;
         _statusMessage = '녹음 중... 0:00';
+        _currentStep = 0;
       });
 
       // Start timer
@@ -188,13 +190,17 @@ class _CaptureScreenState extends State<CaptureScreen>
     _analytics.logMidiConversionStart('capture');
 
     // Step 1: WAV → MP3
-    setState(() => _statusMessage = 'MP3 변환 중...');
+    setState(() {
+      _currentStep = 1;
+      _statusMessage = 'MP3 변환 중... (1/2)';
+    });
 
     final mp3Result = await _audioService.toMp3(wavPath);
     if (mp3Result.isFailure) {
       _analytics.logMidiConversionError('mp3_failed');
       setState(() {
         _isProcessing = false;
+        _currentStep = 0;
         _statusMessage = mp3Result.errorOrNull ?? 'MP3 변환 실패';
       });
       return;
@@ -203,13 +209,17 @@ class _CaptureScreenState extends State<CaptureScreen>
     final mp3Path = mp3Result.valueOrNull!;
 
     // Step 2: MP3 → MIDI
-    setState(() => _statusMessage = 'MIDI 변환 중...');
+    setState(() {
+      _currentStep = 2;
+      _statusMessage = 'MIDI 변환 중... (2/2)';
+    });
 
     final midiResult = await _midiService.convert(mp3Path);
     if (midiResult.isFailure) {
       _analytics.logMidiConversionError('midi_failed');
       setState(() {
         _isProcessing = false;
+        _currentStep = 0;
         _statusMessage = midiResult.errorOrNull ?? 'MIDI 변환 실패';
         _mp3Path = mp3Path; // Keep MP3 even if MIDI fails
       });
@@ -224,7 +234,8 @@ class _CaptureScreenState extends State<CaptureScreen>
       _mp3Path = mp3Path;
       _midiPath = midiResult.valueOrNull;
       _isProcessing = false;
-      _statusMessage = '완료!';
+      _currentStep = 0;
+      _statusMessage = '완료! (${(elapsed / 1000).toStringAsFixed(1)}초)';
     });
 
     // Cleanup WAV
@@ -246,6 +257,7 @@ class _CaptureScreenState extends State<CaptureScreen>
       _mp3Path = null;
       _midiPath = null;
       _statusMessage = '녹음 준비';
+      _currentStep = 0;
     });
   }
 
@@ -286,6 +298,12 @@ class _CaptureScreenState extends State<CaptureScreen>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
+
+              // Step indicator (processing)
+              if (_isProcessing) ...[
+                _buildStepIndicator(),
+                const SizedBox(height: 16),
+              ],
 
               // Timer Display (recording)
               if (_isRecording)
@@ -332,6 +350,74 @@ class _CaptureScreenState extends State<CaptureScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildStepIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _stepDot(1, 'MP3'),
+        _stepLine(1),
+        _stepDot(2, 'MIDI'),
+      ],
+    );
+  }
+
+  Widget _stepDot(int step, String label) {
+    final isActive = _currentStep >= step;
+    final isCurrent = _currentStep == step;
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive 
+              ? theme.colorScheme.primary 
+              : theme.colorScheme.surfaceContainerHighest,
+            border: isCurrent 
+              ? Border.all(color: theme.colorScheme.primary, width: 2)
+              : null,
+          ),
+          child: Center(
+            child: isActive
+              ? Icon(Icons.check, size: 16, color: theme.colorScheme.onPrimary)
+              : Text('$step', style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                )),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+            color: isActive 
+              ? theme.colorScheme.primary 
+              : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _stepLine(int afterStep) {
+    final isActive = _currentStep > afterStep;
+    final theme = Theme.of(context);
+
+    return Container(
+      width: 48,
+      height: 2,
+      margin: const EdgeInsets.only(bottom: 20),
+      color: isActive 
+        ? theme.colorScheme.primary 
+        : theme.colorScheme.surfaceContainerHighest,
     );
   }
 
