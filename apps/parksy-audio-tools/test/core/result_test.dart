@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:parksy_audio_tools/core/result.dart';
+import 'package:parksy_audio_tools/core/result/result.dart';
 
 void main() {
   group('Result', () {
