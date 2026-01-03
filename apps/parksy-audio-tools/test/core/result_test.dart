@@ -19,7 +19,7 @@ void main() {
       
       expect(result.isSuccess, false);
       expect(result.isFailure, true);
-      expect(result.message, '테스트 에러');
+      expect(result.error, '테스트 에러');
       expect(result.code, ErrorCode.networkError);
     });
 
@@ -62,6 +62,53 @@ void main() {
       expect(mapped.isFailure, true);
       expect((mapped as Failure<int>).code, ErrorCode.fileNotFound);
     });
+
+    test('getOrElse returns value on Success', () {
+      const result = Success<int>(42);
+      expect(result.getOrElse(0), 42);
+    });
+
+    test('getOrElse returns default on Failure', () {
+      const result = Failure<int>('error');
+      expect(result.getOrElse(0), 0);
+    });
+
+    test('valueOrNull returns null on Failure', () {
+      const result = Failure<int>('error');
+      expect(result.valueOrNull, isNull);
+    });
+
+    test('codeOrNull returns code on Failure', () {
+      const result = Failure<int>('error', code: ErrorCode.timeout);
+      expect(result.codeOrNull, ErrorCode.timeout);
+    });
+  });
+
+  group('Failure', () {
+    test('isRetryable true for network errors', () {
+      const result = Failure<int>('err', code: ErrorCode.networkError);
+      expect(result.isRetryable, true);
+    });
+
+    test('isRetryable true for timeout', () {
+      const result = Failure<int>('err', code: ErrorCode.timeout);
+      expect(result.isRetryable, true);
+    });
+
+    test('isRetryable true for rate limited', () {
+      const result = Failure<int>('err', code: ErrorCode.rateLimited);
+      expect(result.isRetryable, true);
+    });
+
+    test('isRetryable false for file errors', () {
+      const result = Failure<int>('err', code: ErrorCode.fileNotFound);
+      expect(result.isRetryable, false);
+    });
+
+    test('isRetryable false for permission errors', () {
+      const result = Failure<int>('err', code: ErrorCode.permissionDenied);
+      expect(result.isRetryable, false);
+    });
   });
 
   group('ErrorCode', () {
@@ -77,6 +124,33 @@ void main() {
       expect(ErrorCode.values.contains(ErrorCode.conversionFailed), true);
       expect(ErrorCode.values.contains(ErrorCode.permissionDenied), true);
       expect(ErrorCode.values.contains(ErrorCode.serverError), true);
+      expect(ErrorCode.values.contains(ErrorCode.rateLimited), true);
+      expect(ErrorCode.values.contains(ErrorCode.offline), true);
+    });
+
+    test('userMessage returns Korean text', () {
+      expect(ErrorCode.networkError.userMessage, contains('네트워크'));
+      expect(ErrorCode.timeout.userMessage, contains('시간'));
+      expect(ErrorCode.rateLimited.userMessage, contains('요청'));
+    });
+  });
+
+  group('Extensions', () {
+    test('asSuccess wraps value', () {
+      final result = 42.asSuccess();
+      expect(result.isSuccess, true);
+      expect(result.valueOrNull, 42);
+    });
+
+    test('toResult catches exceptions', () async {
+      final future = Future<int>.error('test error');
+      final result = await future.toResult(
+        onError: (e) => 'caught: $e',
+        code: ErrorCode.unknown,
+      );
+      
+      expect(result.isFailure, true);
+      expect(result.errorOrNull, 'caught: test error');
     });
   });
 }
