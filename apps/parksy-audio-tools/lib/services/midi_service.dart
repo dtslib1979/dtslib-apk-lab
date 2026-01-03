@@ -23,6 +23,23 @@ class MidiService {
     receiveTimeout: AppConfig.apiReceiveTimeout,
   ));
 
+  /// Check server health - returns true if server responds
+  Future<bool> healthCheck() async {
+    if (!ConnectivityService.instance.isOnline) return false;
+    
+    try {
+      final response = await _dio.get(
+        '/health',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 5),
+        ),
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Convert MP3 to MIDI via server
   /// [source] is for analytics: 'capture' or 'file'
   Future<Result<String>> convert(String mp3Path, {String source = 'file'}) async {
