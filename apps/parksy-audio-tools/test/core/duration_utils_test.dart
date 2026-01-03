@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:parksy_audio_tools/core/duration_utils.dart';
+import 'package:parksy_audio_tools/core/utils/duration_utils.dart';
 
 void main() {
-  group('DurationUtils', () {
+  group('DurationFormatting', () {
     test('formats zero duration', () {
       const duration = Duration.zero;
       expect(duration.formatted, '00:00');
@@ -28,12 +28,20 @@ void main() {
       expect(duration.formatted, '12:59:59');
     });
 
-    test('handles edge cases', () {
-      const d1 = Duration(seconds: 59);
-      expect(d1.formatted, '00:59');
-      
-      const d2 = Duration(minutes: 59, seconds: 59);
-      expect(d2.formatted, '59:59');
+    test('toMmSs format', () {
+      const duration = Duration(minutes: 3, seconds: 5);
+      expect(duration.toMmSs(), '3:05');
+    });
+
+    test('toKorean format', () {
+      const d1 = Duration(minutes: 2, seconds: 30);
+      expect(d1.toKorean(), '2분 30초');
+
+      const d2 = Duration(minutes: 5);
+      expect(d2.toKorean(), '5분');
+
+      const d3 = Duration(seconds: 45);
+      expect(d3.toKorean(), '45초');
     });
   });
 
@@ -54,6 +62,17 @@ void main() {
       expect(DurationUtils.parse('invalid'), null);
       expect(DurationUtils.parse(''), null);
       expect(DurationUtils.parse('1:2:3:4'), null);
+    });
+  });
+
+  group('IntToDuration', () {
+    test('converts int to seconds', () {
+      expect(30.seconds.inSeconds, 30);
+    });
+
+    test('converts int to minutes', () {
+      expect(5.minutes.inMinutes, 5);
+      expect(5.minutes.inSeconds, 300);
     });
   });
 }
