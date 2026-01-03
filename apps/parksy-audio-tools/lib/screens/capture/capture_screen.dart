@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:system_audio_recorder/system_audio_recorder.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/duration_utils.dart';
+import '../../services/analytics_service.dart';
 import '../../services/audio_service.dart';
 import '../../services/file_manager.dart';
 import '../../services/midi_service.dart';
 import '../../services/permission_service.dart';
+import '../../widgets/offline_banner.dart';
 import '../../widgets/preset_selector.dart';
 import '../../widgets/result_card.dart';
 
@@ -20,12 +22,14 @@ class CaptureScreen extends StatefulWidget {
   State<CaptureScreen> createState() => _CaptureScreenState();
 }
 
-class _CaptureScreenState extends State<CaptureScreen> {
+class _CaptureScreenState extends State<CaptureScreen>
+    with OfflineAwareMixin {
   // Services
   final _audioService = AudioService.instance;
   final _midiService = MidiService.instance;
   final _fileManager = FileManager.instance;
   final _permissionService = PermissionService.instance;
+  final _analytics = AnalyticsService.instance;
 
   // State
   bool _isRecording = false;
@@ -41,6 +45,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
   String? _recordingPath;
 
   @override
+  void initState() {
+    super.initState();
+    _analytics.logScreenView('capture');
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
@@ -48,6 +58,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   /// Start recording with permission check
   Future<void> _startRecording() async {
+    // Offline check before starting
+    if (!checkOnlineStatus()) {
+      _showMessage('MIDI 변환에 인터넷 연결이 필요합니다');
+      return;
+    }
+
     // Check permissions
     final permResult = await _permissionService.requestCapturePermissions();
     if (!mounted) return;
@@ -98,6 +114,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
         return;
       }
 
+      _analytics.logRecordingStart(_presetSeconds);
+
       setState(() {
         _isRecording = true;
         _elapsedSeconds = 0;
@@ -135,6 +153,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
     try {
       final returnedPath = await SystemAudioRecorder.stopRecord();
 
+      _analytics.logRecordingComplete(_elapsedSeconds);
+
       setState(() {
         _isRecording = false;
         _isProcessing = true;
@@ -164,11 +184,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   /// Process recording: WAV → MP3 → MIDI
   Future<void> _processRecording(String wavPath) async {
+    final startTime = DateTime.now();
+    _analytics.logMidiConversionStart('capture');
+
     // Step 1: WAV → MP3
     setState(() => _statusMessage = 'MP3 변환 중...');
 
     final mp3Result = await _audioService.toMp3(wavPath);
     if (mp3Result.isFailure) {
+      _analytics.logMidiConversionError('mp3_failed');
       setState(() {
         _isProcessing = false;
         _statusMessage = mp3Result.errorOrNull ?? 'MP3 변환 실패';
@@ -183,6 +207,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
     final midiResult = await _midiService.convert(mp3Path);
     if (midiResult.isFailure) {
+      _analytics.logMidiConversionError('midi_failed');
       setState(() {
         _isProcessing = false;
         _statusMessage = midiResult.errorOrNull ?? 'MIDI 변환 실패';
@@ -192,6 +217,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
 
     // Success!
+    final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+    _analytics.logMidiConversionSuccess(elapsed);
+
     setState(() {
       _mp3Path = mp3Path;
       _midiPath = midiResult.valueOrNull;
