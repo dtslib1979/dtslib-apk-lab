@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import '../services/analytics_service.dart';
 
 class ResultCard extends StatelessWidget {
   final String? mp3Path;
@@ -13,11 +14,13 @@ class ResultCard extends StatelessWidget {
 
   Future<void> _shareMp3() async {
     if (mp3Path == null) return;
+    AnalyticsService.instance.logFileShare('mp3');
     await Share.shareXFiles([XFile(mp3Path!)]);
   }
 
   Future<void> _shareMidi() async {
     if (midiPath == null) return;
+    AnalyticsService.instance.logFileShare('midi');
     await Share.shareXFiles([XFile(midiPath!)]);
   }
 
