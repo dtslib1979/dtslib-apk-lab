@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import '../core/config/app_config.dart';
 import '../core/result/result.dart';
 import 'file_manager.dart';
+import 'analytics_service.dart';
+import 'connectivity_service.dart';
 
 /// MIDI conversion service via cloud API
 /// Uses Basic Pitch model on Cloud Run
@@ -13,6 +15,7 @@ class MidiService {
   MidiService._();
 
   final FileManager _fileManager = FileManager.instance;
+  final AnalyticsService _analytics = AnalyticsService.instance;
 
   late final Dio _dio = Dio(BaseOptions(
     baseUrl: AppConfig.midiServerUrl,
@@ -21,7 +24,16 @@ class MidiService {
   ));
 
   /// Convert MP3 to MIDI via server
-  Future<Result<String>> convert(String mp3Path) async {
+  /// [source] is for analytics: 'capture' or 'file'
+  Future<Result<String>> convert(String mp3Path, {String source = 'file'}) async {
+    // Check connectivity first
+    if (!ConnectivityService.instance.isOnline) {
+      return const Failure(
+        '인터넷 연결이 필요합니다',
+        code: ErrorCode.networkError,
+      );
+    }
+
     // Validate input
     if (!await _fileManager.exists(mp3Path)) {
       return const Failure(
@@ -39,6 +51,10 @@ class MidiService {
       );
     }
 
+    // Log conversion start
+    _analytics.logMidiConversionStart(source);
+    final stopwatch = Stopwatch()..start();
+
     try {
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(
@@ -54,6 +70,7 @@ class MidiService {
       );
 
       if (response.statusCode != 200) {
+        _analytics.logMidiConversionError('server_${response.statusCode}');
         return Failure(
           '서버 오류: ${response.statusCode}',
           code: ErrorCode.serverError,
@@ -63,6 +80,7 @@ class MidiService {
       // Validate response - handle both List<int> and Uint8List
       final data = response.data;
       if (data == null) {
+        _analytics.logMidiConversionError('empty_response');
         return const Failure(
           'MIDI 데이터가 비어있습니다',
           code: ErrorCode.conversionFailed,
@@ -76,6 +94,7 @@ class MidiService {
       } else if (data is List<int>) {
         midiBytes = Uint8List.fromList(data);
       } else {
+        _analytics.logMidiConversionError('invalid_response_type');
         return const Failure(
           '잘못된 응답 형식입니다',
           code: ErrorCode.conversionFailed,
@@ -83,6 +102,7 @@ class MidiService {
       }
 
       if (midiBytes.isEmpty) {
+        _analytics.logMidiConversionError('empty_midi');
         return const Failure(
           'MIDI 데이터가 비어있습니다',
           code: ErrorCode.conversionFailed,
@@ -96,13 +116,27 @@ class MidiService {
       );
 
       await File(midiPath).writeAsBytes(midiBytes);
+      
+      // Log success
+      stopwatch.stop();
+      _analytics.logMidiConversionSuccess(stopwatch.elapsedMilliseconds);
+      
       return Success(midiPath);
     } on DioException catch (e) {
+      stopwatch.stop();
+      final errorCode = _getDioErrorCode(e);
+      _analytics.logMidiConversionError(errorCode.name);
+      _analytics.recordError(e, e.stackTrace, reason: 'MIDI conversion failed');
+      
       return Failure(
         _parseDioError(e),
-        code: _getDioErrorCode(e),
+        code: errorCode,
       );
-    } catch (e) {
+    } catch (e, stack) {
+      stopwatch.stop();
+      _analytics.logMidiConversionError('unknown');
+      _analytics.recordError(e, stack, reason: 'MIDI conversion exception');
+      
       return Failure('MIDI 변환 실패: $e', code: ErrorCode.conversionFailed);
     }
   }
@@ -120,6 +154,7 @@ class MidiService {
       case DioExceptionType.badResponse:
         final code = e.response?.statusCode;
         if (code == 413) return '파일이 너무 큽니다';
+        if (code == 429) return '요청이 너무 많습니다. 잠시 후 다시 시도하세요';
         if (code == 500) return '서버 내부 오류';
         return '서버 오류: $code';
       default:
@@ -138,17 +173,6 @@ class MidiService {
       default:
         return ErrorCode.serverError;
     }
-  }
-
-  // === Legacy static method for backward compatibility ===
-  // TODO: Remove after all screens are refactored
-
-  static Future<String> convert_legacy(String mp3Path) async {
-    final result = await instance.convert(mp3Path);
-    return result.fold(
-      onSuccess: (path) => path,
-      onFailure: (error, _) => throw Exception(error),
-    );
   }
 }
 
