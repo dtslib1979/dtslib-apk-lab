@@ -1,7 +1,7 @@
 name: parksy_audio_tools
 description: Screen Audio Capture + MIDI Converter for AIVA
 publish_to: 'none'
-version: 2.1.0+5
+version: 2.1.0+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
