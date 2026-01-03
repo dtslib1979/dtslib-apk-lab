@@ -1,7 +1,7 @@
 name: parksy_audio_tools
 description: Screen Audio Capture + MIDI Converter for AIVA
 publish_to: 'none'
-version: 2.1.0+3
+version: 2.1.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -28,10 +28,10 @@ dependencies:
   dio: ^5.4.0
   connectivity_plus: ^5.0.2
   
-  # === MONITORING ===
-  firebase_core: ^2.24.2
-  firebase_crashlytics: ^3.4.9
-  firebase_analytics: ^10.7.4
+  # === MONITORING (disabled until google-services.json added) ===
+  # firebase_core: ^2.24.2
+  # firebase_crashlytics: ^3.4.9
+  # firebase_analytics: ^10.7.4
   
   # === UTILS ===
   intl: ^0.19.0
