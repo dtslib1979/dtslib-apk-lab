@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/file_manager.dart';
+import '../services/analytics_service.dart';
+import '../widgets/offline_banner.dart';
 import 'capture/capture_screen.dart';
 import 'converter/converter_screen.dart';
 import 'trimmer/trimmer_screen.dart';
@@ -23,11 +25,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     TrimmerScreen(),   // Legacy: File → WAV
   ];
 
+  static const _tabNames = ['capture', 'converter', 'trimmer'];
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _cleanupOnStart();
+    _logScreenView();
   }
 
   @override
@@ -42,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // App going to background - could save state here
     } else if (state == AppLifecycleState.resumed) {
       // App returning to foreground
+      _logScreenView();
     }
   }
 
@@ -53,13 +59,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _logScreenView() {
+    AnalyticsService.instance.logScreenView(_tabNames[_currentIndex]);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // IndexedStack preserves state of all tabs
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      // Offline banner wraps the main content
+      body: OfflineBanner(
+        child: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
@@ -89,5 +101,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _onTabSelected(int index) {
     if (index == _currentIndex) return;
     setState(() => _currentIndex = index);
+    _logScreenView();
   }
 }
