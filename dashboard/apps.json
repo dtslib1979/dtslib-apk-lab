@@ -1,22 +1,12 @@
 [
   {
-    "id": "parksy-audio-tools",
-    "name": "Parksy Audio Tools",
-    "version": "v2.0.0",
-    "description": "🎵 화면녹음 → MP3 → MIDI 변환 (AIVA용)",
-    "icon": "🎹",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-audio-tools/main/parksy-audio-tools-debug.zip",
-    "lastUpdated": "2026-01-03",
-    "featured": true
-  },
-  {
     "id": "parksy-axis",
     "name": "Parksy Axis",
     "version": "v5.2.0",
     "description": "방송용 사고 단계 오버레이 (FSM 상태 전이)",
     "icon": "🎯",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip",
-    "lastUpdated": "2025-12-31"
+    "lastUpdated": "2026-01-03"
   },
   {
     "id": "parksy-pen",
@@ -25,7 +15,7 @@
     "description": "S Pen 레이저펜 오버레이 판서 (Build #31)",
     "icon": "✍️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
-    "lastUpdated": "2025-12-31"
+    "lastUpdated": "2026-01-03"
   },
   {
     "id": "parksy-capture",
@@ -34,7 +24,7 @@
     "description": "텍스트 캡처 → GitHub 자동 아카이브",
     "icon": "💾",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
-    "lastUpdated": "2025-12-31"
+    "lastUpdated": "2026-01-03"
   },
   {
     "id": "parksy-subtitle",
@@ -43,7 +33,7 @@
     "description": "이중자막 오버레이",
     "icon": "🖊️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/overlay-dual-sub/main/overlay-dual-sub-debug.zip",
-    "lastUpdated": "2025-12-31"
+    "lastUpdated": "2026-01-03"
   },
   {
     "id": "parksy-aiva",
@@ -52,7 +42,7 @@
     "description": "AIVA MP3 무음 트리밍",
     "icon": "🎧",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
-    "lastUpdated": "2025-12-31"
+    "lastUpdated": "2026-01-03"
   },
   {
     "id": "parksy-tts",
@@ -61,6 +51,6 @@
     "description": "배치 TTS 생성기 (Google Cloud)",
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
-    "lastUpdated": "2025-12-31"
+    "lastUpdated": "2026-01-03"
   }
 ]
