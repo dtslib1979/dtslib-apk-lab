@@ -5,9 +5,14 @@ function renderApps(apps) {
 
     apps.forEach(app => {
         const card = document.createElement('div');
-        card.className = 'app-card';
+        card.className = 'app-card' + (app.featured ? ' featured' : '');
+
+        const badge = app.featured 
+            ? '<span class="featured-badge">✨ NEW</span>' 
+            : '';
 
         card.innerHTML = `
+            ${badge}
             <div class="app-icon">${app.icon}</div>
             <div class="app-name">${app.name}</div>
             <div class="app-desc">${app.description}</div>
