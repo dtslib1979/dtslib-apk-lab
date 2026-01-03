@@ -1,0 +1,70 @@
+# Flutter Web 빌드 후 Vercel 배포
+name: Deploy Parksy Audio Web
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'apps/parksy-audio-tools/**'
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/parksy-audio-tools
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+      
+      - name: Get dependencies
+        run: flutter pub get
+      
+      - name: Build Web
+        run: |
+          flutter build web --release --base-href /parksy-audio/
+          
+      - name: Create Vercel config
+        run: |
+          cat > build/web/vercel.json << 'EOF'
+          {
+            "rewrites": [
+              { "source": "/(.*)", "destination": "/index.html" }
+            ],
+            "headers": [
+              {
+                "source": "/(.*)",
+                "headers": [
+                  { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+                  { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+                ]
+              }
+            ]
+          }
+          EOF
+      
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+      
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          cd build/web
+          vercel deploy --prod --token=$VERCEL_TOKEN --yes --name=parksy-audio
+      
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parksy-audio-web
+          path: apps/parksy-audio-tools/build/web
+          retention-days: 7
