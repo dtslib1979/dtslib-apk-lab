@@ -3,9 +3,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/duration_utils.dart';
+import '../../services/analytics_service.dart';
 import '../../services/audio_service.dart';
 import '../../services/file_manager.dart';
 import '../../services/midi_service.dart';
+import '../../widgets/offline_banner.dart';
 import '../../widgets/preset_selector.dart';
 import '../../widgets/result_card.dart';
 
@@ -18,11 +20,13 @@ class ConverterScreen extends StatefulWidget {
   State<ConverterScreen> createState() => _ConverterScreenState();
 }
 
-class _ConverterScreenState extends State<ConverterScreen> {
+class _ConverterScreenState extends State<ConverterScreen>
+    with OfflineAwareMixin {
   // Services
   final _audioService = AudioService.instance;
   final _midiService = MidiService.instance;
   final _fileManager = FileManager.instance;
+  final _analytics = AnalyticsService.instance;
 
   // Source file
   String? _sourcePath;
@@ -40,6 +44,12 @@ class _ConverterScreenState extends State<ConverterScreen> {
   String? _midiPath;
 
   final _player = AudioPlayer();
+
+  @override
+  void initState() {
+    super.initState();
+    _analytics.logScreenView('converter');
+  }
 
   @override
   void dispose() {
@@ -90,10 +100,17 @@ class _ConverterScreenState extends State<ConverterScreen> {
   Future<void> _convert() async {
     if (_sourcePath == null) return;
 
+    // Offline check
+    if (!checkOnlineStatus()) return;
+
+    _analytics.logMidiConversionStart('file');
+
     setState(() {
       _isProcessing = true;
       _statusMessage = '트림 중...';
     });
+
+    final startTime = DateTime.now();
 
     // Step 1: Trim
     final trimResult = await _audioService.trim(
@@ -103,6 +120,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
     );
 
     if (trimResult.isFailure) {
+      _analytics.logMidiConversionError('trim_failed');
       setState(() {
         _isProcessing = false;
         _statusMessage = trimResult.errorOrNull ?? '트림 실패';
@@ -118,6 +136,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
     final mp3Result = await _audioService.toMp3(trimmedPath);
     if (mp3Result.isFailure) {
       await _fileManager.delete(trimmedPath);
+      _analytics.logMidiConversionError('mp3_failed');
       setState(() {
         _isProcessing = false;
         _statusMessage = mp3Result.errorOrNull ?? 'MP3 변환 실패';
@@ -135,6 +154,7 @@ class _ConverterScreenState extends State<ConverterScreen> {
 
     final midiResult = await _midiService.convert(mp3Path);
     if (midiResult.isFailure) {
+      _analytics.logMidiConversionError('midi_failed');
       setState(() {
         _isProcessing = false;
         _statusMessage = midiResult.errorOrNull ?? 'MIDI 변환 실패';
@@ -144,6 +164,9 @@ class _ConverterScreenState extends State<ConverterScreen> {
     }
 
     // Success!
+    final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+    _analytics.logMidiConversionSuccess(elapsed);
+
     setState(() {
       _mp3Path = mp3Path;
       _midiPath = midiResult.valueOrNull;
