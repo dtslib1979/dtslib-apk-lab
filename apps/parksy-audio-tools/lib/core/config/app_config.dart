@@ -10,6 +10,12 @@ abstract class AppConfig {
   // === Timeouts ===
   static const Duration apiConnectTimeout = Duration(seconds: 30);
   static const Duration apiReceiveTimeout = Duration(minutes: 5);
+  static const Duration healthCheckTimeout = Duration(seconds: 5);
+
+  // === Retry Policy ===
+  static const int maxRetries = 3;
+  static const Duration retryDelay = Duration(seconds: 2);
+  static const double retryBackoffMultiplier = 1.5;
 
   // === Audio Presets (AIVA compliant) ===
   static const List<int> presetDurations = [60, 120, 180]; // seconds
@@ -22,6 +28,7 @@ abstract class AppConfig {
   ];
   static const String tempFilePrefix = 'parksy_audio_';
   static const Duration tempFileMaxAge = Duration(hours: 24);
+  static const int maxFileSizeMb = 50;
 
   // === FFmpeg Quality ===
   static const int mp3Quality = 2; // 0-9, lower = better
@@ -30,4 +37,9 @@ abstract class AppConfig {
   // === Notifications ===
   static const String recordingNotificationTitle = 'Parksy Audio';
   static const String recordingNotificationMessage = '시스템 오디오 녹음 중...';
+
+  // === Feature Flags ===
+  static const bool enableAnalytics = true;
+  static const bool enableCrashlytics = true;
+  static const bool showDebugBanner = false;
 }
