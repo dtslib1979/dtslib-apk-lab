@@ -57,12 +57,50 @@ body {
     padding: 20px 16px;
     text-align: center;
     transition: all 0.3s ease;
+    position: relative;
 }
 
 .app-card:hover {
     transform: translateY(-4px);
     border-color: #4CAF50;
     box-shadow: 0 8px 24px rgba(76, 175, 80, 0.2);
+}
+
+/* Featured App Style */
+.app-card.featured {
+    border-color: #9C27B0;
+    background: linear-gradient(135deg, #1a0a1a 0%, #0d050d 100%);
+    box-shadow: 0 4px 20px rgba(156, 39, 176, 0.3);
+}
+
+.app-card.featured:hover {
+    border-color: #E040FB;
+    box-shadow: 0 8px 32px rgba(224, 64, 251, 0.4);
+}
+
+.featured-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #9C27B0 0%, #E040FB 100%);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(156, 39, 176, 0.5);
+}
+
+.app-card.featured .app-icon {
+    background: linear-gradient(135deg, #9C27B0 0%, #E040FB 100%);
+}
+
+.app-card.featured .download-btn {
+    background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+}
+
+.app-card.featured .download-btn:hover {
+    background: linear-gradient(135deg, #AB47BC 0%, #9C27B0 100%);
 }
 
 .app-icon {
@@ -102,6 +140,10 @@ body {
     padding: 2px 8px;
     border-radius: 4px;
     margin-bottom: 12px;
+}
+
+.app-card.featured .app-version {
+    color: #E040FB;
 }
 
 .download-btn {
