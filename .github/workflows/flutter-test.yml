@@ -1,0 +1,51 @@
+name: Flutter Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/parksy-audio-tools/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/parksy-audio-tools/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/parksy-audio-tools
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze --no-fatal-infos
+        continue-on-error: true
+
+      - name: Run unit tests
+        run: flutter test --coverage
+
+      - name: Check test coverage
+        run: |
+          if [ -f coverage/lcov.info ]; then
+            echo "Coverage report generated"
+            # Could add coverage threshold check here
+          fi
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        if: success()
+        with:
+          files: apps/parksy-audio-tools/coverage/lcov.info
+          fail_ci_if_error: false
