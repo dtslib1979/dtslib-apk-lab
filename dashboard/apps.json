@@ -1,5 +1,15 @@
 [
   {
+    "id": "parksy-audio-tools",
+    "name": "Parksy Audio Tools",
+    "version": "v2.0.0",
+    "description": "🎵 화면녹음 → MP3 → MIDI 변환 (AIVA용)",
+    "icon": "🎹",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-audio-tools/main/parksy-audio-tools-debug.zip",
+    "lastUpdated": "2026-01-03",
+    "featured": true
+  },
+  {
     "id": "parksy-axis",
     "name": "Parksy Axis",
     "version": "v5.2.0",
