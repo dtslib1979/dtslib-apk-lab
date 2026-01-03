@@ -1,5 +1,7 @@
-Build trigger: 2026-01-03T02:00:00Z
-Cycle: 2
+Build trigger: 2026-01-03T02:18:00Z
+Cycle: 3
 Changes:
-- Fixed MIDI server API endpoint (added /convert sync endpoint)
-- Added Cloud Run deployment workflow
+- Docker healthcheck fix (added curl)
+- Cloud Run optimization
+- Complete documentation (README, CHANGELOG, TESTING)
+- Main README update with featured app
