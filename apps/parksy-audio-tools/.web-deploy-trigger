@@ -1,0 +1,4 @@
+# Web Deploy Trigger
+timestamp: 2026-01-03T16:10:00Z
+version: 2.1.0+7
+trigger: manual
