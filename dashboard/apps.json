@@ -36,13 +36,13 @@
     "lastUpdated": "2026-01-03"
   },
   {
-    "id": "parksy-aiva",
-    "name": "Parksy AIVA",
-    "version": "v2.0.0",
-    "description": "AIVA MP3 무음 트리밍",
-    "icon": "🎧",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
-    "lastUpdated": "2026-01-03"
+    "id": "parksy-audio-tools",
+    "name": "Parksy Audio Tools",
+    "version": "v2.1.0",
+    "description": "화면 녹음→MIDI + 파일→MIDI + 트림 통합",
+    "icon": "🎵",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-audio-tools/main/parksy-audio-tools-debug.zip",
+    "lastUpdated": "2026-01-05"
   },
   {
     "id": "parksy-tts",
