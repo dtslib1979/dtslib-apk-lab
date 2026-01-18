@@ -43,12 +43,5 @@ async function loadApps() {
     }
 }
 
-// SW 등록
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('SW registered'))
-        .catch(err => console.log('SW failed:', err));
-}
-
 // 초기화
 document.addEventListener('DOMContentLoaded', loadApps);
