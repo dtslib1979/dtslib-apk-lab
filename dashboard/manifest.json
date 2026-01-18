@@ -4,8 +4,8 @@
     "description": "Parksy APK Download Store",
     "start_url": "https://dtslib-apk-lab.vercel.app/",
     "display": "browser",
-    "background_color": "#ffffff",
-    "theme_color": "#4CAF50",
+    "background_color": "#081c15",
+    "theme_color": "#52b788",
     "icons": [
         {
             "src": "icons/icon-192.png",
