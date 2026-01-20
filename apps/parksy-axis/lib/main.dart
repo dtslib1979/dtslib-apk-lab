@@ -5,8 +5,12 @@ import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
-/// Parksy Axis v5.2.0
+/// Parksy Axis v5.3.0
 /// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
+///
+/// v5.3.0: 오버레이 설정 동기화 버그 수정
+///   - loadFresh()로 항상 최신 설정 로드
+///   - SharedPreferences.reload() 추가
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +46,8 @@ class _OverlayAppState extends State<_OverlayApp> {
   }
 
   Future<void> _load() async {
-    _cfg = await SettingsService.load();
+    // 오버레이는 항상 최신 설정을 SharedPreferences에서 직접 로드
+    _cfg = await SettingsService.loadFresh();
     _currentScale = _cfg!.overlayScale;
     _currentW = (_cfg!.width * _currentScale).toInt();
     _currentH = (_cfg!.height * _currentScale).toInt();

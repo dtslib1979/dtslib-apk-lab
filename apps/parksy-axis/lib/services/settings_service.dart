@@ -84,9 +84,17 @@ class SettingsService {
   static const _key = 'axis_v5';
   static AxisSettings? _cache;
 
+  /// 일반 로드 (캐시 사용)
   static Future<AxisSettings> load() async {
     if (_cache != null) return _cache!;
+    return loadFresh();
+  }
+
+  /// 강제 새로고침 (오버레이용 - 캐시 무시, SharedPreferences reload)
+  static Future<AxisSettings> loadFresh() async {
     final prefs = await SharedPreferences.getInstance();
+    // SharedPreferences 네이티브 캐시 새로고침
+    await prefs.reload();
     final raw = prefs.getString(_key);
     if (raw != null) {
       try {
@@ -104,6 +112,8 @@ class SettingsService {
     _cache = s;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, jsonEncode(s.toJson()));
+    // 저장 후 즉시 동기화 보장
+    await prefs.reload();
   }
 
   static void clear() => _cache = null;

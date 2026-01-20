@@ -1,4 +1,4 @@
-# Parksy Axis v5.0.0
+# Parksy Axis v5.3.0
 
 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 
@@ -10,6 +10,13 @@
 - 📐 반응형 스케일: scale = (w/260 + h/300) / 2
 - 🔧 실시간 커스터마이징
 - 📍 4방향 오버레이 위치
+
+## Changelog
+
+### v5.3.0
+- 🐛 **버그 수정**: 편집한 설정이 오버레이에 반영 안 되던 문제 해결
+- ✨ `loadFresh()` 추가: 오버레이 시작 시 항상 최신 설정 로드
+- 🔄 `SharedPreferences.reload()` 호출로 네이티브 캐시 동기화
 
 ## Architecture
 
