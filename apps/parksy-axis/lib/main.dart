@@ -5,9 +5,12 @@ import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
-/// Parksy Axis v5.3.0
+/// Parksy Axis v5.3.1
 /// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 ///
+/// v5.3.1: 오버레이 시작 전 설정 강제 저장
+///   - 오버레이 시작 직전 현재 설정을 SharedPreferences에 저장
+///   - 100ms 딜레이로 저장 완료 보장
 /// v5.3.0: 오버레이 설정 동기화 버그 수정
 ///   - loadFresh()로 항상 최신 설정 로드
 ///   - SharedPreferences.reload() 추가
