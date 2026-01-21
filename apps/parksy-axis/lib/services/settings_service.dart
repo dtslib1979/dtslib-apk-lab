@@ -105,8 +105,6 @@ class AxisTemplate {
 /// v7: 파일 기반 설정 서비스 (프로세스 간 동기화 보장)
 class SettingsService {
   static const _fileName = 'axis_overlay_config.json';
-  static const _templatesFileName = 'axis_templates.json';
-  static const _selectedFileName = 'axis_selected.txt';
 
   /// 앱 문서 디렉토리 경로
   static Future<String> get _dirPath async {
