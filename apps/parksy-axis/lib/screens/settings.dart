@@ -4,7 +4,9 @@ import '../models/theme.dart';
 import '../widgets/tree_view.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final AxisSettings initial;
+
+  const SettingsScreen({super.key, required this.initial});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -12,26 +14,65 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late AxisSettings _cfg;
-  bool _loading = true;
   final _rootCtrl = TextEditingController();
   int _preview = 0;
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    _cfg = await SettingsService.load();
+    _cfg = widget.initial.copy();
     _rootCtrl.text = _cfg.rootName;
-    setState(() => _loading = false);
   }
 
-  Future<void> _save() async {
+  void _saveAsTemplate() {
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('템플릿으로 저장', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: '템플릿 이름',
+            hintStyle: TextStyle(color: Colors.grey[600]),
+            filled: true,
+            fillColor: Colors.grey[800],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _cfg.rootName = _rootCtrl.text;
+              Navigator.pop(context, {
+                'settings': _cfg,
+                'name': nameCtrl.text,
+              });
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyWithoutSaving() {
     _cfg.rootName = _rootCtrl.text;
-    await SettingsService.save(_cfg);
-    if (mounted) Navigator.pop(context, true);
+    Navigator.pop(context, {
+      'settings': _cfg,
+      'name': null, // 이름 없으면 템플릿으로 저장 안 함
+    });
   }
 
   void _addStage() => _input('스테이지 추가', '', (v) {
@@ -56,14 +97,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(title),
+        backgroundColor: Colors.grey[900],
+        title: Text(title, style: const TextStyle(color: Colors.white)),
         content: TextField(
           controller: c,
           autofocus: true,
-          decoration: const InputDecoration(hintText: '이름'),
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: '이름',
+            hintStyle: TextStyle(color: Colors.grey[600]),
+            filled: true,
+            fillColor: Colors.grey[800],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
           TextButton(
             onPressed: () {
               ok(c.text);
@@ -78,10 +133,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     final t = AxisTheme.byId(_cfg.themeId);
     final f = AxisFont.byId(_cfg.fontId);
 
@@ -91,7 +142,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('커스터마이징'),
         backgroundColor: Colors.black,
         actions: [
-          IconButton(icon: Icon(Icons.check, color: t.accent), onPressed: _save),
+          IconButton(
+            icon: const Icon(Icons.check),
+            color: t.accent,
+            onPressed: _applyWithoutSaving,
+            tooltip: '적용 (저장 안 함)',
+          ),
+          IconButton(
+            icon: const Icon(Icons.save),
+            color: Colors.green,
+            onPressed: _saveAsTemplate,
+            tooltip: '템플릿으로 저장',
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -135,9 +197,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: BoxDecoration(
                       color: x.accent,
                       borderRadius: BorderRadius.circular(12),
-                      border: sel ? Border.all(color: Colors.white, width: 3) : null,
+                      border:
+                          sel ? Border.all(color: Colors.white, width: 3) : null,
                     ),
-                    child: sel ? const Icon(Icons.check, color: Colors.black) : null,
+                    child: sel
+                        ? const Icon(Icons.check, color: Colors.black)
+                        : null,
                   ),
                 );
               }).toList(),
@@ -206,7 +271,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.grey[900],
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -217,7 +283,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _sec('스테이지', t.accent),
-                IconButton(icon: Icon(Icons.add, color: t.accent), onPressed: _addStage),
+                IconButton(
+                  icon: Icon(Icons.add, color: t.accent),
+                  onPressed: _addStage,
+                ),
               ],
             ),
             ReorderableListView.builder(
@@ -236,7 +305,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 tileColor: Colors.grey[900],
                 leading: Icon(Icons.drag_handle, color: t.dim),
                 title: Text(_cfg.stages[i],
-                    style: TextStyle(color: Colors.white, fontFamily: f.family)),
+                    style:
+                        TextStyle(color: Colors.white, fontFamily: f.family)),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -261,10 +331,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _sec(String t, Color c) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: Text(t, style: TextStyle(color: c, fontSize: 16, fontWeight: FontWeight.bold)),
+        child: Text(t,
+            style:
+                TextStyle(color: c, fontSize: 16, fontWeight: FontWeight.bold)),
       );
 
-  Widget _slider(String lbl, double val, double min, double max, ValueChanged<double> fn,
+  Widget _slider(
+      String lbl, double val, double min, double max, ValueChanged<double> fn,
       {bool pct = false}) {
     final disp = pct ? '${(val * 100).toInt()}%' : val.toStringAsFixed(1);
     return Column(

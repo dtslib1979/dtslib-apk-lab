@@ -46,13 +46,10 @@ class _OverlayAppState extends State<_OverlayApp> {
   }
 
   Future<void> _load() async {
-    // 오버레이 시작 직후 약간의 딜레이 (메인 앱 저장 완료 대기)
-    await Future.delayed(const Duration(milliseconds: 200));
-    // 오버레이는 항상 최신 설정을 SharedPreferences에서 직접 로드
-    _cfg = await SettingsService.loadFresh();
-    // 혹시 모르니 한번 더 로드
-    await Future.delayed(const Duration(milliseconds: 100));
-    _cfg = await SettingsService.loadFresh();
+    // 오버레이 시작 직후 딜레이 (메인 앱 저장 완료 대기)
+    await Future.delayed(const Duration(milliseconds: 300));
+    // 활성 설정 로드 (TemplateService 사용)
+    _cfg = await TemplateService.getActiveSettings();
     _currentScale = _cfg!.overlayScale;
     _currentW = (_cfg!.width * _currentScale).toInt();
     _currentH = (_cfg!.height * _currentScale).toInt();
