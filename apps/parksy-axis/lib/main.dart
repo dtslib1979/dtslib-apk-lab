@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'app.dart';
 import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
-/// Parksy Axis v6.0.0
+/// Parksy Axis v7.0.0
 /// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 ///
-/// v6.0.0: 설정 동기화 완전 재설계
-///   - 저장 2회 + 딜레이 500ms 보장
-///   - 오버레이 로드 전 딜레이 + 2회 로드
+/// v7.0.0: 파일 기반 설정 동기화 + 핀치 줌 개선
+///   - JSON 파일 직접 저장으로 프로세스 간 동기화 보장
+///   - RawGestureDetector로 핀치 줌 충돌 해결
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,13 +47,18 @@ class _OverlayAppState extends State<_OverlayApp> {
   }
 
   Future<void> _load() async {
-    // 오버레이 시작 직후 딜레이 (메인 앱 저장 완료 대기)
-    await Future.delayed(const Duration(milliseconds: 300));
-    // 활성 설정 로드 (TemplateService 사용)
-    _cfg = await TemplateService.getActiveSettings();
+    debugPrint('[Overlay] _load() called');
+    
+    // 파일 시스템에서 설정 로드 (프로세스 간 동기화 보장)
+    _cfg = await SettingsService.loadForOverlay();
+    
+    debugPrint('[Overlay] loaded config: $_cfg');
+    debugPrint('[Overlay] stages: ${_cfg?.stages}');
+    
     _currentScale = _cfg!.overlayScale;
     _currentW = (_cfg!.width * _currentScale).toInt();
     _currentH = (_cfg!.height * _currentScale).toInt();
+    
     setState(() => _init = false);
   }
 
@@ -67,23 +73,28 @@ class _OverlayAppState extends State<_OverlayApp> {
 
   /// 핀치 줌 시작
   void _onScaleStart(ScaleStartDetails d) {
-    _baseScale = _currentScale;
+    if (d.pointerCount >= 2) {
+      _baseScale = _currentScale;
+      debugPrint('[Overlay] pinch start: scale=$_baseScale');
+    }
   }
 
-  /// 핀치 줌 처리 (창 크기 조절 방식)
+  /// 핀치 줌 처리
   void _onScaleUpdate(ScaleUpdateDetails d) {
-    final target = (_baseScale * d.scale).clamp(0.5, 2.5);
-    _currentScale = _currentScale + (target - _currentScale) * 0.3;
-    _currentW = (_cfg!.width * _currentScale).toInt();
-    _currentH = (_cfg!.height * _currentScale).toInt();
-    FlutterOverlayWindow.resizeOverlay(_currentW, _currentH, true);
-    setState(() {});
+    if (d.pointerCount >= 2) {
+      final target = (_baseScale * d.scale).clamp(0.5, 2.5);
+      _currentScale = _currentScale + (target - _currentScale) * 0.3;
+      _currentW = (_cfg!.width * _currentScale).toInt();
+      _currentH = (_cfg!.height * _currentScale).toInt();
+      FlutterOverlayWindow.resizeOverlay(_currentW, _currentH, true);
+      setState(() {});
+    }
   }
 
   /// 핀치 줌 종료 시 저장
   Future<void> _onScaleEnd(ScaleEndDetails d) async {
-    _cfg!.overlayScale = _currentScale;
-    await SettingsService.save(_cfg!);
+    debugPrint('[Overlay] pinch end: scale=$_currentScale');
+    await SettingsService.saveScale(_currentScale);
   }
 
   @override
@@ -91,7 +102,12 @@ class _OverlayAppState extends State<_OverlayApp> {
     if (_init || _cfg == null) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: Container(color: Colors.transparent),
+        home: Container(
+          color: Colors.black54,
+          child: const Center(
+            child: CircularProgressIndicator(color: Colors.amber),
+          ),
+        ),
       );
     }
 
@@ -102,10 +118,24 @@ class _OverlayAppState extends State<_OverlayApp> {
       debugShowCheckedModeBanner: false,
       home: Material(
         color: Colors.transparent,
-        child: GestureDetector(
-          onScaleStart: _onScaleStart,
-          onScaleUpdate: _onScaleUpdate,
-          onScaleEnd: _onScaleEnd,
+        child: RawGestureDetector(
+          gestures: <Type, GestureRecognizerFactory>{
+            ScaleGestureRecognizer: GestureRecognizerFactoryWithHandlers<ScaleGestureRecognizer>(
+              () => ScaleGestureRecognizer(),
+              (instance) {
+                instance
+                  ..onStart = _onScaleStart
+                  ..onUpdate = _onScaleUpdate
+                  ..onEnd = _onScaleEnd;
+              },
+            ),
+            TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+              () => TapGestureRecognizer(),
+              (instance) {
+                instance.onTap = _next;
+              },
+            ),
+          },
           child: SizedBox(
             width: _currentW.toDouble(),
             height: _currentH.toDouble(),

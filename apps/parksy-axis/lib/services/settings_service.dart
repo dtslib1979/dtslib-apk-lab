@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 설정 모델 - v6 스키마
+/// 설정 모델 - v7 스키마
 class AxisSettings {
   String rootName;
   List<String> stages;
@@ -65,13 +68,16 @@ class AxisSettings {
         strokeWidth: strokeWidth,
         overlayScale: overlayScale,
       );
+
+  @override
+  String toString() => 'AxisSettings(root: $rootName, stages: $stages, theme: $themeId)';
 }
 
 /// 템플릿 모델
 class AxisTemplate {
   final String id;
   final String name;
-  final bool isPreset; // true = 기본 프리셋, false = 사용자 저장
+  final bool isPreset;
   final AxisSettings settings;
 
   AxisTemplate({
@@ -96,11 +102,74 @@ class AxisTemplate {
       );
 }
 
+/// v7: 파일 기반 설정 서비스 (프로세스 간 동기화 보장)
+class SettingsService {
+  static const _fileName = 'axis_overlay_config.json';
+  static const _templatesFileName = 'axis_templates.json';
+  static const _selectedFileName = 'axis_selected.txt';
+
+  /// 앱 문서 디렉토리 경로
+  static Future<String> get _dirPath async {
+    final dir = await getApplicationDocumentsDirectory();
+    return dir.path;
+  }
+
+  /// 오버레이용 설정 파일 경로
+  static Future<File> get _configFile async {
+    final path = await _dirPath;
+    return File('$path/$_fileName');
+  }
+
+  /// 오버레이용 설정 저장 (메인 앱에서 호출)
+  static Future<void> saveForOverlay(AxisSettings s) async {
+    try {
+      final file = await _configFile;
+      final json = jsonEncode(s.toJson());
+      await file.writeAsString(json, flush: true);
+      debugPrint('[SettingsService] saveForOverlay: $s');
+      debugPrint('[SettingsService] saved to: ${file.path}');
+    } catch (e) {
+      debugPrint('[SettingsService] saveForOverlay ERROR: $e');
+    }
+  }
+
+  /// 오버레이용 설정 로드 (오버레이에서 호출)
+  static Future<AxisSettings> loadForOverlay() async {
+    try {
+      final file = await _configFile;
+      debugPrint('[SettingsService] loadForOverlay from: ${file.path}');
+      
+      if (await file.exists()) {
+        final json = await file.readAsString();
+        debugPrint('[SettingsService] loaded json: $json');
+        final settings = AxisSettings.fromJson(jsonDecode(json));
+        debugPrint('[SettingsService] parsed: $settings');
+        return settings;
+      } else {
+        debugPrint('[SettingsService] file not found, using defaults');
+      }
+    } catch (e) {
+      debugPrint('[SettingsService] loadForOverlay ERROR: $e');
+    }
+    return AxisSettings();
+  }
+
+  /// 오버레이 스케일만 저장 (핀치 줌 후)
+  static Future<void> saveScale(double scale) async {
+    try {
+      final settings = await loadForOverlay();
+      settings.overlayScale = scale;
+      await saveForOverlay(settings);
+    } catch (e) {
+      debugPrint('[SettingsService] saveScale ERROR: $e');
+    }
+  }
+}
+
 /// 템플릿 서비스
 class TemplateService {
-  static const _templatesKey = 'axis_templates_v6';
-  static const _selectedKey = 'axis_selected_v6';
-  static const _activeKey = 'axis_active_v6'; // 오버레이용 활성 설정
+  static const _templatesKey = 'axis_templates_v7';
+  static const _selectedKey = 'axis_selected_v7';
 
   /// 기본 프리셋
   static List<AxisTemplate> get presets => [
@@ -166,7 +235,6 @@ class TemplateService {
   /// 사용자 템플릿 저장
   static Future<void> saveUserTemplate(AxisTemplate t) async {
     final templates = await loadUserTemplates();
-    // 같은 ID 있으면 교체
     final idx = templates.indexWhere((e) => e.id == t.id);
     if (idx >= 0) {
       templates[idx] = t;
@@ -178,7 +246,6 @@ class TemplateService {
       _templatesKey,
       jsonEncode(templates.map((e) => e.toJson()).toList()),
     );
-    await prefs.reload();
   }
 
   /// 사용자 템플릿 삭제
@@ -190,7 +257,6 @@ class TemplateService {
       _templatesKey,
       jsonEncode(templates.map((e) => e.toJson()).toList()),
     );
-    await prefs.reload();
   }
 
   /// 모든 템플릿 (프리셋 + 사용자)
@@ -203,7 +269,6 @@ class TemplateService {
   static Future<void> setSelectedId(String id) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_selectedKey, id);
-    await prefs.reload();
   }
 
   /// 선택된 템플릿 ID 로드
@@ -212,63 +277,4 @@ class TemplateService {
     await prefs.reload();
     return prefs.getString(_selectedKey) ?? 'default';
   }
-
-  /// 활성 설정 저장 (오버레이 시작 직전 호출)
-  static Future<void> setActiveSettings(AxisSettings s) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_activeKey, jsonEncode(s.toJson()));
-    await prefs.reload();
-    // 추가 동기화
-    await Future.delayed(const Duration(milliseconds: 100));
-    await prefs.reload();
-  }
-
-  /// 활성 설정 로드 (오버레이에서 호출)
-  static Future<AxisSettings> getActiveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.reload();
-    final raw = prefs.getString(_activeKey);
-    if (raw != null) {
-      try {
-        return AxisSettings.fromJson(jsonDecode(raw));
-      } catch (_) {}
-    }
-    return AxisSettings();
-  }
-}
-
-/// 하위 호환성을 위한 기존 SettingsService (deprecated)
-class SettingsService {
-  static const _key = 'axis_v5';
-  static AxisSettings? _cache;
-
-  static Future<AxisSettings> load() async {
-    if (_cache != null) return _cache!;
-    return loadFresh();
-  }
-
-  static Future<AxisSettings> loadFresh() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.reload();
-    final raw = prefs.getString(_key);
-    if (raw != null) {
-      try {
-        _cache = AxisSettings.fromJson(jsonDecode(raw));
-      } catch (_) {
-        _cache = AxisSettings();
-      }
-    } else {
-      _cache = AxisSettings();
-    }
-    return _cache!;
-  }
-
-  static Future<void> save(AxisSettings s) async {
-    _cache = s;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(s.toJson()));
-    await prefs.reload();
-  }
-
-  static void clear() => _cache = null;
 }

@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       (e) => e.id == _selectedId,
       orElse: () => _templates.first,
     );
-    _preview = t.settings;
+    _preview = t.settings.copy();
   }
 
   Future<void> _checkPerm() async {
@@ -90,19 +90,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await FlutterOverlayWindow.closeOverlay();
     } else {
       if (_preview != null) {
-        // 선택된 템플릿 설정을 활성 설정으로 저장
-        await TemplateService.setActiveSettings(_preview!);
-        // 동기화 대기
-        await Future.delayed(const Duration(milliseconds: 300));
+        // v7: 파일로 설정 저장 (프로세스 간 동기화 보장)
+        debugPrint('[Home] saving settings for overlay: $_preview');
+        await SettingsService.saveForOverlay(_preview!);
+        
+        // 파일 쓰기 완료 대기
+        await Future.delayed(const Duration(milliseconds: 100));
       }
+      
+      final w = (_preview?.width ?? 260) * (_preview?.overlayScale ?? 1.0);
+      final h = (_preview?.height ?? 300) * (_preview?.overlayScale ?? 1.0);
+      
       await FlutterOverlayWindow.showOverlay(
-        height: _preview?.height ?? 300,
-        width: _preview?.width ?? 260,
+        height: h.toInt(),
+        width: w.toInt(),
         alignment: _align(),
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
         overlayTitle: 'Parksy Axis',
-        overlayContent: 'v6.0.0',
+        overlayContent: 'v7.0.0',
       );
     }
     _on = await FlutterOverlayWindow.isActive();
@@ -126,9 +132,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+    
     if (result != null) {
       final saved = result['settings'] as AxisSettings;
       final name = result['name'] as String?;
+      final applyNow = result['applyNow'] as bool? ?? false;
+
+      debugPrint('[Home] settings result: name=$name, applyNow=$applyNow');
+      debugPrint('[Home] settings: $saved');
 
       if (name != null && name.isNotEmpty) {
         // 새 템플릿으로 저장
@@ -143,6 +154,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _selectedId = id;
         await TemplateService.setSelectedId(id);
       }
+      
+      // v7: 체크 버튼이든 저장 버튼이든 항상 설정 적용
+      _preview = saved.copy();
+      
+      // 오버레이용 설정 파일 저장
+      await SettingsService.saveForOverlay(saved);
+      debugPrint('[Home] settings saved for overlay');
 
       await _loadTemplates();
     }
@@ -210,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'v6.0.0',
+                'v7.0.0',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ),

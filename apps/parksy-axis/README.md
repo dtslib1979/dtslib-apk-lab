@@ -1,4 +1,4 @@
-# Parksy Axis v6.0.0
+# Parksy Axis v7.0.0
 
 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 
@@ -10,28 +10,35 @@
 - 📐 반응형 스케일: scale = (w/260 + h/300) / 2
 - 🔧 실시간 커스터마이징
 - 📍 4방향 오버레이 위치
+- 👆 핀치 줌: 태블릿에서 두 손가락으로 크기 조절
 
 ## Changelog
 
+### v7.0.0
+- 🔄 **파일 기반 설정 동기화**: SharedPreferences → JSON 파일 직접 저장
+- ✨ **핀치 줌 개선**: RawGestureDetector로 태블릿 호환성 향상
+- 🐛 **설정 적용 버그 수정**: 체크 버튼 누르면 즉시 저장 및 적용
+- 📦 `path_provider` 의존성 추가
+
+### v6.0.0
+- 템플릿 시스템 도입 (프리셋 4개, 사용자 템플릿)
+
 ### v5.3.1
-- 🔧 **설정 동기화 강화**: 오버레이 시작 전 현재 설정 강제 저장
-- ⏱️ 100ms 딜레이로 저장 완료 보장 후 오버레이 실행
+- 설정 동기화 강화: 오버레이 시작 전 현재 설정 강제 저장
 
 ### v5.3.0
-- 🐛 **버그 수정**: 편집한 설정이 오버레이에 반영 안 되던 문제 해결
-- ✨ `loadFresh()` 추가: 오버레이 시작 시 항상 최신 설정 로드
-- 🔄 `SharedPreferences.reload()` 호출로 네이티브 캐시 동기화
+- `loadFresh()` 추가: 오버레이 시작 시 항상 최신 설정 로드
 
 ## Architecture
 
 ```
 lib/
-├── main.dart          # Entry + Overlay FSM
+├── main.dart          # Entry + Overlay FSM (RawGestureDetector)
 ├── app.dart           # MaterialApp
 ├── models/
 │   └── theme.dart     # AxisTheme + AxisFont
 ├── services/
-│   └── settings_service.dart  # SharedPrefs wrapper
+│   └── settings_service.dart  # 파일 기반 설정 저장/로드
 ├── screens/
 │   ├── home.dart      # Main UI
 │   └── settings.dart  # Customization

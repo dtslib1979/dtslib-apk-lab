@@ -55,9 +55,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               _cfg.rootName = _rootCtrl.text;
+              // v7: 템플릿 저장 + 즉시 적용
               Navigator.pop(context, {
                 'settings': _cfg,
                 'name': nameCtrl.text,
+                'applyNow': true,
               });
             },
             child: const Text('저장'),
@@ -67,11 +69,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _applyWithoutSaving() {
+  /// v7: 체크 버튼 - 설정을 저장하고 즉시 적용
+  void _applyAndSave() {
     _cfg.rootName = _rootCtrl.text;
+    debugPrint('[Settings] _applyAndSave: $_cfg');
     Navigator.pop(context, {
       'settings': _cfg,
-      'name': null, // 이름 없으면 템플릿으로 저장 안 함
+      'name': null,
+      'applyNow': true,
     });
   }
 
@@ -142,12 +147,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('커스터마이징'),
         backgroundColor: Colors.black,
         actions: [
+          // v7: 체크 버튼 - 저장 + 적용
           IconButton(
             icon: const Icon(Icons.check),
             color: t.accent,
-            onPressed: _applyWithoutSaving,
-            tooltip: '적용 (저장 안 함)',
+            onPressed: _applyAndSave,
+            tooltip: '저장 및 적용',
           ),
+          // 저장 버튼 - 템플릿으로 저장
           IconButton(
             icon: const Icon(Icons.save),
             color: Colors.green,
