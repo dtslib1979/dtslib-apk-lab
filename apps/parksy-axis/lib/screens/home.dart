@@ -80,9 +80,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } else {
       // 오버레이 시작 전 현재 설정 강제 저장 (동기화 보장)
       if (_cfg != null) {
+        // 1차 저장
         await SettingsService.save(_cfg!);
-        // 저장 완료 대기
-        await Future.delayed(const Duration(milliseconds: 100));
+        // 디스크 동기화 대기
+        await Future.delayed(const Duration(milliseconds: 300));
+        // 2차 저장 (확실하게)
+        await SettingsService.save(_cfg!);
+        // 최종 대기
+        await Future.delayed(const Duration(milliseconds: 200));
       }
       await FlutterOverlayWindow.showOverlay(
         height: _cfg?.height ?? 300,
@@ -91,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
         overlayTitle: 'Parksy Axis',
-        overlayContent: 'v5.3.0',
+        overlayContent: 'v6.0.0',
       );
     }
     _on = await FlutterOverlayWindow.isActive();
@@ -145,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'v5.3.1',
+                'v6.0.0',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ),

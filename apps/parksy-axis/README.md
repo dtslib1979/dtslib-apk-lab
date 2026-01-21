@@ -1,4 +1,4 @@
-# Parksy Axis v5.3.1
+# Parksy Axis v6.0.0
 
 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 

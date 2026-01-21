@@ -5,15 +5,12 @@ import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
-/// Parksy Axis v5.3.1
+/// Parksy Axis v6.0.0
 /// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 ///
-/// v5.3.1: 오버레이 시작 전 설정 강제 저장
-///   - 오버레이 시작 직전 현재 설정을 SharedPreferences에 저장
-///   - 100ms 딜레이로 저장 완료 보장
-/// v5.3.0: 오버레이 설정 동기화 버그 수정
-///   - loadFresh()로 항상 최신 설정 로드
-///   - SharedPreferences.reload() 추가
+/// v6.0.0: 설정 동기화 완전 재설계
+///   - 저장 2회 + 딜레이 500ms 보장
+///   - 오버레이 로드 전 딜레이 + 2회 로드
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,7 +46,12 @@ class _OverlayAppState extends State<_OverlayApp> {
   }
 
   Future<void> _load() async {
+    // 오버레이 시작 직후 약간의 딜레이 (메인 앱 저장 완료 대기)
+    await Future.delayed(const Duration(milliseconds: 200));
     // 오버레이는 항상 최신 설정을 SharedPreferences에서 직접 로드
+    _cfg = await SettingsService.loadFresh();
+    // 혹시 모르니 한번 더 로드
+    await Future.delayed(const Duration(milliseconds: 100));
     _cfg = await SettingsService.loadFresh();
     _currentScale = _cfg!.overlayScale;
     _currentW = (_cfg!.width * _currentScale).toInt();
