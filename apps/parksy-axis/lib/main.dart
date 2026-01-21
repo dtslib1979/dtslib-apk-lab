@@ -6,12 +6,11 @@ import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
-/// Parksy Axis v7.0.0
+/// Parksy Axis v7.1
 /// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 ///
-/// v7.0.0: 파일 기반 설정 동기화 + 핀치 줌 개선
-///   - JSON 파일 직접 저장으로 프로세스 간 동기화 보장
-///   - RawGestureDetector로 핀치 줌 충돌 해결
+/// v7.1: 파일 쓰기 딜레이 증가 (100ms → 300ms)
+/// v7.0: 파일 기반 설정 동기화 + 핀치 줌 개선
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
