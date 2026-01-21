@@ -88,19 +88,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _toggle() async {
     if (_on) {
       await FlutterOverlayWindow.closeOverlay();
+      // v7.2: 오버레이 종료 후 딜레이 (재시작 문제 수정)
+      await Future.delayed(const Duration(milliseconds: 300));
     } else {
       if (_preview != null) {
         // v7: 파일로 설정 저장 (프로세스 간 동기화 보장)
         debugPrint('[Home] saving settings for overlay: $_preview');
         await SettingsService.saveForOverlay(_preview!);
-        
-        // 파일 쓰기 완료 대기 (v7.1: 딜레이 증가)
+
+        // 파일 쓰기 완료 대기
         await Future.delayed(const Duration(milliseconds: 300));
       }
-      
+
       final w = (_preview?.width ?? 260) * (_preview?.overlayScale ?? 1.0);
       final h = (_preview?.height ?? 300) * (_preview?.overlayScale ?? 1.0);
-      
+
       await FlutterOverlayWindow.showOverlay(
         height: h.toInt(),
         width: w.toInt(),
@@ -108,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         enableDrag: true,
         flag: OverlayFlag.defaultFlag,
         overlayTitle: 'Parksy Axis',
-        overlayContent: 'v7.1',
+        overlayContent: 'v7.2',
       );
     }
     _on = await FlutterOverlayWindow.isActive();
@@ -155,14 +157,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         await TemplateService.setSelectedId(id);
       }
       
-      // v7: 체크 버튼이든 저장 버튼이든 항상 설정 적용
+      // v7.2: 설정 적용 - _loadTemplates() 호출하지 않음 (버그 수정)
+      // _loadTemplates()가 _updatePreview()를 호출해서 _preview를 템플릿 원본으로 덮어쓰는 버그 있었음
       _preview = saved.copy();
-      
+
       // 오버레이용 설정 파일 저장
       await SettingsService.saveForOverlay(saved);
-      debugPrint('[Home] settings saved for overlay');
+      debugPrint('[Home] settings saved for overlay: $_preview');
 
-      await _loadTemplates();
+      // 새 템플릿 저장한 경우에만 템플릿 목록 새로고침
+      if (name != null && name.isNotEmpty) {
+        await _loadTemplates();
+        // 중요: _loadTemplates() 후 _preview 복원 (덮어쓰기 방지)
+        _preview = saved.copy();
+      }
     }
   }
 
@@ -228,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'v7.1',
+                'v7.2',
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ),

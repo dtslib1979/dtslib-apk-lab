@@ -6,9 +6,10 @@ import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
 import 'models/theme.dart';
 
-/// Parksy Axis v7.1
+/// Parksy Axis v7.2
 /// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 ///
+/// v7.2: 설정 적용 버그 수정 (_loadTemplates 덮어쓰기) + 오버레이 재시작 수정
 /// v7.1: 파일 쓰기 딜레이 증가 (100ms → 300ms)
 /// v7.0: 파일 기반 설정 동기화 + 핀치 줌 개선
 
