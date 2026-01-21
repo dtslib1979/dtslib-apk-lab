@@ -2,8 +2,8 @@
   {
     "id": "parksy-axis",
     "name": "Parksy Axis",
-    "version": "v7.0.0",
-    "description": "방송용 사고 단계 오버레이 (FSM 상태 전이)",
+    "version": "v7.1",
+    "description": "방송용 사고 단계 오버레이 (FSM 상태 전이, 파일 기반 동기화)",
     "icon": "🎯",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip",
     "lastUpdated": "2026-01-21"
