@@ -1,4 +1,4 @@
-# Parksy Axis v7.2
+# Parksy Axis v7.3
 
 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
 
@@ -13,6 +13,10 @@
 - 👆 핀치 줌: 태블릿에서 두 손가락으로 크기 조절
 
 ## Changelog
+
+### v7.3
+- 🔧 **하드코딩 경로 사용**: `path_provider` 제거, 오버레이 프로세스 platform channel 문제 해결
+- 📁 설정 파일 경로: `/data/data/kr.parksy.axis/files/axis_overlay_config.json`
 
 ### v7.2
 - 🐛 **설정 적용 버그 수정**: `_loadTemplates()` 호출이 `_preview`를 덮어쓰는 문제 해결

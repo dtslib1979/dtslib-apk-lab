@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// v7.3: path_provider 제거 - 오버레이 프로세스에서 platform channel 문제 해결
 
 /// 설정 모델 - v7 스키마
 class AxisSettings {
@@ -102,28 +103,34 @@ class AxisTemplate {
       );
 }
 
-/// v7: 파일 기반 설정 서비스 (프로세스 간 동기화 보장)
+/// v7.3: 파일 기반 설정 서비스 (하드코딩 경로 - 오버레이 호환)
 class SettingsService {
+  // 하드코딩된 경로 - path_provider 없이 오버레이에서도 동작
+  static const _basePath = '/data/data/kr.parksy.axis/files';
   static const _fileName = 'axis_overlay_config.json';
 
-  /// 앱 문서 디렉토리 경로
-  static Future<String> get _dirPath async {
-    final dir = await getApplicationDocumentsDirectory();
-    return dir.path;
-  }
-
-  /// 오버레이용 설정 파일 경로
-  static Future<File> get _configFile async {
-    final path = await _dirPath;
-    return File('$path/$_fileName');
-  }
+  /// 오버레이용 설정 파일 경로 (동기)
+  static File get _configFile => File('$_basePath/$_fileName');
 
   /// 오버레이용 설정 저장 (메인 앱에서 호출)
   static Future<void> saveForOverlay(AxisSettings s) async {
     try {
-      final file = await _configFile;
+      final file = _configFile;
+
+      // 디렉토리 생성 확인
+      final dir = Directory(_basePath);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
       final json = jsonEncode(s.toJson());
       await file.writeAsString(json, flush: true);
+
+      // 추가 sync 호출
+      final raf = await file.open(mode: FileMode.append);
+      await raf.flush();
+      await raf.close();
+
       debugPrint('[SettingsService] saveForOverlay: $s');
       debugPrint('[SettingsService] saved to: ${file.path}');
     } catch (e) {
@@ -134,9 +141,9 @@ class SettingsService {
   /// 오버레이용 설정 로드 (오버레이에서 호출)
   static Future<AxisSettings> loadForOverlay() async {
     try {
-      final file = await _configFile;
+      final file = _configFile;
       debugPrint('[SettingsService] loadForOverlay from: ${file.path}');
-      
+
       if (await file.exists()) {
         final json = await file.readAsString();
         debugPrint('[SettingsService] loaded json: $json');
