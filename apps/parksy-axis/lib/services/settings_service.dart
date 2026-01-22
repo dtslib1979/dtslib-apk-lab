@@ -1,119 +1,57 @@
+/// Parksy Axis v9.0.0 - 설정 서비스
+/// Result 패턴 + 파일 기반 동기화
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/constants.dart';
+import '../models/settings.dart';
 
-// v7.3: path_provider 제거 - 오버레이 프로세스에서 platform channel 문제 해결
+/// 결과 타입 - 성공/실패 처리
+sealed class Result<T> {
+  const Result();
 
-/// 설정 모델 - v7 스키마
-class AxisSettings {
-  String rootName;
-  List<String> stages;
-  String position;
-  int width;
-  int height;
-  String themeId;
-  String fontId;
-  double bgOpacity;
-  double strokeWidth;
-  double overlayScale;
+  bool get isSuccess => this is Success<T>;
+  bool get isFailure => this is Failure<T>;
 
-  AxisSettings({
-    this.rootName = '[Idea]',
-    List<String>? stages,
-    this.position = 'bottomLeft',
-    this.width = 260,
-    this.height = 300,
-    this.themeId = 'amber',
-    this.fontId = 'mono',
-    this.bgOpacity = 0.9,
-    this.strokeWidth = 1.5,
-    this.overlayScale = 1.0,
-  }) : stages = stages ?? ['Capture', 'Note', 'Build', 'Test', 'Publish'];
-
-  Map<String, dynamic> toJson() => {
-        'root': rootName,
-        'stages': stages,
-        'pos': position,
-        'w': width,
-        'h': height,
-        'theme': themeId,
-        'font': fontId,
-        'opacity': bgOpacity,
-        'stroke': strokeWidth,
-        'overlayScale': overlayScale,
+  T? get valueOrNull => switch (this) {
+        Success(value: final v) => v,
+        Failure() => null,
       };
 
-  factory AxisSettings.fromJson(Map<String, dynamic> j) => AxisSettings(
-        rootName: j['root'] ?? '[Idea]',
-        stages: j['stages'] != null ? List<String>.from(j['stages']) : null,
-        position: j['pos'] ?? 'bottomLeft',
-        width: j['w'] ?? 260,
-        height: j['h'] ?? 300,
-        themeId: j['theme'] ?? 'amber',
-        fontId: j['font'] ?? 'mono',
-        bgOpacity: (j['opacity'] ?? 0.9).toDouble(),
-        strokeWidth: (j['stroke'] ?? 1.5).toDouble(),
-        overlayScale: (j['overlayScale'] ?? 1.0).toDouble(),
-      );
+  T getOrDefault(T defaultValue) => valueOrNull ?? defaultValue;
 
-  AxisSettings copy() => AxisSettings(
-        rootName: rootName,
-        stages: List.from(stages),
-        position: position,
-        width: width,
-        height: height,
-        themeId: themeId,
-        fontId: fontId,
-        bgOpacity: bgOpacity,
-        strokeWidth: strokeWidth,
-        overlayScale: overlayScale,
-      );
-
-  @override
-  String toString() => 'AxisSettings(root: $rootName, stages: $stages, theme: $themeId)';
+  R fold<R>({
+    required R Function(T value) onSuccess,
+    required R Function(String error) onFailure,
+  }) {
+    return switch (this) {
+      Success(value: final v) => onSuccess(v),
+      Failure(error: final e) => onFailure(e),
+    };
+  }
 }
 
-/// 템플릿 모델
-class AxisTemplate {
-  final String id;
-  final String name;
-  final bool isPreset;
-  final AxisSettings settings;
-
-  AxisTemplate({
-    required this.id,
-    required this.name,
-    required this.isPreset,
-    required this.settings,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'isPreset': isPreset,
-        'settings': settings.toJson(),
-      };
-
-  factory AxisTemplate.fromJson(Map<String, dynamic> j) => AxisTemplate(
-        id: j['id'],
-        name: j['name'],
-        isPreset: j['isPreset'] ?? false,
-        settings: AxisSettings.fromJson(j['settings']),
-      );
+final class Success<T> extends Result<T> {
+  final T value;
+  const Success(this.value);
 }
 
-/// v7.3: 파일 기반 설정 서비스 (하드코딩 경로 - 오버레이 호환)
+final class Failure<T> extends Result<T> {
+  final String error;
+  const Failure(this.error);
+}
+
+/// v9.0.0: 파일 기반 설정 서비스 (하드코딩 경로 - 오버레이 호환)
 class SettingsService {
-  // 하드코딩된 경로 - path_provider 없이 오버레이에서도 동작
-  static const _basePath = '/data/data/kr.parksy.axis/files';
-  static const _fileName = 'axis_overlay_config.json';
+  static const _basePath = '/data/data/${AppInfo.packageName}/files';
+  static const _fileName = StorageKeys.configFileName;
 
-  /// 오버레이용 설정 파일 경로 (동기)
   static File get _configFile => File('$_basePath/$_fileName');
 
   /// 오버레이용 설정 저장 (메인 앱에서 호출)
-  static Future<void> saveForOverlay(AxisSettings s) async {
+  static Future<Result<void>> saveForOverlay(AxisSettings settings) async {
     try {
       final file = _configFile;
 
@@ -123,7 +61,7 @@ class SettingsService {
         await dir.create(recursive: true);
       }
 
-      final json = jsonEncode(s.toJson());
+      final json = jsonEncode(settings.toJson());
       await file.writeAsString(json, flush: true);
 
       // 추가 sync 호출
@@ -131,15 +69,16 @@ class SettingsService {
       await raf.flush();
       await raf.close();
 
-      debugPrint('[SettingsService] saveForOverlay: $s');
-      debugPrint('[SettingsService] saved to: ${file.path}');
+      debugPrint('[SettingsService] saveForOverlay: $settings');
+      return const Success(null);
     } catch (e) {
       debugPrint('[SettingsService] saveForOverlay ERROR: $e');
+      return Failure('저장 실패: $e');
     }
   }
 
   /// 오버레이용 설정 로드 (오버레이에서 호출)
-  static Future<AxisSettings> loadForOverlay() async {
+  static Future<Result<AxisSettings>> loadForOverlay() async {
     try {
       final file = _configFile;
       debugPrint('[SettingsService] loadForOverlay from: ${file.path}');
@@ -149,124 +88,104 @@ class SettingsService {
         debugPrint('[SettingsService] loaded json: $json');
         final settings = AxisSettings.fromJson(jsonDecode(json));
         debugPrint('[SettingsService] parsed: $settings');
-        return settings;
+        return Success(settings);
       } else {
         debugPrint('[SettingsService] file not found, using defaults');
+        return const Success(AxisSettings());
       }
     } catch (e) {
       debugPrint('[SettingsService] loadForOverlay ERROR: $e');
+      return Failure('로드 실패: $e');
     }
-    return AxisSettings();
   }
 
   /// 오버레이 스케일만 저장 (핀치 줌 후)
-  static Future<void> saveScale(double scale) async {
+  static Future<Result<void>> saveScale(double scale) async {
     try {
-      final settings = await loadForOverlay();
-      settings.overlayScale = scale;
-      await saveForOverlay(settings);
+      final result = await loadForOverlay();
+      final settings = result.getOrDefault(const AxisSettings());
+      final updated = settings.copyWith(overlayScale: scale);
+      return saveForOverlay(updated);
     } catch (e) {
       debugPrint('[SettingsService] saveScale ERROR: $e');
+      return Failure('스케일 저장 실패: $e');
     }
   }
 }
 
 /// 템플릿 서비스
 class TemplateService {
-  static const _templatesKey = 'axis_templates_v7';
-  static const _selectedKey = 'axis_selected_v7';
+  static const _templatesKey = StorageKeys.templatesKey;
+  static const _selectedKey = StorageKeys.selectedTemplateKey;
 
   /// 기본 프리셋
-  static List<AxisTemplate> get presets => [
-        AxisTemplate(
-          id: 'default',
-          name: '기본',
-          isPreset: true,
-          settings: AxisSettings(),
-        ),
-        AxisTemplate(
-          id: 'broadcast',
-          name: '방송용',
-          isPreset: true,
-          settings: AxisSettings(
-            rootName: '[LIVE]',
-            stages: ['대기', '인트로', '본방', '마무리', '종료'],
-            themeId: 'rose',
-            fontId: 'sans',
-            width: 280,
-            height: 320,
-          ),
-        ),
-        AxisTemplate(
-          id: 'meeting',
-          name: '회의용',
-          isPreset: true,
-          settings: AxisSettings(
-            rootName: '[회의]',
-            stages: ['안건', '토론', '결론', '액션'],
-            themeId: 'cyan',
-            fontId: 'mono',
-            width: 240,
-            height: 280,
-          ),
-        ),
-        AxisTemplate(
-          id: 'dev',
-          name: '개발용',
-          isPreset: true,
-          settings: AxisSettings(
-            rootName: '[DEV]',
-            stages: ['Plan', 'Code', 'Test', 'Deploy'],
-            themeId: 'lime',
-            fontId: 'mono',
-          ),
-        ),
-      ];
+  static List<AxisTemplate> get presets => PresetTemplates.all;
 
   /// 사용자 템플릿 로드
-  static Future<List<AxisTemplate>> loadUserTemplates() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.reload();
-    final raw = prefs.getString(_templatesKey);
-    if (raw == null) return [];
+  static Future<Result<List<AxisTemplate>>> loadUserTemplates() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final raw = prefs.getString(_templatesKey);
+      if (raw == null) return const Success([]);
+
       final list = jsonDecode(raw) as List;
-      return list.map((e) => AxisTemplate.fromJson(e)).toList();
-    } catch (_) {
-      return [];
+      final templates = list.map((e) => AxisTemplate.fromJson(e)).toList();
+      return Success(templates);
+    } catch (e) {
+      debugPrint('[TemplateService] loadUserTemplates ERROR: $e');
+      return Failure('템플릿 로드 실패: $e');
     }
   }
 
   /// 사용자 템플릿 저장
-  static Future<void> saveUserTemplate(AxisTemplate t) async {
-    final templates = await loadUserTemplates();
-    final idx = templates.indexWhere((e) => e.id == t.id);
-    if (idx >= 0) {
-      templates[idx] = t;
-    } else {
-      templates.add(t);
+  static Future<Result<void>> saveUserTemplate(AxisTemplate template) async {
+    try {
+      final result = await loadUserTemplates();
+      final templates = result.getOrDefault([]);
+
+      final idx = templates.indexWhere((e) => e.id == template.id);
+      if (idx >= 0) {
+        templates[idx] = template;
+      } else {
+        templates.add(template);
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _templatesKey,
+        jsonEncode(templates.map((e) => e.toJson()).toList()),
+      );
+      return const Success(null);
+    } catch (e) {
+      debugPrint('[TemplateService] saveUserTemplate ERROR: $e');
+      return Failure('템플릿 저장 실패: $e');
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _templatesKey,
-      jsonEncode(templates.map((e) => e.toJson()).toList()),
-    );
   }
 
   /// 사용자 템플릿 삭제
-  static Future<void> deleteUserTemplate(String id) async {
-    final templates = await loadUserTemplates();
-    templates.removeWhere((e) => e.id == id);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _templatesKey,
-      jsonEncode(templates.map((e) => e.toJson()).toList()),
-    );
+  static Future<Result<void>> deleteUserTemplate(String id) async {
+    try {
+      final result = await loadUserTemplates();
+      final templates = result.getOrDefault([]);
+      templates.removeWhere((e) => e.id == id);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _templatesKey,
+        jsonEncode(templates.map((e) => e.toJson()).toList()),
+      );
+      return const Success(null);
+    } catch (e) {
+      debugPrint('[TemplateService] deleteUserTemplate ERROR: $e');
+      return Failure('템플릿 삭제 실패: $e');
+    }
   }
 
   /// 모든 템플릿 (프리셋 + 사용자)
   static Future<List<AxisTemplate>> loadAllTemplates() async {
-    final user = await loadUserTemplates();
+    final result = await loadUserTemplates();
+    final user = result.getOrDefault([]);
     return [...presets, ...user];
   }
 

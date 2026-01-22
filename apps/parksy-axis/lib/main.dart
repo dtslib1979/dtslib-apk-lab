@@ -1,18 +1,24 @@
+/// Parksy Axis v9.0.0 Ultimate Edition
+/// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
+///
+/// v9.0.0: 완전 리팩토링
+///   - sealed class Result 패턴
+///   - immutable 설정 모델 + copyWith
+///   - 8개 테마 (그라데이션 지원)
+///   - 6개 폰트 프리셋
+///   - 탭 기반 설정 UI
+///   - 펄스 애니메이션
+///   - core/ 모듈 분리
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'app.dart';
+import 'core/constants.dart';
 import 'widgets/tree_view.dart';
 import 'services/settings_service.dart';
+import 'models/settings.dart';
 import 'models/theme.dart';
-
-/// Parksy Axis v7.3
-/// 방송용 사고 단계 오버레이 - FSM 기반 상태 전이
-///
-/// v7.3: 하드코딩 경로 사용 (path_provider 제거 - 오버레이 platform channel 문제 해결)
-/// v7.2: 설정 적용 버그 수정 (_loadTemplates 덮어쓰기) + 오버레이 재시작 수정
-/// v7.1: 파일 쓰기 딜레이 증가 (100ms → 300ms)
-/// v7.0: 파일 기반 설정 동기화 + 핀치 줌 개선
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,12 +40,12 @@ class _OverlayApp extends StatefulWidget {
 
 class _OverlayAppState extends State<_OverlayApp> {
   int _idx = 0;
-  AxisSettings? _cfg;
+  AxisSettings _cfg = const AxisSettings();
   bool _init = true;
   double _baseScale = 1.0;
   double _currentScale = 1.0;
-  int _currentW = 260;
-  int _currentH = 300;
+  int _currentW = OverlayDefaults.width;
+  int _currentH = OverlayDefaults.height;
 
   @override
   void initState() {
@@ -49,23 +55,24 @@ class _OverlayAppState extends State<_OverlayApp> {
 
   Future<void> _load() async {
     debugPrint('[Overlay] _load() called');
-    
+
     // 파일 시스템에서 설정 로드 (프로세스 간 동기화 보장)
-    _cfg = await SettingsService.loadForOverlay();
-    
+    final result = await SettingsService.loadForOverlay();
+    _cfg = result.getOrDefault(const AxisSettings());
+
     debugPrint('[Overlay] loaded config: $_cfg');
-    debugPrint('[Overlay] stages: ${_cfg?.stages}');
-    
-    _currentScale = _cfg!.overlayScale;
-    _currentW = (_cfg!.width * _currentScale).toInt();
-    _currentH = (_cfg!.height * _currentScale).toInt();
-    
+    debugPrint('[Overlay] stages: ${_cfg.stages}');
+
+    _currentScale = _cfg.overlayScale;
+    _currentW = _cfg.scaledWidth;
+    _currentH = _cfg.scaledHeight;
+
     setState(() => _init = false);
   }
 
   /// FSM: s → (s+1) mod n
   void _next() {
-    final n = _cfg?.stages.length ?? 5;
+    final n = _cfg.stages.length;
     setState(() => _idx = (_idx + 1) % n);
   }
 
@@ -83,10 +90,13 @@ class _OverlayAppState extends State<_OverlayApp> {
   /// 핀치 줌 처리
   void _onScaleUpdate(ScaleUpdateDetails d) {
     if (d.pointerCount >= 2) {
-      final target = (_baseScale * d.scale).clamp(0.5, 2.5);
-      _currentScale = _currentScale + (target - _currentScale) * 0.3;
-      _currentW = (_cfg!.width * _currentScale).toInt();
-      _currentH = (_cfg!.height * _currentScale).toInt();
+      final target = (_baseScale * d.scale).clamp(
+        OverlayDefaults.minScale,
+        OverlayDefaults.maxScale,
+      );
+      _currentScale = _currentScale + (target - _currentScale) * OverlayDefaults.scaleSmoothing;
+      _currentW = (_cfg.width * _currentScale).toInt();
+      _currentH = (_cfg.height * _currentScale).toInt();
       FlutterOverlayWindow.resizeOverlay(_currentW, _currentH, true);
       setState(() {});
     }
@@ -100,7 +110,7 @@ class _OverlayAppState extends State<_OverlayApp> {
 
   @override
   Widget build(BuildContext context) {
-    if (_init || _cfg == null) {
+    if (_init) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Container(
@@ -112,8 +122,8 @@ class _OverlayAppState extends State<_OverlayApp> {
       );
     }
 
-    final t = AxisTheme.byId(_cfg!.themeId);
-    final f = AxisFont.byId(_cfg!.fontId);
+    final t = AxisTheme.byId(_cfg.themeId);
+    final f = AxisFont.byId(_cfg.fontId);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -144,12 +154,12 @@ class _OverlayAppState extends State<_OverlayApp> {
               active: _idx,
               onTap: _next,
               onJump: _jump,
-              root: _cfg!.rootName,
-              items: _cfg!.stages,
+              root: _cfg.rootName,
+              items: _cfg.stages,
               theme: t,
               font: f,
-              opacity: _cfg!.bgOpacity,
-              stroke: _cfg!.strokeWidth,
+              opacity: _cfg.bgOpacity,
+              stroke: _cfg.strokeWidth,
             ),
           ),
         ),

@@ -2,11 +2,11 @@
   {
     "id": "parksy-axis",
     "name": "Parksy Axis",
-    "version": "v7.3.1",
-    "description": "방송용 사고 단계 오버레이 (FSM 상태 전이, 오버레이 설정 동기화 수정)",
+    "version": "v9.0.0",
+    "description": "방송용 사고 단계 오버레이 - Ultimate Edition (sealed Result 패턴, 8 테마, 탭 UI)",
     "icon": "🎯",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip",
-    "lastUpdated": "2026-01-21"
+    "lastUpdated": "2026-01-22"
   },
   {
     "id": "parksy-pen",
