@@ -1,0 +1,12 @@
+{
+  "repo": "dtslib-apk-lab",
+  "level": 2,
+  "parent": "dtslib-papyrus",
+  "type": "Parksy Ecosystem",
+  "inherit": {
+    "immutable": "strict",
+    "defaults": "override-allowed"
+  },
+  "created": "2026-01-26",
+  "overrides": []
+}
