@@ -8,6 +8,9 @@ on:
       - '.github/workflows/build-aiva-trimmer.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
