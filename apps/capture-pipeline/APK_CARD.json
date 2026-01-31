@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.0",
+  "apk_id": "parksy-capture",
+  "name": "Parksy Capture",
+  "name_en": "Parksy Capture",
+  "version": "v10.0.8",
+  "icon": "💾",
+
+  "purpose": {
+    "one_liner": "LLM 대화 무손실 캡처 → GitHub 자동 아카이브",
+    "problem": "모바일에서 긴 LLM 대화 복사하면 클립보드 제한으로 잘림. 데이터 유실됨.",
+    "solution": "Share Intent는 크기 제한 없음. 복사 대신 공유하면 무손실 캡처 + 자동 백업."
+  },
+
+  "install": {
+    "source": "GitHub Releases / APK 스토어",
+    "url": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
+    "store_url": "https://dtslib-apk-lab.vercel.app/",
+    "permissions": ["저장소 접근", "공유 인텐트 수신"],
+    "optional_permissions": ["GitHub 백업 (API 키 필요)"],
+    "steps": [
+      "APK 다운로드 (ZIP 압축 해제)",
+      "설치 (출처 불명 앱 허용)",
+      "첫 실행 시 온보딩 3페이지 확인",
+      "저장소 권한 부여"
+    ]
+  },
+
+  "usage": {
+    "basic_flow": [
+      "LLM 웹앱(ChatGPT, Claude 등) 열기",
+      "대화 전체 선택 (Select All)",
+      "공유 버튼 탭",
+      "Parksy Capture 선택",
+      "✓ 저장 완료 (Downloads/parksy-logs/)"
+    ],
+    "output_format": "Markdown (.md)",
+    "output_location": "Downloads/parksy-logs/ParksyLog_YYYYMMDD_HHMMSS.md"
+  },
+
+  "advanced": {
+    "scenarios": [
+      {
+        "name": "대화 이어하기 (Re-upload)",
+        "description": "저장된 로그를 다른 LLM 앱으로 공유 → 대화 이어서 진행"
+      },
+      {
+        "name": "GitHub 자동 백업",
+        "description": "parksy-logs 레포에 자동 동기화. API 키 설정 필요."
+      },
+      {
+        "name": "RAG/파인튜닝 데이터셋",
+        "description": "축적된 로그 → parksy-logs 레포 → 벡터DB/LoRA 학습용"
+      }
+    ]
+  },
+
+  "demo": {
+    "video_url": null,
+    "screenshot_urls": [],
+    "live_demo_url": "https://dtslib-apk-lab.vercel.app/"
+  },
+
+  "caution": [
+    "첫 실행 시 저장소 권한 필수 (없으면 저장 안 됨)",
+    "개인정보 포함 대화 GitHub 업로드 주의",
+    "GitHub 백업은 API 키 설정 후 작동",
+    "대용량 로그 많으면 저장 공간 정리 필요"
+  ],
+
+  "troubleshooting": [
+    {
+      "problem": "저장이 안 된다",
+      "solution": "설정 → 앱 → Parksy Capture → 권한 → 저장소 허용"
+    },
+    {
+      "problem": "GitHub 백업이 안 된다",
+      "solution": "GitHub Secrets에 CAPTURE_API_KEY, CAPTURE_WORKER_URL 설정 확인"
+    }
+  ],
+
+  "filming_points": [
+    "설치 과정 (ZIP 다운로드 → APK 설치)",
+    "첫 실행 온보딩 3페이지",
+    "권한 부여 화면",
+    "LLM 앱에서 Select All → Share → Parksy Capture",
+    "저장 완료 토스트 메시지",
+    "앱 열어서 로그 목록 확인",
+    "검색/즐겨찾기 기능 시연",
+    "Re-upload (저장된 로그 다시 공유)"
+  ],
+
+  "metadata": {
+    "category": "생산성/자동화",
+    "target_user": "LLM 헤비유저, AI 개발자, 프롬프트 엔지니어",
+    "difficulty": "초급",
+    "estimated_tutorial_length": "15분",
+    "related_repos": ["parksy-logs", "eae-univ", "OrbitPrompt"],
+    "tech_stack": ["Flutter", "Kotlin", "Cloudflare Workers"],
+    "philosophy": "LLM 대화를 소비하는 게 아니라 수집하는 사람을 위한 도구"
+  }
+}
