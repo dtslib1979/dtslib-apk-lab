@@ -5,7 +5,7 @@
     "version": "v9.0.0",
     "description": "방송용 사고 단계 오버레이 - Ultimate Edition (sealed Result 패턴, 8 테마, 탭 UI)",
     "icon": "🎯",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-axis/main/parksy-axis-debug.zip",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-axis-latest/app-debug.apk",
     "lastUpdated": "2026-01-22"
   },
   {
@@ -14,7 +14,7 @@
     "version": "v1.0.31",
     "description": "S Pen 레이저펜 오버레이 판서 (Build #31)",
     "icon": "✍️",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-laser-pen/main/laser-pen-overlay-debug.zip",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-pen-latest/app-debug.apk",
     "lastUpdated": "2026-01-03"
   },
   {
@@ -23,7 +23,7 @@
     "version": "v10.0.8",
     "description": "텍스트 캡처 → GitHub 자동 아카이브",
     "icon": "💾",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-capture-pipeline/main/capture-pipeline-debug.zip",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-capture-latest/app-debug.apk",
     "lastUpdated": "2026-01-03"
   },
   {
@@ -41,7 +41,7 @@
     "version": "v2.0.0",
     "description": "AIVA MP3 무음 트리밍",
     "icon": "🎧",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-aiva-latest/app-debug.apk",
     "lastUpdated": "2026-01-03"
   },
   {
@@ -50,7 +50,7 @@
     "version": "v1.0.2",
     "description": "배치 TTS 생성기 (Google Cloud)",
     "icon": "🎙️",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-tts-latest/app-debug.apk",
     "lastUpdated": "2026-01-03"
   }
 ]

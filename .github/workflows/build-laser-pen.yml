@@ -37,9 +37,29 @@ jobs:
       - name: Build Debug APK
         run: flutter build apk --debug
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: laser-pen-overlay-debug
           path: apps/laser-pen-overlay/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 30
+
+      - name: Get version from pubspec
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: parksy-pen-latest
+          name: Parksy Pen (Latest)
+          body: |
+            ✍️ Parksy Pen v${{ steps.version.outputs.version }}
+
+            Auto-updated on each successful build.
+          files: apps/laser-pen-overlay/build/app/outputs/flutter-apk/app-debug.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
