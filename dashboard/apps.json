@@ -2,8 +2,8 @@
   {
     "id": "parksy-axis",
     "name": "Parksy Axis",
-    "version": "v9.0.0",
-    "description": "방송용 사고 단계 오버레이 - Ultimate Edition (sealed Result 패턴, 8 테마, 탭 UI)",
+    "version": "v9.1.0",
+    "description": "방송용 사고 단계 오버레이 - 설정 동기화 수정, 8 테마, 탭 UI",
     "icon": "🎯",
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-axis-latest/app-debug.apk",
     "lastUpdated": "2026-01-22"
