@@ -10,7 +10,9 @@ YYYY-MM-DD | Event | Symptom | Cause | Fix
 
 ---
 
-## 2026-02-10
+## 2026-02-10 — 세션 2 (11커밋: Action 7 + PHL 4)
+
+Parksy Axis v11.0.0 최종 릴리즈 + DEVLOG/CONTROL_KEYS 인프라 구축
 
 | Date | Event | Symptom | Cause | Fix |
 |------|-------|---------|-------|-----|
@@ -19,8 +21,13 @@ YYYY-MM-DD | Event | Symptom | Cause | Fix
 | 02-10 | bugfix | shareData 1회 전송 시 누락 | 오버레이 엔진 초기화 전에 데이터 도착하면 무시됨 | 500ms 간격 3회 재시도 |
 | 02-10 | bugfix | DropdownButton assertion crash | `_selectedId`가 템플릿 목록에 없는 ID 참조 | `_validateSelectedId()` + widget `safeId` 폴백 |
 | 02-10 | deploy | 버전 범프 시 누락 파일 | 6개 파일 동기화 필요한 걸 까먹음 | constants.dart, pubspec.yaml, app-meta.json, README.md, apps.json, home.dart 6파일 고정 |
+| 02-10 | deploy | v11.0.0 최종 릴리즈 + Vercel 스토어 반영 | — | 6파일 범프 + apps.json lastUpdated + gh release 확인 |
 | 02-10 | infra | wget/curl TMPDIR EACCES | Termux `/tmp/claude-XXXXX/` 접근 불가 | `gh release download` 사용, 완료 후 `ls -lh`로 85MB 검증 |
 | 02-10 | infra | APK 다운로드 불완전 (11MB/85MB) | gh release download 중간 끊김 | rm 후 재다운 + 파일 사이즈 체크 |
+| 02-10 | docs | 삽질 로그 체계 없음 | 커밋 로그만으론 증상/원인/레버 분리 안 됨 | DEVLOG.md 생성 (4칸 테이블 고정) |
+| 02-10 | docs | Claude 매 세션 코드 탐색부터 시작 | 키 파일/규칙/커맨드 참조 문서 없음 | CONTROL_KEYS.md 생성 (9섹션) |
+| 02-10 | docs | 사전조사 부족 + 토론 비대화 반복 | Before Touch Code 루틴 없음, DEVLOG 포맷 미통일 | 3-Check 루틴 + 1포맷 원칙 + 자동화 엔드포인트 선언 |
+| 02-10 | docs | APK 방향성 미선언 | 오버레이 전용 전략이 문서화 안 됨 | Overlay Direction Declaration 추가 |
 
 ## 2026-02-09 (소급)
 
