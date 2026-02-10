@@ -50,18 +50,20 @@ class SettingsService {
 
   static File get _configFile => File('$_basePath/$_fileName');
 
+  static const _prefsBackupKey = 'axis_overlay_config_backup';
+
   /// 오버레이용 설정 저장 (메인 앱에서 호출)
+  /// 파일 + SharedPreferences 이중 저장
   static Future<Result<void>> saveForOverlay(AxisSettings settings) async {
     try {
-      final file = _configFile;
+      final json = jsonEncode(settings.toJson());
 
-      // 디렉토리 생성 확인
+      // 1) 파일 저장
+      final file = _configFile;
       final dir = Directory(_basePath);
       if (!await dir.exists()) {
         await dir.create(recursive: true);
       }
-
-      final json = jsonEncode(settings.toJson());
       await file.writeAsString(json, flush: true);
 
       // 추가 sync 호출
@@ -69,7 +71,15 @@ class SettingsService {
       await raf.flush();
       await raf.close();
 
-      debugPrint('[SettingsService] saveForOverlay: $settings');
+      // 2) SharedPreferences 백업 (오버레이에서 파일 못 읽을 때 보험)
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefsBackupKey, json);
+      } catch (e) {
+        debugPrint('[SettingsService] prefs backup failed (non-fatal): $e');
+      }
+
+      debugPrint('[SettingsService] saveForOverlay OK: $settings');
       return const Success(null);
     } catch (e) {
       debugPrint('[SettingsService] saveForOverlay ERROR: $e');
@@ -78,21 +88,36 @@ class SettingsService {
   }
 
   /// 오버레이용 설정 로드 (오버레이에서 호출)
+  /// 파일 우선, 실패 시 SharedPreferences 폴백
   static Future<Result<AxisSettings>> loadForOverlay() async {
     try {
       final file = _configFile;
       debugPrint('[SettingsService] loadForOverlay from: ${file.path}');
 
+      // 1) 파일에서 로드 시도
       if (await file.exists()) {
         final json = await file.readAsString();
-        debugPrint('[SettingsService] loaded json: $json');
-        final settings = AxisSettings.fromJson(jsonDecode(json));
-        debugPrint('[SettingsService] parsed: $settings');
-        return Success(settings);
-      } else {
-        debugPrint('[SettingsService] file not found, using defaults');
-        return const Success(AxisSettings());
+        if (json.isNotEmpty) {
+          debugPrint('[SettingsService] loaded from file: $json');
+          final settings = AxisSettings.fromJson(jsonDecode(json));
+          debugPrint('[SettingsService] parsed: $settings');
+          return Success(settings);
+        }
       }
+
+      // 2) 파일 없거나 비어있으면 SharedPreferences 폴백
+      debugPrint('[SettingsService] file miss, trying prefs backup');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final backup = prefs.getString(_prefsBackupKey);
+      if (backup != null && backup.isNotEmpty) {
+        debugPrint('[SettingsService] loaded from prefs backup: $backup');
+        final settings = AxisSettings.fromJson(jsonDecode(backup));
+        return Success(settings);
+      }
+
+      debugPrint('[SettingsService] no saved config anywhere, using defaults');
+      return const Success(AxisSettings());
     } catch (e) {
       debugPrint('[SettingsService] loadForOverlay ERROR: $e');
       return Failure('로드 실패: $e');

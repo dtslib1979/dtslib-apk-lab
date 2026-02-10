@@ -42,24 +42,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkPerm();
-      _loadTemplates();
+      _refreshOverlayState();
     }
+  }
+
+  /// resume 시 오버레이 상태만 갱신 (_preview 건드리지 않음)
+  Future<void> _refreshOverlayState() async {
+    _on = await FlutterOverlayWindow.isActive();
+    _templates = await TemplateService.loadAllTemplates();
+    if (mounted) setState(() {});
   }
 
   Future<void> _init() async {
     await _checkPerm();
-    await _loadTemplates();
+    _templates = await TemplateService.loadAllTemplates();
+    _selectedId = await TemplateService.getSelectedId();
+
+    // 파일에 저장된 설정이 있으면 그걸 쓴다 (커스터마이징 유지)
+    final saved = await SettingsService.loadForOverlay();
+    final cfg = saved.valueOrNull;
+    if (cfg != null && cfg.isValid) {
+      _preview = cfg;
+      debugPrint('[Home] init: loaded from config file: $_preview');
+    } else {
+      _updatePreview();
+      debugPrint('[Home] init: no saved config, using template: $_preview');
+    }
+
     _on = await FlutterOverlayWindow.isActive();
     if (mounted) setState(() {});
   }
 
+  /// 템플릿 목록만 새로고침 (_preview 건드리지 않음)
   Future<void> _loadTemplates() async {
     _templates = await TemplateService.loadAllTemplates();
     _selectedId = await TemplateService.getSelectedId();
-    _updatePreview();
     if (mounted) setState(() {});
   }
 
+  /// 템플릿 선택 시에만 _preview를 템플릿 값으로 교체
   void _updatePreview() {
     final t = _templates.firstWhere(
       (e) => e.id == _selectedId,
@@ -90,11 +111,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _toggle() async {
     if (_on) {
       await FlutterOverlayWindow.closeOverlay();
-      await 300.ms.delay; // v9: extension 활용
+      await 300.ms.delay;
     } else {
-      debugPrint('[Home] saving settings for overlay: $_preview');
-      await SettingsService.saveForOverlay(_preview);
-      await 300.ms.delay; // 파일 쓰기 완료 대기
+      debugPrint('[Home] toggle: saving settings for overlay: $_preview');
+
+      // 저장 + 검증
+      final result = await SettingsService.saveForOverlay(_preview);
+      if (result.isFailure) {
+        debugPrint('[Home] toggle: SAVE FAILED');
+      }
+
+      // 저장 후 다시 읽어서 검증
+      final verify = await SettingsService.loadForOverlay();
+      debugPrint('[Home] toggle: verify read-back: ${verify.valueOrNull}');
+
+      await 500.ms.delay; // 파일 시스템 동기화 대기 (300→500ms)
 
       await FlutterOverlayWindow.showOverlay(
         height: _preview.scaledHeight,
@@ -115,6 +146,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _selectedId = id;
     await TemplateService.setSelectedId(id);
     _updatePreview();
+    // 템플릿 변경 시 파일에도 저장 (오버레이 동기화)
+    await SettingsService.saveForOverlay(_preview);
+    debugPrint('[Home] template changed: $_selectedId → $_preview');
     setState(() {});
   }
 
