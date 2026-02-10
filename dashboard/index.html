@@ -2,127 +2,254 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4CAF50">
-    <title>Parksy APK Store</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0D0D0D">
+    <title>DTSLIB APK Lab</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0D0D0D;
+            --bg-card: #1A1A1A;
+            --bg-card-hover: #222;
+            --border: rgba(212,175,55,0.15);
+            --border-hover: rgba(212,175,55,0.35);
+            --text: #F5F5DC;
+            --text-secondary: rgba(245,245,220,0.6);
+            --text-muted: rgba(245,245,220,0.3);
+            --accent: #D4AF37;
+            --accent-glow: rgba(212,175,55,0.4);
+            --green: #253A2F;
         }
+
+        html { scroll-behavior: smooth; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #000;
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
-            color: #fff;
+            -webkit-font-smoothing: antialiased;
         }
+
         .container {
             max-width: 500px;
             margin: 0 auto;
             padding: 16px;
         }
+
+        /* ── Header ── */
         header {
             text-align: center;
-            padding: 20px 0 16px;
+            padding: 40px 0 24px;
         }
-        .brand {
-            font-size: 1.6rem;
+
+        .brand-mark {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, var(--green) 0%, #1a2e23 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Cinzel', serif;
+            font-size: 18px;
             font-weight: 700;
-            line-height: 1.2;
+            color: var(--accent);
+            letter-spacing: 0.05em;
         }
-        .brand-parksy {
-            color: #fff;
+
+        .brand-title {
+            font-family: 'Cinzel', serif;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--text);
+            margin-bottom: 4px;
         }
-        .brand-apk {
-            background: linear-gradient(90deg, #007AFF, #5856D6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+
+        .brand-title span {
+            color: var(--accent);
         }
+
+        .brand-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
         .app-count {
-            color: #86868b;
-            font-size: 0.85rem;
-            margin-top: 8px;
+            display: inline-block;
+            margin-top: 16px;
+            padding: 4px 12px;
+            background: rgba(212,175,55,0.08);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            font-size: 12px;
+            color: var(--accent);
+            letter-spacing: 0.05em;
         }
+
+        /* ── Warning ── */
         .warning {
-            background: rgba(255, 193, 7, 0.1);
+            background: rgba(212,175,55,0.06);
+            border: 1px solid var(--border);
             border-radius: 10px;
             padding: 10px 14px;
-            margin-bottom: 16px;
-            color: #ffc107;
-            font-size: 0.75rem;
+            margin-bottom: 20px;
+            color: var(--accent);
+            font-size: 11px;
             text-align: center;
+            letter-spacing: 0.02em;
         }
+
+        /* ── App Grid ── */
         .app-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
         }
+
         .app-card {
-            background: #1c1c1e;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 12px 8px;
+            padding: 16px 8px 12px;
             text-align: center;
             text-decoration: none;
             color: inherit;
-            transition: transform 0.2s, background 0.2s;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(16px);
         }
+
+        .app-card.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .app-card:hover,
         .app-card:active {
-            transform: scale(0.95);
-            background: #2c2c2e;
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
         }
+
+        .app-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(212,175,55,0.04) 50%,
+                transparent 100%);
+            background-size: 200% 100%;
+            animation: cardShimmer 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .app-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes cardShimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+
         .app-icon {
-            font-size: 2.2rem;
-            width: 56px;
-            height: 56px;
-            margin: 0 auto 8px;
+            font-size: 32px;
+            width: 52px;
+            height: 52px;
+            margin: 0 auto 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(145deg, #2c2c2e, #1c1c1e);
+            background: linear-gradient(145deg, var(--green), #1a2e23);
+            border: 1px solid var(--border);
             border-radius: 14px;
         }
+
         .app-name {
-            font-size: 0.7rem;
-            font-weight: 500;
-            margin-bottom: 2px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 3px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: var(--text);
         }
+
         .app-version {
-            color: #007AFF;
-            font-size: 0.6rem;
+            font-size: 10px;
+            color: var(--accent);
+            letter-spacing: 0.03em;
         }
+
+        /* ── Divider ── */
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 28px 0;
+        }
+
+        /* ── Footer ── */
         footer {
             text-align: center;
-            padding: 20px 0;
-            color: #48484a;
-            font-size: 0.7rem;
+            padding: 20px 0 40px;
+        }
+
+        footer p {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .footer-brand {
+            font-family: 'Cinzel', serif;
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            color: var(--text-muted);
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <div class="brand">
-                <span class="brand-parksy">Parksy</span><br>
-                <span class="brand-apk">APK Store</span>
-            </div>
+            <div class="brand-mark">APK</div>
+            <h1 class="brand-title">DTSLIB <span>APK Lab</span></h1>
+            <p class="brand-sub">Internal Build Distribution</p>
             <p class="app-count" id="appCount"></p>
         </header>
 
         <div class="warning">
-            ⚠️ Personal use only. Debug builds.
+            Debug builds — Internal &amp; partner use only
         </div>
 
         <div class="app-grid" id="appGrid"></div>
 
+        <div class="divider"></div>
+
         <footer>
-            <p>Built with GitHub Actions</p>
+            <p><a href="https://github.com/dtslib1979/dtslib-apk-lab" target="_blank">GitHub Repository</a></p>
+            <div class="footer-brand">DTSLIB FRANCHISE OS</div>
         </footer>
     </div>
 
@@ -130,15 +257,30 @@
         fetch('apps.json')
             .then(r => r.json())
             .then(apps => {
-                document.getElementById('appCount').textContent = `${apps.length} Apps`;
-                const grid = document.getElementById('appGrid');
-                grid.innerHTML = apps.map(app => `
-                    <a href="${app.downloadUrl}" class="app-card">
-                        <div class="app-icon">${app.icon}</div>
-                        <div class="app-name">${app.name.replace('Parksy ', '')}</div>
-                        <div class="app-version">${app.version}</div>
-                    </a>
-                `).join('');
+                document.getElementById('appCount').textContent = apps.length + ' Apps';
+                var grid = document.getElementById('appGrid');
+                grid.innerHTML = apps.map(function(app) {
+                    return '<a href="' + app.downloadUrl + '" class="app-card reveal">' +
+                        '<div class="app-icon">' + app.icon + '</div>' +
+                        '<div class="app-name">' + app.name.replace('Parksy ', '') + '</div>' +
+                        '<div class="app-version">' + app.version + '</div>' +
+                    '</a>';
+                }).join('');
+
+                // IntersectionObserver Reveal
+                var observer = new IntersectionObserver(function(entries) {
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('revealed');
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.1 });
+
+                document.querySelectorAll('.reveal').forEach(function(el, i) {
+                    el.style.transitionDelay = (i * 0.08) + 's';
+                    observer.observe(el);
+                });
             });
     </script>
 </body>
