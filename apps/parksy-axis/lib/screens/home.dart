@@ -153,11 +153,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         overlayContent: 'v${AppInfo.version}',
       );
 
-      // 오버레이 엔진 초기화 대기 후 shareData로 설정 직접 전송
-      await 500.ms.delay;
+      // 오버레이 엔진 초기화 대기 후 shareData로 설정 직접 전송 (3회 재시도)
       final jsonStr = jsonEncode(_preview.toJson());
-      await FlutterOverlayWindow.shareData(jsonStr);
-      debugPrint('[Home] shareData sent: $jsonStr');
+      for (var i = 0; i < 3; i++) {
+        await 500.ms.delay;
+        await FlutterOverlayWindow.shareData(jsonStr);
+        debugPrint('[Home] shareData sent #${i + 1}');
+      }
     }
     _on = await FlutterOverlayWindow.isActive();
     setState(() {});

@@ -58,18 +58,19 @@ class _OverlayAppState extends State<_OverlayApp> {
   /// 메인 앱에서 shareData()로 설정을 직접 수신
   void _listenForData() {
     FlutterOverlayWindow.overlayListener.listen((data) {
-      debugPrint('[Overlay] received shareData: ${data.toString().substring(0, 80)}...');
       try {
-        if (data is String && data.isNotEmpty) {
-          final json = jsonDecode(data) as Map<String, dynamic>;
+        debugPrint('[Overlay] received shareData type=${data.runtimeType}');
+        final str = (data is String) ? data : data.toString();
+        if (str.isNotEmpty) {
+          final json = jsonDecode(str) as Map<String, dynamic>;
           final settings = AxisSettings.fromJson(json);
           if (settings.isValid) {
             _applySettings(settings);
-            debugPrint('[Overlay] shareData applied: $_cfg');
+            debugPrint('[Overlay] shareData applied: theme=${settings.themeId} stages=${settings.stages.length}');
           }
         }
       } catch (e) {
-        debugPrint('[Overlay] shareData parse error: $e');
+        debugPrint('[Overlay] shareData error: $e');
       }
     });
   }
