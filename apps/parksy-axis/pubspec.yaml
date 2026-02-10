@@ -1,7 +1,7 @@
 name: parksy_axis
 description: Broadcast stage position overlay - Ultimate Edition
 publish_to: 'none'
-version: 10.0.1+4
+version: 11.0.0+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
