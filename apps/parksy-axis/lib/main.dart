@@ -10,6 +10,7 @@
 ///   - 펄스 애니메이션
 ///   - core/ 모듈 분리
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
@@ -50,7 +51,35 @@ class _OverlayAppState extends State<_OverlayApp> {
   @override
   void initState() {
     super.initState();
+    _listenForData();
     _load();
+  }
+
+  /// 메인 앱에서 shareData()로 설정을 직접 수신
+  void _listenForData() {
+    FlutterOverlayWindow.overlayListener.listen((data) {
+      debugPrint('[Overlay] received shareData: ${data.toString().substring(0, 80)}...');
+      try {
+        if (data is String && data.isNotEmpty) {
+          final json = jsonDecode(data) as Map<String, dynamic>;
+          final settings = AxisSettings.fromJson(json);
+          if (settings.isValid) {
+            _applySettings(settings);
+            debugPrint('[Overlay] shareData applied: $_cfg');
+          }
+        }
+      } catch (e) {
+        debugPrint('[Overlay] shareData parse error: $e');
+      }
+    });
+  }
+
+  void _applySettings(AxisSettings settings) {
+    _cfg = settings;
+    _currentScale = _cfg.overlayScale;
+    _currentW = _cfg.scaledWidth;
+    _currentH = _cfg.scaledHeight;
+    if (mounted) setState(() => _init = false);
   }
 
   Future<void> _load() async {
@@ -58,16 +87,12 @@ class _OverlayAppState extends State<_OverlayApp> {
 
     // 파일 시스템에서 설정 로드 (프로세스 간 동기화 보장)
     final result = await SettingsService.loadForOverlay();
-    _cfg = result.getOrDefault(const AxisSettings());
+    final loaded = result.getOrDefault(const AxisSettings());
 
-    debugPrint('[Overlay] loaded config: $_cfg');
-    debugPrint('[Overlay] stages: ${_cfg.stages}');
+    debugPrint('[Overlay] loaded config: $loaded');
+    debugPrint('[Overlay] stages: ${loaded.stages}');
 
-    _currentScale = _cfg.overlayScale;
-    _currentW = _cfg.scaledWidth;
-    _currentH = _cfg.scaledHeight;
-
-    setState(() => _init = false);
+    _applySettings(loaded);
   }
 
   /// FSM: s → (s+1) mod n

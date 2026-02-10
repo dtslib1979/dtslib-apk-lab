@@ -1,6 +1,7 @@
 /// Parksy Axis v10.0.0 - 홈 화면
 /// 컴포넌트 기반 UI + 개선된 상태 관리
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart' hide OverlayPosition;
 import '../core/constants.dart';
@@ -140,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final verify = await SettingsService.loadForOverlay();
       debugPrint('[Home] toggle: verify read-back: ${verify.valueOrNull}');
 
-      await 500.ms.delay; // 파일 시스템 동기화 대기 (300→500ms)
+      await 300.ms.delay;
 
       await FlutterOverlayWindow.showOverlay(
         height: _preview.scaledHeight,
@@ -151,6 +152,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         overlayTitle: AppInfo.name,
         overlayContent: 'v${AppInfo.version}',
       );
+
+      // 오버레이 엔진 초기화 대기 후 shareData로 설정 직접 전송
+      await 500.ms.delay;
+      final jsonStr = jsonEncode(_preview.toJson());
+      await FlutterOverlayWindow.shareData(jsonStr);
+      debugPrint('[Home] shareData sent: $jsonStr');
     }
     _on = await FlutterOverlayWindow.isActive();
     setState(() {});
