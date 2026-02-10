@@ -200,3 +200,12 @@ docs:  문서 추가/수정
 - **내가 쓰는 디바이스 오버레이 생산 도구** ✅
 - 방송 키트 확장 가능 ✅
 - 6개+ 앱을 같은 패턴으로 반복 생산 ✅
+
+### Overlay Direction Declaration
+
+> All APKs are personal **Overlay Productivity Tools**.
+> No Play Store distribution.
+> Modules are not fixed in advance.
+> Reusable patterns are extracted only after **2~3 overlay apps confirm common structure**.
+
+헌법은 지금 쓴다. 법 조항은 판례가 쌓이면 쓴다.
