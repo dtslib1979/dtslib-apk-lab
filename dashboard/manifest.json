@@ -1,11 +1,11 @@
 {
-    "name": "Parksy APK Store",
-    "short_name": "APK Store",
-    "description": "Parksy APK Download Store",
+    "name": "DTSLIB APK Lab",
+    "short_name": "APK Lab",
+    "description": "Internal Build Distribution — DTSLIB Franchise",
     "start_url": "https://dtslib-apk-lab.vercel.app/",
-    "display": "browser",
-    "background_color": "#081c15",
-    "theme_color": "#52b788",
+    "display": "standalone",
+    "background_color": "#0D0D0D",
+    "theme_color": "#D4AF37",
     "icons": [
         {
             "src": "icons/icon-192.png",
