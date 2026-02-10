@@ -46,10 +46,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// _selectedId가 _templates에 존재하는지 검증, 없으면 'default'로 폴백
+  void _validateSelectedId() {
+    if (_templates.isEmpty) return;
+    final exists = _templates.any((t) => t.id == _selectedId);
+    if (!exists) {
+      debugPrint('[Home] _validateSelectedId: "$_selectedId" not in templates, fallback to default');
+      _selectedId = 'default';
+      TemplateService.setSelectedId('default');
+    }
+  }
+
   /// resume 시 오버레이 상태만 갱신 (_preview 건드리지 않음)
   Future<void> _refreshOverlayState() async {
     _on = await FlutterOverlayWindow.isActive();
     _templates = await TemplateService.loadAllTemplates();
+    _selectedId = await TemplateService.getSelectedId();
+    _validateSelectedId();
     if (mounted) setState(() {});
   }
 
@@ -57,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _checkPerm();
     _templates = await TemplateService.loadAllTemplates();
     _selectedId = await TemplateService.getSelectedId();
+    _validateSelectedId();
 
     // 파일에 저장된 설정이 있으면 그걸 쓴다 (커스터마이징 유지)
     final saved = await SettingsService.loadForOverlay();
@@ -77,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadTemplates() async {
     _templates = await TemplateService.loadAllTemplates();
     _selectedId = await TemplateService.getSelectedId();
+    _validateSelectedId();
     if (mounted) setState(() {});
   }
 
@@ -191,7 +206,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       // 새 템플릿 저장한 경우에만 템플릿 목록 새로고침
       if (name != null && name.isNotEmpty) {
+        final savedId = _selectedId; // 방금 저장한 ID 보존
         await _loadTemplates();
+        // _loadTemplates()가 _validateSelectedId()로 폴백했을 수 있으므로 복원
+        if (_templates.any((t) => t.id == savedId)) {
+          _selectedId = savedId;
+        }
         _preview = saved; // 복원
       }
 
@@ -337,6 +357,11 @@ class _TemplateSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 안전장치: selectedId가 templates에 없으면 첫 번째 항목으로 폴백
+    final safeId = templates.any((t) => t.id == selectedId)
+        ? selectedId
+        : (templates.isNotEmpty ? templates.first.id : null);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -360,7 +385,7 @@ class _TemplateSelector extends StatelessWidget {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: selectedId,
+                value: safeId,
                 isExpanded: true,
                 dropdownColor: Colors.grey[850],
                 style: const TextStyle(color: Colors.white),
