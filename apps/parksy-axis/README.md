@@ -1,4 +1,4 @@
-# Parksy Axis v11.0.0
+# Parksy Axis v11.1.0
 
 방송용 사고 단계 오버레이 - FSM 기반 상태 전이 (Ultimate Edition)
 
@@ -10,9 +10,11 @@
 - 📐 반응형 스케일: scale = (w/260 + h/300) / 2
 - 🔧 실시간 커스터마이징
 - 📍 4방향 오버레이 위치
-- 👆 핀치 줌: 태블릿에서 두 손가락으로 크기 조절
-
 ## Changelog
+
+### v11.1.0
+- 🐛 **오버레이 터치 복구**: `defaultFlag` → `focusPointer` (Android 14 터치 차단 해결)
+- 🔧 **핀치 줌 제거**: enableDrag 네이티브 충돌 해소, 크기는 설정에서 조절
 
 ### v7.3
 - 🔧 **하드코딩 경로 사용**: `path_provider` 제거, 오버레이 프로세스 platform channel 문제 해결
@@ -44,7 +46,7 @@
 
 ```
 lib/
-├── main.dart          # Entry + Overlay FSM (RawGestureDetector)
+├── main.dart          # Entry + Overlay FSM (GestureDetector)
 ├── app.dart           # MaterialApp
 ├── models/
 │   └── theme.dart     # AxisTheme + AxisFont
