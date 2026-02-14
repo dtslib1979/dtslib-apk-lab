@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         width: _preview.scaledWidth,
         alignment: _align(),
         enableDrag: true,
-        flag: OverlayFlag.defaultFlag,
+        flag: OverlayFlag.focusPointer,
         overlayTitle: AppInfo.name,
         overlayContent: 'v${AppInfo.version}',
       );

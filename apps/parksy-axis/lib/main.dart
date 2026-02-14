@@ -12,7 +12,6 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'app.dart';
 import 'core/constants.dart';
@@ -43,8 +42,6 @@ class _OverlayAppState extends State<_OverlayApp> {
   int _idx = 0;
   AxisSettings _cfg = const AxisSettings();
   bool _init = true;
-  double _baseScale = 1.0;
-  double _currentScale = 1.0;
   int _currentW = OverlayDefaults.width;
   int _currentH = OverlayDefaults.height;
 
@@ -77,7 +74,6 @@ class _OverlayAppState extends State<_OverlayApp> {
 
   void _applySettings(AxisSettings settings) {
     _cfg = settings;
-    _currentScale = _cfg.overlayScale;
     _currentW = _cfg.scaledWidth;
     _currentH = _cfg.scaledHeight;
     if (mounted) setState(() => _init = false);
@@ -105,35 +101,6 @@ class _OverlayAppState extends State<_OverlayApp> {
   /// Direct jump: s → i
   void _jump(int i) => setState(() => _idx = i);
 
-  /// 핀치 줌 시작
-  void _onScaleStart(ScaleStartDetails d) {
-    if (d.pointerCount >= 2) {
-      _baseScale = _currentScale;
-      debugPrint('[Overlay] pinch start: scale=$_baseScale');
-    }
-  }
-
-  /// 핀치 줌 처리
-  void _onScaleUpdate(ScaleUpdateDetails d) {
-    if (d.pointerCount >= 2) {
-      final target = (_baseScale * d.scale).clamp(
-        OverlayDefaults.minScale,
-        OverlayDefaults.maxScale,
-      );
-      _currentScale = _currentScale + (target - _currentScale) * OverlayDefaults.scaleSmoothing;
-      _currentW = (_cfg.width * _currentScale).toInt();
-      _currentH = (_cfg.height * _currentScale).toInt();
-      FlutterOverlayWindow.resizeOverlay(_currentW, _currentH, true);
-      setState(() {});
-    }
-  }
-
-  /// 핀치 줌 종료 시 저장
-  Future<void> _onScaleEnd(ScaleEndDetails d) async {
-    debugPrint('[Overlay] pinch end: scale=$_currentScale');
-    await SettingsService.saveScale(_currentScale);
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_init) {
@@ -155,24 +122,8 @@ class _OverlayAppState extends State<_OverlayApp> {
       debugShowCheckedModeBanner: false,
       home: Material(
         color: Colors.transparent,
-        child: RawGestureDetector(
-          gestures: <Type, GestureRecognizerFactory>{
-            ScaleGestureRecognizer: GestureRecognizerFactoryWithHandlers<ScaleGestureRecognizer>(
-              () => ScaleGestureRecognizer(),
-              (instance) {
-                instance
-                  ..onStart = _onScaleStart
-                  ..onUpdate = _onScaleUpdate
-                  ..onEnd = _onScaleEnd;
-              },
-            ),
-            TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
-              () => TapGestureRecognizer(),
-              (instance) {
-                instance.onTap = _next;
-              },
-            ),
-          },
+        child: GestureDetector(
+          onTap: _next,
           child: SizedBox(
             width: _currentW.toDouble(),
             height: _currentH.toDouble(),
