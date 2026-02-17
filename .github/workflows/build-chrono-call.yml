@@ -44,7 +44,7 @@ jobs:
           cache: true
 
       - name: Generate boilerplate (icons, test, etc)
-        run: flutter create . --org com.parksy --no-overwrite
+        run: flutter create . --org com.parksy --project-name chrono_call
 
       - name: Get dependencies
         run: flutter pub get
