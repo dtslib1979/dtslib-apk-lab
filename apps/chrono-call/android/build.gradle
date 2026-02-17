@@ -11,7 +11,12 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url "https://packages.arthenica.com/repository/ffmpeg-kit/" }
+        maven {
+            url 'https://github.com/ArthenICa/ffmpeg-kit/raw/main/prebuilt/bundle-android-aar/test'
+            content {
+                includeGroup 'com.arthenica'
+            }
+        }
     }
 }
 
