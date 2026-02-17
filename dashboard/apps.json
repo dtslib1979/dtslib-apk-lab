@@ -52,5 +52,14 @@
     "icon": "🎙️",
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-tts-latest/app-debug.apk",
     "lastUpdated": "2026-01-03"
+  },
+  {
+    "id": "chrono-call",
+    "name": "Parksy ChronoCall",
+    "version": "v1.0.0",
+    "description": "통화 녹음 STT 변환기 (Whisper API)",
+    "icon": "📞",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/chrono-call-latest/app-debug.apk",
+    "lastUpdated": "2026-02-17"
   }
 ]

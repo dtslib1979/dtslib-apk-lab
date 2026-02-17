@@ -1,0 +1,77 @@
+name: Build ChronoCall
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/chrono-call/**'
+      - '.github/workflows/build-chrono-call.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/chrono-call
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secret leak guard
+        run: |
+          cd ../..
+          if grep -rE "sk-[a-zA-Z0-9]{20,}|ghp_|gho_|github_pat_" --include="*.dart" --include="*.kt" apps/chrono-call/; then
+            echo "::error::Secret-like string found in source code!"
+            exit 1
+          fi
+          echo "No hardcoded secrets detected"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrono-call-debug
+          path: apps/chrono-call/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Get version from pubspec
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: chrono-call-latest
+          name: Parksy ChronoCall (Latest)
+          body: |
+            Parksy ChronoCall v${{ steps.version.outputs.version }}
+
+            Auto-updated on each successful build.
+          files: apps/chrono-call/build/app/outputs/flutter-apk/app-debug.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

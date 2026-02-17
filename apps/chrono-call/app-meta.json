@@ -1,0 +1,9 @@
+{
+  "id": "chrono-call",
+  "name": "Parksy ChronoCall",
+  "desc": "통화 녹음 STT 변환기 (Whisper)",
+  "version": "v1.0.0",
+  "icon": "📞",
+  "cardClass": "chronocall",
+  "workflow": "build-chrono-call"
+}

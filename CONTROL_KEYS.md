@@ -70,6 +70,7 @@ DEVLOG.md는 **4칸 테이블 하나만** 사용:
 | Parksy Glot | `apps/parksy-glot/` | `com.dtslib.parksy_glot` | Yes | — |
 | Parksy Audio Tools | `apps/parksy-audio-tools/` | `kr.parksy.audio_tools` | Yes | — |
 | MIDI Converter | `apps/midi-converter/` | — | No | — |
+| Parksy ChronoCall | `apps/chrono-call/` | `com.parksy.chronocall` | No | `chrono-call-latest` |
 
 ---
 
