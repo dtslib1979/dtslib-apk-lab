@@ -43,6 +43,9 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Generate boilerplate (icons, test, etc)
+        run: flutter create . --org com.parksy --no-overwrite
+
       - name: Get dependencies
         run: flutter pub get
 
