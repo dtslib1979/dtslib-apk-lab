@@ -286,19 +286,13 @@ class _HomeScreenState extends State<HomeScreen> {
         await Future.delayed(const Duration(milliseconds: 500));
       }
 
-      // Step 2: Preprocess (stereo → mono, 44.1kHz → 16kHz, compress)
-      setState(() => _statusMessage = 'Preprocessing (mono 16kHz 64kbps)...');
+      // Step 2: Check file size (Whisper API limit 25MB)
+      setState(() => _statusMessage = 'Checking file size...');
 
       final prepResult = await AudioPreprocessor.preprocess(filePath);
-      if (!prepResult.success) {
-        _showError('Preprocess failed: ${prepResult.error}');
-        return;
-      }
-
-      // Check Whisper file size limit (25MB)
       if (prepResult.outputSizeMB > AppConstants.maxFileSizeMB) {
         _showError(
-            'File still too large after compression: '
+            'File too large: '
             '${prepResult.outputSizeMB.toStringAsFixed(1)}MB '
             '(limit: ${AppConstants.maxFileSizeMB}MB). '
             'Try a shorter recording.');
@@ -306,10 +300,8 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       setState(() => _statusMessage =
-          '${prepResult.inputSizeMB.toStringAsFixed(1)}MB → '
-          '${prepResult.outputSizeMB.toStringAsFixed(1)}MB '
-          '(-${prepResult.compressionRatio})');
-      await Future.delayed(const Duration(milliseconds: 800));
+          '${prepResult.outputSizeMB.toStringAsFixed(1)}MB — ready');
+      await Future.delayed(const Duration(milliseconds: 500));
 
       // Step 3: Whisper API
       setState(() {

@@ -11,7 +11,6 @@ dependencies:
     sdk: flutter
   file_picker: ^8.0.0
   just_audio: ^0.9.36
-  ffmpeg_kit_flutter_audio: ^6.0.3
   path_provider: ^2.1.1
   share_plus: ^10.0.0
   dio: ^5.4.0
