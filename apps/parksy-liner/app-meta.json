@@ -1,0 +1,8 @@
+{
+  "name": "Parksy Liner",
+  "package": "kr.parksy.liner",
+  "version": "v1.0.0",
+  "description": "Photo to sketch pipeline — XDoG line art for Samsung Notes S Pen overdrawing",
+  "category": "creative",
+  "icon": "liner_icon.png"
+}

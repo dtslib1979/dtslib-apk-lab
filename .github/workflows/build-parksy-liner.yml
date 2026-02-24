@@ -1,0 +1,71 @@
+name: Build Parksy Liner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/parksy-liner/**'
+      - '.github/workflows/build-parksy-liner.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/parksy-liner
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Clean and get dependencies
+        run: |
+          flutter clean
+          flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parksy-liner-debug
+          path: apps/parksy-liner/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Get version from pubspec
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: parksy-liner-latest
+          name: Parksy Liner (Latest)
+          body: |
+            ✏️ Parksy Liner v${{ steps.version.outputs.version }}
+
+            Photo → Sketch pipeline for Samsung Notes S Pen overdrawing.
+            Auto-updated on each successful build.
+          files: apps/parksy-liner/build/app/outputs/flutter-apk/app-debug.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -61,5 +61,14 @@
     "icon": "📞",
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/chrono-call-latest/app-debug.apk",
     "lastUpdated": "2026-02-17"
+  },
+  {
+    "id": "parksy-liner",
+    "name": "Parksy Liner",
+    "version": "v1.0.0",
+    "description": "Photo → Sketch 파이프라인 — XDoG 선화 추출, Samsung Notes S Pen 오버드로잉",
+    "icon": "✏️",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-liner-latest/app-debug.apk",
+    "lastUpdated": "2026-02-24"
   }
 ]
