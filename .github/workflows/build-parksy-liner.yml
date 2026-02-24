@@ -37,7 +37,7 @@ jobs:
       - name: Generate Flutter boilerplate (ic_launcher etc)
         run: |
           flutter create . --org kr.parksy --project-name parksy_liner
-          git checkout -- lib/ android/app/src/main/AndroidManifest.xml android/app/build.gradle android/settings.gradle pubspec.yaml
+          git checkout -- lib/ android/app/src/main/AndroidManifest.xml android/app/build.gradle android/settings.gradle android/build.gradle android/gradle.properties android/gradle/wrapper/gradle-wrapper.properties android/app/src/main/kotlin/ android/app/src/main/res/values/ android/app/src/main/res/xml/ pubspec.yaml
 
       - name: Clean and get dependencies
         run: |
