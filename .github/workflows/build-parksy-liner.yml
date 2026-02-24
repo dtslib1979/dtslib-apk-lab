@@ -34,6 +34,11 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Generate Flutter boilerplate (ic_launcher etc)
+        run: |
+          flutter create . --org kr.parksy --project-name parksy_liner
+          git checkout -- lib/ android/app/src/main/AndroidManifest.xml android/app/build.gradle android/settings.gradle pubspec.yaml
+
       - name: Clean and get dependencies
         run: |
           flutter clean
