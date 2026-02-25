@@ -28,7 +28,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://github.com/ArthenICa/ffmpeg-kit/raw/main/android/ffmpeg-kit-audio-6.0-2.LTS' }
+        maven { url "https://storage.googleapis.com/download.flutter.io" }
+        maven { url 'https://github.com/ArthenICa/ffmpeg-kit/raw/main/prebuilt/bundle-android-aar/test' }
         maven { url 'https://jitpack.io' }
     }
 }
