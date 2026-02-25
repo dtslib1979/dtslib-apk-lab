@@ -47,7 +47,7 @@ class MidiService {
       await sfFile.writeAsBytes(data.buffer.asUint8List());
     }
 
-    _sfId = await _midi.loadSoundfont(path: sfPath, bank: 0, program: 0);
+    _sfId = await _midi.loadSoundfontFile(filePath: sfPath, bank: 0, program: 0);
     _sfLoaded = true;
   }
 
@@ -137,11 +137,7 @@ class MidiService {
   }
 
   void _allNotesOff() {
-    for (int ch = 0; ch < 16; ch++) {
-      for (int note = 0; note < 128; note++) {
-        _midi.stopNote(sfId: _sfId, channel: ch, key: note);
-      }
-    }
+    _midi.stopAllNotes(sfId: _sfId);
   }
 
   void dispose() {
