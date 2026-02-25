@@ -36,13 +36,13 @@
     "lastUpdated": "2026-01-03"
   },
   {
-    "id": "parksy-aiva",
-    "name": "Parksy AIVA",
-    "version": "v2.0.0",
-    "description": "AIVA MP3 무음 트리밍",
-    "icon": "🎧",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-aiva-latest/app-debug.apk",
-    "lastUpdated": "2026-01-03"
+    "id": "parksy-wavesy",
+    "name": "Parksy Wavesy",
+    "version": "v3.0.0",
+    "description": "음원 편집 가위 — MP3/MIDI 트리밍",
+    "icon": "🌊",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-wavesy-latest/app-debug.apk",
+    "lastUpdated": "2026-02-25"
   },
   {
     "id": "parksy-tts",

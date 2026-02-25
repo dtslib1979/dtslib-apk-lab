@@ -45,12 +45,12 @@ APPS_CONFIG = [
         "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/overlay-dual-sub/main/overlay-dual-sub-debug.zip"
     },
     {
-        "id": "parksy-aiva",
-        "name": "Parksy AIVA",
-        "description": "AIVA MP3 무음 트리밍",
-        "icon": "🎧",
-        "pubspec": "apps/aiva-trimmer/pubspec.yaml",
-        "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-aiva-trimmer/main/aiva-trimmer-debug.zip"
+        "id": "parksy-wavesy",
+        "name": "Parksy Wavesy",
+        "description": "음원 편집 가위 — MP3/MIDI 트리밍",
+        "icon": "🌊",
+        "pubspec": "apps/parksy-wavesy/pubspec.yaml",
+        "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-wavesy/main/parksy-wavesy-debug.zip"
     },
     {
         "id": "parksy-tts",

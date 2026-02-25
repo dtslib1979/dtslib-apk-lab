@@ -106,7 +106,7 @@ state.json         = 공정 현황판
 모든 앱은 **Parksy** 브랜드를 사용:
 - Parksy Capture (capture-pipeline)
 - Parksy Pen (laser-pen-overlay)
-- Parksy AIVA (aiva-trimmer)
+- Parksy Wavesy (parksy-wavesy)
 - Parksy TTS (tts-factory)
 - **Parksy ChronoCall (chrono-call)** ← NEW
 
@@ -115,7 +115,7 @@ state.json         = 공정 현황판
 apps/
 ├── capture-pipeline/    # 공유 텍스트 캡처 앱
 ├── laser-pen-overlay/   # S Pen 오버레이 앱
-├── aiva-trimmer/        # 오디오 트리밍 앱
+├── parksy-wavesy/       # 음원 편집 가위 (MP3/MIDI)
 ├── tts-factory/         # TTS 변환 앱
 └── chrono-call/         # 통화 녹음 STT 변환 앱 ← NEW
 

@@ -1,0 +1,9 @@
+{
+  "id": "parksy-wavesy",
+  "name": "Parksy Wavesy",
+  "desc": "음원 편집 가위 — MP3/MIDI 트리밍",
+  "version": "v3.0.0",
+  "icon": "🌊",
+  "cardClass": "wavesy",
+  "workflow": "build-parksy-wavesy"
+}

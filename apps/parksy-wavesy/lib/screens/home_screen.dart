@@ -15,7 +15,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pickAudio() async {
     final r = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['mp3', 'wav', 'm4a'],
+      allowedExtensions: ['mp3', 'wav', 'm4a', 'mid', 'midi'],
     );
     if (r == null || r.files.isEmpty) return;
     final f = r.files.first;
@@ -38,11 +38,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  bool _isMidi(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.mid') || lower.endsWith('.midi');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AIVA Trimmer'),
+        title: const Text('Parksy Wavesy'),
         centerTitle: true,
       ),
       body: Column(
@@ -51,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Center(
             child: ElevatedButton.icon(
               onPressed: _pickAudio,
-              icon: const Icon(Icons.audio_file, size: 32),
+              icon: const Icon(Icons.waves, size: 32),
               label: const Text(
                 'Pick Audio',
                 style: TextStyle(fontSize: 20),
@@ -62,6 +67,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   vertical: 24,
                 ),
               ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'MP3 / WAV / M4A / MIDI',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 32),
@@ -81,10 +94,19 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListView.builder(
                 itemCount: _recent.length,
                 itemBuilder: (_, i) => ListTile(
-                  leading: const Icon(Icons.music_note),
+                  leading: Icon(
+                    _isMidi(_recent[i]) ? Icons.piano : Icons.music_note,
+                  ),
                   title: Text(
                     _recent[i].split('/').last,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    _isMidi(_recent[i]) ? 'MIDI' : 'Audio',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.4),
+                    ),
                   ),
                   onTap: () => Navigator.push(
                     context,

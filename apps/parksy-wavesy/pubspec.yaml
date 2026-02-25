@@ -1,7 +1,7 @@
-name: aiva_trimmer
-description: AIVA companion prep tool - audio trimmer for personal use
+name: parksy_wavesy
+description: Parksy Wavesy — MP3/MIDI audio editor & trimmer
 publish_to: 'none'
-version: 2.0.0+1
+version: 3.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -12,6 +12,7 @@ dependencies:
   file_picker: ^8.0.0
   just_audio: ^0.9.36
   ffmpeg_kit_flutter_audio: ^6.0.3
+  flutter_midi_pro: ^3.1.6
   path_provider: ^2.1.1
   share_plus: ^7.2.1
   intl: ^0.19.0
@@ -23,3 +24,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/soundfonts/

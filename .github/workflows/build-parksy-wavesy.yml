@@ -1,0 +1,75 @@
+name: Build Parksy Wavesy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/parksy-wavesy/**'
+      - '.github/workflows/build-parksy-wavesy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/parksy-wavesy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Download SoundFont
+        run: |
+          mkdir -p assets/soundfonts
+          curl -L -o assets/soundfonts/TimGM6mb.sf2 \
+            "https://sourceforge.net/projects/mscore/files/soundfont/TimGM6mb.sf2/download"
+          ls -lh assets/soundfonts/TimGM6mb.sf2
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parksy-wavesy-debug
+          path: apps/parksy-wavesy/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Get version from pubspec
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: parksy-wavesy-latest
+          name: Parksy Wavesy (Latest)
+          body: |
+            🌊 Parksy Wavesy v${{ steps.version.outputs.version }}
+
+            Auto-updated on each successful build.
+          files: apps/parksy-wavesy/build/app/outputs/flutter-apk/app-debug.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

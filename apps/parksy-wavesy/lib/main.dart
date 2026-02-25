@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 
 void main() {
-  runApp(const AivaTrimmerApp());
+  runApp(const ParksyWavesyApp());
 }
 
-class AivaTrimmerApp extends StatelessWidget {
-  const AivaTrimmerApp({super.key});
+class ParksyWavesyApp extends StatelessWidget {
+  const ParksyWavesyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AIVA Trimmer',
+      title: 'Parksy Wavesy',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
+          seedColor: Colors.teal,
           brightness: Brightness.dark,
         ),
         useMaterial3: true,

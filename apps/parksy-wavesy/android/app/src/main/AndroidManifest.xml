@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     
     <application
-        android:label="Parksy AIVA"
+        android:label="Parksy Wavesy"
         android:name="${applicationName}"
         android:icon="@drawable/ic_launcher">
         
