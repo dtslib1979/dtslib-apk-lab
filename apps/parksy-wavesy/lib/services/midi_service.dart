@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 /// For v3.0.0: play/pause/seek on MIDI files with bundled SoundFont.
 class MidiService {
   final MidiPro _midi = MidiPro();
+  int _sfId = 0;
   bool _sfLoaded = false;
   bool _playing = false;
   Timer? _ticker;
@@ -46,7 +47,7 @@ class MidiService {
       await sfFile.writeAsBytes(data.buffer.asUint8List());
     }
 
-    await _midi.loadSoundfont(sf2Path: sfPath, bank: 0, program: 0);
+    _sfId = await _midi.loadSoundfont(path: sfPath, bank: 0, program: 0);
     _sfLoaded = true;
   }
 
@@ -120,9 +121,9 @@ class MidiService {
         _events[_eventIndex].time <= _position) {
       final e = _events[_eventIndex];
       if (e.type == _MidiEventType.noteOn) {
-        _midi.playNote(channel: e.channel, key: e.note, velocity: e.velocity);
+        _midi.playNote(sfId: _sfId, channel: e.channel, key: e.note, velocity: e.velocity);
       } else if (e.type == _MidiEventType.noteOff) {
-        _midi.stopNote(channel: e.channel, key: e.note);
+        _midi.stopNote(sfId: _sfId, channel: e.channel, key: e.note);
       }
       _eventIndex++;
     }
@@ -138,7 +139,7 @@ class MidiService {
   void _allNotesOff() {
     for (int ch = 0; ch < 16; ch++) {
       for (int note = 0; note < 128; note++) {
-        _midi.stopNote(channel: ch, key: note);
+        _midi.stopNote(sfId: _sfId, channel: ch, key: note);
       }
     }
   }
