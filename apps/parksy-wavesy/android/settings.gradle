@@ -23,15 +23,4 @@ plugins {
     id "org.jetbrains.kotlin.android" version "1.9.10" apply false
 }
 
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
-    repositories {
-        google()
-        mavenCentral()
-        maven { url "https://storage.googleapis.com/download.flutter.io" }
-        maven { url 'https://github.com/ArthenICa/ffmpeg-kit/raw/main/prebuilt/bundle-android-aar/test' }
-        maven { url 'https://jitpack.io' }
-    }
-}
-
 include ":app"
