@@ -2,12 +2,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven {
-            url 'https://github.com/ArthenICa/ffmpeg-kit/raw/main/android/ffmpeg-kit-audio-6.0-2.LTS'
-            content {
-                includeGroup 'com.arthenica'
-            }
-        }
     }
 }
 
