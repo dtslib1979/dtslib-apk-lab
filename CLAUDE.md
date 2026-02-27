@@ -492,3 +492,28 @@ D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md  ← 이 레포 상세
 2. **상위 ~/CLAUDE.md** — 헌법 (레포지토리는 소설이다)
 3. **dtslib-localpc/repos/status.json** — 크로스레포 현황
 4. **형제 레포 CLAUDE.md** — 크로스 작업 시에만 참조
+
+### 세션 종료 프로토콜 (필수)
+
+> **커밋 전에 반드시 실행.** 이걸 안 하면 다른 세션이 옛날 정보를 읽는다.
+
+**매 커밋 시:**
+1. `D:\PARKSY\dtslib-localpc\repos\status.json` 열기
+2. `dtslib-apk-lab` 항목에서 변경된 필드 갱신:
+   - `last_commit` / `last_commit_msg` — 방금 커밋 해시+메시지
+   - `phase` — 앱 추가/삭제 시
+   - `apps` — 앱 상태 변경 시 (build pending → production 등)
+   - `active_dev` — 현재 개발 중인 앱 변경 시
+   - `pending` — 완료된 항목 제거, 새 항목 추가
+   - `dirty_files` — 0으로
+3. `D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md` — 큰 변경 있으면 갱신
+4. dtslib-localpc에서도 커밋: `chore: update dtslib-apk-lab status`
+
+```
+예시: ChronoCall 빌드 완료 후 커밋할 때
+1. dtslib-apk-lab 커밋
+2. status.json의 apps.chrono-call.status → "production"
+3. status.json의 active_dev → 다음 작업
+4. dtslib-localpc 커밋 + 푸시
+5. dtslib-apk-lab 푸시
+```
