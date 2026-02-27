@@ -462,3 +462,33 @@ Dart → Kotlin:
 | SharedPreferences 한도 | 큰 JSON 저장 시 느림 | 100건 제한 적용됨, Phase 2에서 SQLite 고려 |
 | Samsung 경로 하드코딩 | 기기별 다를 수 있음 | 4개 알려진 경로 시도 + fallback FilePicker |
 | API 키 평문 저장 | SharedPreferences에 그냥 저장 | 개인용이라 OK, 필요시 flutter_secure_storage |
+
+---
+
+## 크로스레포 연동 (Control Tower)
+
+> **이 세션은 독립적이지 않다.** 3개 프로덕션 레포가 하나의 PC에서 협업한다.
+
+### 관제탑 부트스트랩
+
+새 세션 시작 시, 크로스레포 작업이 필요하면 아래를 먼저 읽어라:
+
+```
+D:\PARKSY\dtslib-localpc\repos\status.json       ← 3개 레포 현황
+D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md  ← 이 레포 상세
+```
+
+### 형제 레포
+
+| 레포 | 경로 | 연결 포인트 |
+|------|------|-------------|
+| parksy-audio | `D:\PARKSY\parksy-audio` | ChronoCall 오디오 기능, 앱 사운드 에셋 |
+| parksy-image | `D:\parksy-image` | 앱 아이콘, UI 에셋, 스토어 스크린샷 |
+| dtslib-localpc | `D:\PARKSY\dtslib-localpc` | 관제탑 (PC 전체 상태) |
+
+### 우선순위 규칙
+
+1. **이 레포 CLAUDE.md** — 최우선 (앱 개발 컨텍스트)
+2. **상위 ~/CLAUDE.md** — 헌법 (레포지토리는 소설이다)
+3. **dtslib-localpc/repos/status.json** — 크로스레포 현황
+4. **형제 레포 CLAUDE.md** — 크로스 작업 시에만 참조
