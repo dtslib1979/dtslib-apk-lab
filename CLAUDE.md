@@ -506,14 +506,20 @@ D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md  ← 이 레포 상세
    - `active_dev` — 현재 개발 중인 앱 변경 시
    - `pending` — 완료된 항목 제거, 새 항목 추가
    - `dirty_files` — 0으로
-3. `D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md` — 큰 변경 있으면 갱신
-4. dtslib-localpc에서도 커밋: `chore: update dtslib-apk-lab status`
+3. **`D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md`에 세션 로그 append (필수)**
+   - 아래 포맷으로 파일 끝에 추가. 매 세션 반드시. 빠지면 개발 이력이 유실된다.
+   - 이 로그가 쌓이면 → D: 유실 시 Claude가 전부 재구축할 수 있다.
+   - 코드를 백업하는 게 아니라, **코드를 다시 만들 수 있는 지식**을 백업하는 것이다.
+4. dtslib-localpc에서도 커밋: `chore: update dtslib-apk-lab session log`
 
-```
-예시: ChronoCall 빌드 완료 후 커밋할 때
-1. dtslib-apk-lab 커밋
-2. status.json의 apps.chrono-call.status → "production"
-3. status.json의 active_dev → 다음 작업
-4. dtslib-localpc 커밋 + 푸시
-5. dtslib-apk-lab 푸시
+**세션 로그 포맷:**
+```markdown
+---
+### YYYY-MM-DD | 세션 요약 한 줄
+**작업**: 구체적으로 뭘 했는지 (파일명, 함수명, 파라미터 포함)
+**결정**: 왜 그렇게 했는지 (비교 대상, 시도한 대안, 버린 이유)
+**결과**: 수치 포함 (점수, 파일 크기, 에러 메시지 등)
+**교훈**: 다음 세션이 반드시 알아야 할 것
+**재구축 힌트**: D: 유실 시 이걸 다시 만들려면 Claude에게 이렇게 시켜라
+---
 ```
