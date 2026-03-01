@@ -1,18 +1,32 @@
-# PARKSY APK LAB — 글로벌 콘텐츠 마케팅 전략 v1.0
+# PARKSY APK LAB — 글로벌 콘텐츠 마케팅 백서 v2.0
 
 > **작성일:** 2026-03-01
-> **버전:** v1.0 (DRAFT v0 + PLAN v0 + 터묵스 인사이트 통합)
+> **버전:** v2.0 Final — 실전 배포 가능
 > **한 줄 피치:** "코드 한 줄 안 치고 앱 10개 만든 공방이, 공장이 되는 순간의 다큐멘터리"
-> **소스:** `MARKETING_STRATEGY_DRAFT.md` + `CONTENT_MARKETING_PLAN.md` + 터묵스 Claude 세션
 
 ---
 
-## 0. 이 문서의 소재 출처
+## 팩트 시트
+
+이 문서에서 주장하는 모든 수치의 출처. 과장 없음. git이 증거.
+
+| 주장 | 실제 수치 | 증거 |
+|------|----------|------|
+| "앱 10개" | 앱 디렉토리 10개 | `ls apps/` → 10개 |
+| "스토어 등록 8개" | `dashboard/apps.json` 8항목 | 파일 직접 확인 |
+| "커밋 60개" | 전 브랜치 합산 60커밋 | `git log --oneline --all \| wc -l` |
+| "개발 기간 30일" | 2026-01-31 ~ 2026-03-01 | `git log --format='%ad' --date=short` |
+| "자동화 스크립트 6개" | `scripts/` 6파일 | `ls scripts/` |
+| "68개 의존성 0 GPL 위반" | license-audit.py 출력 | 백서 v2 섹션 6.3 |
+| "헌법 금지 패턴 10개" | CONSTITUTION.md §11.5 | regex 10줄 |
+| "Parksy Pen 31빌드" | laser-pen-overlay git 히스토리 | RETROSPECTIVE.md |
+
+### 소스 문서 계보
 
 | 소스 | 기여 | 흡수한 것 |
 |------|------|----------|
 | `MARKETING_STRATEGY_DRAFT.md` | 무기 5개, 바이럴 경로, "글 먼저 영상 나중" | 실행력, 경쟁 분석, 4-Tier 타겟 |
-| `CONTENT_MARKETING_PLAN.md` | 3축 구조, 증거물 맵, 서사 아크, 지표 | 분석 프레임워크, 인벤토리 |
+| `CONTENT_MARKETING_PLAN.md` v1 | 3축 구조, 증거물 맵, 서사 아크, 지표 | 분석 프레임워크, 인벤토리 |
 | 터묵스 Claude 세션 | **"공방→공장 전환, 파이프라인이 상품"** | 마스터 서사의 중심축 |
 | `VDD-Report.md` | 방법론 논문 | 증거물 확인 |
 | `CONSTITUTION.md` v1.3 | 반상업 헌법 | 포지셔닝의 법적 뼈대 |
@@ -51,6 +65,65 @@ STAGE 3: 방송국 (Studio)                    ← 다음
 ```
 
 **마케팅은 Stage 1의 이야기를 팔면서, Stage 2의 전환을 다큐멘터리로 찍는 것이다.**
+
+### 공방 연대기 — git이 증거
+
+실제 커밋 날짜 기반. 30일간의 기록.
+
+```
+2026-01-31  ■ DAY 1 — 첫 커밋. APK 다운로드 URL 수정.
+            Capture → GitHub Releases 마이그레이션.
+            스토어 랜딩 Dark+Gold 리디자인.
+
+2026-02-10  ■ DAY 11 — Axis v10.0.0 대규모 업그레이드.
+            shareData IPC 동기화, 8 테마.
+            같은 날 v10.0.1 핫픽스. 빌드 2번.
+
+2026-02-11  ■ DAY 12 — DEVLOG 시스템 도입.
+            "삽질→DB 레코드 전환."
+            Claude 세션 운전 설명서 (CONTROL_KEYS.md).
+
+2026-02-14  ■ DAY 15 — Axis v11.0.0.
+            Overlay Direction Declaration.
+            터치 차단 버그 발견→v11.1.0 즉시 수정.
+            6파일 동기화 프로토콜 확립.
+
+2026-02-17  ■ DAY 18 — ChronoCall Phase 1 MVP 착수.
+            통화 녹음 STT 파이프라인 스캐폴딩.
+            같은 날 프로덕션 코드 완성 (9 Dart + 1 Kotlin).
+
+2026-02-18  ■ DAY 19 — ChronoCall CI 삽질.
+            compileSdk 35 수정, ffmpeg-kit Maven 충돌,
+            결국 ffmpeg_kit 제거 → 원본 직접 전송으로 전환.
+            4커밋 연속 fix. "빌드 60번 OK" 철학의 증거.
+
+2026-02-24  ■ DAY 25 — Parksy Liner v1.0.0.
+            Photo → Sketch (XDoG 선화 추출).
+            CI: gradle-wrapper.properties 수동 추가.
+
+2026-02-25  ■ DAY 26 — 헌법 제정.
+            헌법 제1조 "레포지토리는 소설이다".
+            헌법 제2조 "매트릭스 아키텍처".
+
+2026-02-26  ■ DAY 27 — Wavesy v3.0.0 리라이트.
+            AIVA Trimmer → Parksy Wavesy 리브랜딩.
+            flutter_midi_pro API 삽질 3연속.
+            libc++_shared.so 충돌 해결.
+
+2026-02-28  ■ DAY 29 — 크로스레포 시스템 도입.
+            Control Tower 부트스트랩.
+            세션 종료 프로토콜 의무화.
+            개발 철학서 작성 — "상용화의 족쇄를 벗어던졌다."
+
+2026-03-01  ■ DAY 30 — 공장 전환일.
+            Wavesy v4.0.0 (MIDI 편집 엔진).
+            스토어 2섹션 구조 (Production / Prototype Lab).
+            소스풀 백서 v2 + 자동화 스크립트 4종 실장.
+            글로벌 마케팅 전략 v1→v2.
+```
+
+**30일. 60커밋. 10앱. 6자동화 스크립트. 문서 7개. 헌법 1부.**
+이 타임라인 자체가 콘텐츠다.
 
 ---
 
@@ -583,7 +656,123 @@ ACT 5: 방송국 (Studio)
 3. "I built a license auditing pipeline for my personal apps. Am I insane? 🧵"
 4. "From workshop to factory — how I automated building apps with AI: 🧵"
 
-## 부록 C: 참조 문서 매트릭스
+## 부록 C: Show HN 실전 초안
+
+> 이건 "나중에 쓰자"가 아니다. 복붙해서 바로 올릴 수 있는 초안이다.
+
+---
+
+**Title:** Show HN: I built 10 Android apps without writing code, using only voice + Claude
+
+**Body:**
+
+I've never written a line of code. I'm not a developer. I build Android apps by talking to AI.
+
+Over 30 days, I shipped 10 native Android apps using only voice input (Samsung STT) → Claude Code on Termux → Flutter build → install on my Galaxy. 60+ commits. Zero lines typed by hand.
+
+The apps:
+- Parksy Pen (S Pen laser overlay, 31 builds to get it right)
+- Parksy Capture v10 (text capture → GitHub auto-archive)
+- Parksy Wavesy v4 (MP3/MIDI audio editor)
+- Parksy ChronoCall (call recording → Whisper STT → transcript viewer)
+- Parksy TTS (batch text-to-speech)
+- Parksy Liner (photo → sketch via XDoG algorithm)
+- ...and 4 more
+
+I'll never sell these. My apps have a constitution (CONSTITUTION.md) that literally forbids commercialization. It auto-blocks `firebase`, `analytics`, `admob`, `play.store` in CI.
+
+The apps aren't the product. The pipeline is. I built:
+- A 3-tier source pool (F-Droid open source → Samsung SDK → structure reference)
+- Automated license auditing (9 apps, 68 dependencies, 0 GPL violations)
+- A personal app store on Vercel (not Google Play)
+- Cross-repo orchestration with JSON manifests
+
+Everything is open source. Everything is documented. Git history = plot. Repository is a novel.
+
+Links:
+- Store: https://dtslib-apk-lab.vercel.app/
+- GitHub: https://github.com/dtslib1979/dtslib-apk-lab
+- VDD Report: [link to VDD-Report.md]
+- Constitution: [link to CONSTITUTION.md]
+
+I started as a workshop. Now I'm building a factory. AMA.
+
+---
+
+**예상 HN 반응 대응표:**
+
+| 반응 | 빈도 | 준비된 답변 |
+|------|------|-----------|
+| "Not bad, but what's the code quality?" | 높음 | "It works on my phone. That's my QA. CONSTITUTION.md §1: Success = it works on my device." |
+| "This is just vibe coding" | 높음 | "Exactly. I call it VDD — Voice-Driven Development. Here's the methodology paper: [VDD-Report.md]" |
+| "AI wrote bad code" | 중간 | "Build 31. Each failure documented in git. That's the point — failure is plot, not shame." |
+| "Why not sell it?" | 높음 | "I have a constitution that forbids it. Literally. With CI enforcement. [CONSTITUTION.md]" |
+| "Open source license issues?" | 중간 | "Automated audit: 9 apps, 68 deps, 0 GPL violations. Script: license-audit.py" |
+| "Prove you didn't write code" | 높음 | "git log --all --format='%an' shows only Claude commits. VDD-Report documents the voice-only workflow." |
+| "What's the store page built with?" | 낮음 | "Plain HTML + JSON on Vercel. dashboard/index.html + apps.json. No framework." |
+
+---
+
+## 부록 D: Twitter/X 첫 스레드 초안
+
+> 복붙 가능. 앱 10개 각 한 줄 + 스크린샷 슬롯.
+
+```
+I shipped 10 Android apps. I've never written a line of code.
+
+I talk to AI. AI writes code. I install it on my phone.
+
+30 days. 60 commits. Here are all 10: 🧵
+
+1/ Parksy Pen v1.0.31 — S Pen laser pointer overlay for screen recording.
+   31 builds. Every failure in git. Build 20 was the worst (FLAG_SECURE killed everything).
+   [screenshot]
+
+2/ Parksy Capture v10.0.8 — Share text from any app → auto-archive to GitHub.
+   Version TEN. This one has been through wars.
+   [screenshot]
+
+3/ Parksy Wavesy v4.0.0 — Audio editor. MP3 trimming + MIDI editing.
+   4 major versions. Started as "AIVA Trimmer", rewritten twice.
+   [screenshot]
+
+4/ Parksy ChronoCall v1.0.0 — Call recording → Whisper STT → timestamped transcript.
+   Samsung call folder auto-detection. Share intent receiver.
+   [screenshot]
+
+5/ Parksy TTS v1.0.2 — Batch text-to-speech generator.
+   Feed it text, get audio files. Simple.
+   [screenshot]
+
+6/ Parksy Liner v1.0.0 — Photo → Sketch. XDoG edge detection.
+   AI wrote the image processing algorithm. I don't know what XDoG means.
+   [screenshot]
+
+7/ Parksy Axis v11.1.0 — App hub. Overlay controller for all Parksy apps.
+   Version ELEVEN. 8 themes. IPC sync.
+   [screenshot]
+
+8/ Parksy Subtitle v0.0.0 — Dual subtitle overlay. v0. Just born.
+   [screenshot]
+
+9/ These apps have a constitution. CONSTITUTION.md.
+   It forbids: login, analytics, ads, Play Store, multi-user.
+   CI auto-blocks: firebase, admob, tracking, payment.
+   I will never sell these.
+
+10/ The apps aren't the product. The pipeline is.
+    Automated source pool. License auditing. Personal app store.
+    Workshop → Factory.
+
+    Store: https://dtslib-apk-lab.vercel.app/
+    GitHub: https://github.com/dtslib1979/dtslib-apk-lab
+
+    AMA.
+```
+
+---
+
+## 부록 E: 참조 문서 매트릭스
 
 | 문서 | 위치 | 역할 | 무기 매핑 |
 |------|------|------|----------|
@@ -598,10 +787,20 @@ ACT 5: 방송국 (Studio)
 
 ---
 
-*이 문서는 MARKETING_STRATEGY_DRAFT (실행력) + CONTENT_MARKETING_PLAN (분석) + 터묵스 인사이트 (공방→공장)를 통합한 글로벌 콘텐츠 마케팅 전략 v1.0이다.*
+---
 
-*소스 전부 존재. 앱 전부 빌드. 인프라 전부 라이브.*
-*이 전략의 중심 서사: 공방이 공장이 되는 순간.*
-*글 먼저, 영상 나중. 마케팅 먼저, 제작 나중.*
+## 결론: 3줄 요약
 
+1. **팔 앱이 없다. 팔 이야기가 있다.** — 30일, 60커밋, 10앱, 0줄 코딩. git이 증거.
+2. **공방이 공장이 됐다.** — 수작업 VDD → Source Pool 자동화. 파이프라인이 상품이다.
+3. **글 먼저, 영상 나중. 마케팅 먼저, 제작 나중.** — Show HN 초안은 부록 C에 있다. 복붙해서 쏘면 된다.
+
+> **"앱이 상품이 아니라 파이프라인이 상품이다."**
+> **그리고 그 파이프라인을 문서화한 이 백서 자체가 콘텐츠다.**
+> **자기 꼬리를 먹는 뱀. 우로보로스. 그게 콘텐츠 팩토리다.**
+
+---
+
+*이 백서는 MARKETING_STRATEGY_DRAFT (실행력) + CONTENT_MARKETING_PLAN v1 (분석) + 터묵스 인사이트 (공방→공장)를 통합한 최종본이다.*
+*v2.0 — 실전 배포 가능. Show HN 초안 + Twitter 스레드 + HN 반응 대응표 포함.*
 *최종 갱신: 2026-03-01*
