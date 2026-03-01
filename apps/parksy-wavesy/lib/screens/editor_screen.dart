@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
@@ -5,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import '../services/midi_service.dart';
+import '../services/midi_editor.dart';
+import '../models/midi_file.dart';
 
 class EditorScreen extends StatefulWidget {
   final String path;
@@ -19,6 +22,8 @@ class _EditorScreenState extends State<EditorScreen> {
   AudioPlayer? _player;
   // MIDI player
   MidiService? _midiService;
+  // MIDI file model (for editing)
+  MidiFile? _midiFile;
 
   bool get _isMidi {
     final lower = widget.path.toLowerCase();
@@ -34,6 +39,15 @@ class _EditorScreenState extends State<EditorScreen> {
   bool _exporting = false;
   bool _loading = true;
   String? _error;
+
+  // MIDI editing state
+  List<TrackInfo> _tracks = [];
+  double _bpm = 120;
+  double _originalBpm = 120;
+  bool _bpmChanged = false;
+  Map<int, int> _instrumentChanges = {};
+  int _transpose = 0;
+  bool _showTracks = false;
 
   @override
   void initState() {
@@ -67,6 +81,7 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Future<void> _initMidi() async {
+    // Load for playback
     _midiService = MidiService();
     _dur = await _midiService!.loadMidiFile(widget.path);
     _midiService!.positionStream.listen((p) {
@@ -75,6 +90,13 @@ class _EditorScreenState extends State<EditorScreen> {
     _midiService!.playingStream.listen((p) {
       if (mounted) setState(() => _playing = p);
     });
+
+    // Load for editing
+    final bytes = await File(widget.path).readAsBytes();
+    _midiFile = MidiFile.parse(bytes);
+    _tracks = MidiEditor.getTrackInfo(_midiFile!);
+    _bpm = _midiFile!.initialBpm;
+    _originalBpm = _bpm;
   }
 
   @override
@@ -145,23 +167,56 @@ class _EditorScreenState extends State<EditorScreen> {
     final src = widget.path.split('/').last.split('.').first;
     final inS = _inPt!.inSeconds;
     final outS = _outPt!.inSeconds;
-    final out = '${dir.path}/${ts}_${src}_IN${inS}_OUT$outS.wav';
-    final dur = (_outPt! - _inPt!).inMilliseconds / 1000.0;
 
     if (_isMidi) {
-      // MIDI export: not supported in v3.0.0 — show message
-      setState(() => _exporting = false);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('MIDI export coming in v4.0 — use audio files for now'),
-          duration: Duration(seconds: 3),
-        ),
-      );
-      return;
+      await _exportMidi(dir, ts, src, inS, outS);
+    } else {
+      await _exportAudio(dir, ts, src, inS, outS);
     }
 
-    // Audio export via FFmpeg
+    setState(() => _exporting = false);
+  }
+
+  Future<void> _exportMidi(
+      Directory dir, String ts, String src, int inS, int outS) async {
+    if (_midiFile == null) return;
+
+    // Collect selected track indices
+    final keepIndices = <int>{};
+    for (final t in _tracks) {
+      if (t.selected) keepIndices.add(t.index);
+    }
+
+    // Apply all edits
+    final edited = MidiEditor.applyEdits(
+      source: _midiFile!,
+      trimStart: _inPt,
+      trimEnd: _outPt,
+      keepTrackIndices: keepIndices.length < _tracks.length ? keepIndices : null,
+      newBpm: _bpmChanged ? _bpm : null,
+      instrumentChanges: _instrumentChanges.isNotEmpty ? _instrumentChanges : null,
+      transposeSemitones: _transpose != 0 ? _transpose : null,
+    );
+
+    // Serialize and save
+    final outPath = '${dir.path}/${ts}_${src}_IN${inS}_OUT$outS.mid';
+    final bytes = edited.serialize();
+    await File(outPath).writeAsBytes(bytes);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Saved: ${outPath.split('/').last}'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    await Share.shareXFiles([XFile(outPath)]);
+  }
+
+  Future<void> _exportAudio(
+      Directory dir, String ts, String src, int inS, int outS) async {
+    final dur = (_outPt! - _inPt!).inMilliseconds / 1000.0;
+    final out = '${dir.path}/${ts}_${src}_IN${inS}_OUT$outS.wav';
     final cmd = '-y -ss ${_inPt!.inMilliseconds / 1000} '
         '-i "${widget.path}" '
         '-t $dur '
@@ -170,7 +225,6 @@ class _EditorScreenState extends State<EditorScreen> {
         '"$out"';
 
     await FFmpegKit.execute(cmd);
-    setState(() => _exporting = false);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -182,6 +236,40 @@ class _EditorScreenState extends State<EditorScreen> {
     await Share.shareXFiles([XFile(out)]);
   }
 
+  void _showInstrumentPicker(TrackInfo track) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A2332),
+      builder: (ctx) {
+        return ListView.builder(
+          itemCount: gmInstruments.length,
+          itemBuilder: (_, i) {
+            final selected = (_instrumentChanges[track.index] ?? track.program) == i;
+            return ListTile(
+              leading: selected
+                  ? const Icon(Icons.check, color: Colors.tealAccent)
+                  : const SizedBox(width: 24),
+              title: Text(
+                '$i: ${gmInstruments[i]}',
+                style: TextStyle(
+                  color: selected ? Colors.tealAccent : Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+              dense: true,
+              onTap: () {
+                setState(() {
+                  _instrumentChanges[track.index] = i;
+                });
+                Navigator.pop(ctx);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = widget.path.split('/').last;
@@ -191,10 +279,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          name,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(name, overflow: TextOverflow.ellipsis),
         actions: [
           if (_isMidi)
             Padding(
@@ -213,14 +298,12 @@ class _EditorScreenState extends State<EditorScreen> {
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
+                    child: Text(_error!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center),
                   ),
                 )
-              : Padding(
+              : SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
@@ -273,10 +356,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       const SizedBox(height: 16),
                       // Clip duration
                       if (_inPt != null && _outPt != null)
-                        Text(
-                          'Clip: ${_fmt(clipDur)}',
-                          style: const TextStyle(fontSize: 18),
-                        ),
+                        Text('Clip: ${_fmt(clipDur)}',
+                            style: const TextStyle(fontSize: 18)),
                       const SizedBox(height: 16),
                       // Preset chips
                       Wrap(
@@ -289,7 +370,26 @@ class _EditorScreenState extends State<EditorScreen> {
                           );
                         }).toList(),
                       ),
-                      const Spacer(),
+
+                      // --- MIDI Editing Section ---
+                      if (_isMidi && _midiFile != null) ...[
+                        const SizedBox(height: 24),
+                        const Divider(color: Colors.white24),
+                        const SizedBox(height: 8),
+
+                        // BPM Control
+                        _buildBpmControl(),
+                        const SizedBox(height: 16),
+
+                        // Transpose Control
+                        _buildTransposeControl(),
+                        const SizedBox(height: 16),
+
+                        // Track Panel
+                        _buildTrackPanel(),
+                      ],
+
+                      const SizedBox(height: 24),
                       // Export button
                       if (_exporting)
                         const CircularProgressIndicator()
@@ -297,14 +397,15 @@ class _EditorScreenState extends State<EditorScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed:
-                                (_inPt != null && _outPt != null) ? _export : null,
+                            onPressed: (_inPt != null && _outPt != null)
+                                ? _export
+                                : null,
                             icon: Icon(
                               _isMidi ? Icons.piano : Icons.save_alt,
                               size: 28,
                             ),
                             label: Text(
-                              _isMidi ? 'Export (v4.0)' : 'Export WAV',
+                              _isMidi ? 'Export MIDI' : 'Export WAV',
                               style: const TextStyle(fontSize: 20),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -317,6 +418,290 @@ class _EditorScreenState extends State<EditorScreen> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  // --- Transpose Control ---
+  Widget _buildTransposeControl() {
+    final label = transposeLabels[_transpose] ?? '${_transpose > 0 ? "+" : ""}$_transpose';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Transpose',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _transpose != 0 ? Colors.amberAccent : Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline),
+                onPressed: () {
+                  setState(() => _transpose = (_transpose - 1).clamp(-12, 12));
+                },
+              ),
+              Expanded(
+                child: Slider(
+                  value: _transpose.toDouble(),
+                  min: -12,
+                  max: 12,
+                  divisions: 24,
+                  onChanged: (v) {
+                    setState(() => _transpose = v.round());
+                  },
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: () {
+                  setState(() => _transpose = (_transpose + 1).clamp(-12, 12));
+                },
+              ),
+            ],
+          ),
+          if (_transpose != 0)
+            TextButton(
+              onPressed: () => setState(() => _transpose = 0),
+              child: const Text('Reset', style: TextStyle(fontSize: 12)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // --- BPM Control ---
+  Widget _buildBpmControl() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Tempo',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                '${_bpm.round()} BPM',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _bpmChanged ? Colors.tealAccent : Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline),
+                onPressed: () {
+                  setState(() {
+                    _bpm = (_bpm - 5).clamp(20, 300);
+                    _bpmChanged = _bpm != _originalBpm;
+                  });
+                },
+              ),
+              Expanded(
+                child: Slider(
+                  value: _bpm,
+                  min: 20,
+                  max: 300,
+                  onChanged: (v) {
+                    setState(() {
+                      _bpm = v;
+                      _bpmChanged = _bpm.round() != _originalBpm.round();
+                    });
+                  },
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: () {
+                  setState(() {
+                    _bpm = (_bpm + 5).clamp(20, 300);
+                    _bpmChanged = _bpm != _originalBpm;
+                  });
+                },
+              ),
+            ],
+          ),
+          if (_bpmChanged)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _bpm = _originalBpm;
+                  _bpmChanged = false;
+                });
+              },
+              child: Text('Reset (${_originalBpm.round()} BPM)',
+                  style: const TextStyle(fontSize: 12)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // --- Track Panel ---
+  Widget _buildTrackPanel() {
+    final activeTracks = _tracks.where((t) => t.noteCount > 0).toList();
+    final emptyTracks = _tracks.where((t) => t.noteCount == 0).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          // Header
+          InkWell(
+            onTap: () => setState(() => _showTracks = !_showTracks),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Tracks (${_tracks.where((t) => t.selected).length}/${_tracks.length})',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  Icon(_showTracks
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down),
+                ],
+              ),
+            ),
+          ),
+
+          if (_showTracks) ...[
+            // Select all / none
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        for (final t in _tracks) {
+                          t.selected = true;
+                        }
+                      });
+                    },
+                    child: const Text('All', style: TextStyle(fontSize: 12)),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        for (final t in _tracks) {
+                          t.selected = t.noteCount == 0; // keep meta tracks
+                        }
+                      });
+                    },
+                    child: const Text('None', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+
+            // Active tracks (with notes)
+            ...activeTracks.map((t) => _buildTrackTile(t)),
+
+            // Empty tracks (meta-only)
+            if (emptyTracks.isNotEmpty) ...[
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Text(
+                  'Meta tracks',
+                  style: TextStyle(
+                      fontSize: 11, color: Colors.white.withOpacity(0.4)),
+                ),
+              ),
+              ...emptyTracks.map((t) => _buildTrackTile(t, isMeta: true)),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrackTile(TrackInfo track, {bool isMeta = false}) {
+    final instrument = _instrumentChanges.containsKey(track.index)
+        ? gmInstrumentName(_instrumentChanges[track.index]!)
+        : track.instrumentName;
+    final changed = _instrumentChanges.containsKey(track.index);
+
+    return CheckboxListTile(
+      dense: true,
+      value: track.selected,
+      onChanged: (v) => setState(() => track.selected = v ?? true),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              track.displayName,
+              style: TextStyle(
+                fontSize: 14,
+                color: track.selected ? Colors.white : Colors.white38,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (!isMeta && track.channel != 9)
+            GestureDetector(
+              onTap: () => _showInstrumentPicker(track),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: changed ? Colors.tealAccent : Colors.white24,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  instrument,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: changed ? Colors.tealAccent : Colors.white54,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      subtitle: Text(
+        isMeta
+            ? 'Ch ${track.channel ?? "-"}'
+            : '${track.noteCount} notes  Ch ${track.channel ?? "-"}',
+        style: TextStyle(
+          fontSize: 11,
+          color: Colors.white.withOpacity(0.3),
+        ),
+      ),
     );
   }
 
@@ -339,7 +724,8 @@ class _EditorScreenState extends State<EditorScreen> {
           Text(label, style: const TextStyle(fontSize: 16)),
           Text(
             value != null ? _fmt(value) : '--:--',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style:
+                const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
         ],
       ),

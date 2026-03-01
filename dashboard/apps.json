@@ -38,11 +38,11 @@
   {
     "id": "parksy-wavesy",
     "name": "Parksy Wavesy",
-    "version": "v3.0.0",
-    "description": "음원 편집 가위 — MP3/MIDI 트리밍",
+    "version": "v4.0.0",
+    "description": "음원 편집 가위 — MP3/MIDI 트리밍 + MIDI 편집",
     "icon": "🌊",
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-wavesy-latest/app-debug.apk",
-    "lastUpdated": "2026-02-25"
+    "lastUpdated": "2026-03-01"
   },
   {
     "id": "parksy-tts",
