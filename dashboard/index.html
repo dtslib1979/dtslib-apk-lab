@@ -26,6 +26,8 @@
             --accent: #D4AF37;
             --accent-glow: rgba(212,175,55,0.4);
             --green: #253A2F;
+            --proto-border: rgba(245,245,220,0.08);
+            --proto-border-hover: rgba(245,245,220,0.2);
         }
 
         html { scroll-behavior: smooth; }
@@ -112,6 +114,63 @@
             letter-spacing: 0.02em;
         }
 
+        /* ── Section Headers ── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .section-label {
+            font-family: 'Cinzel', serif;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .section-line {
+            flex: 1;
+            height: 1px;
+        }
+
+        .section-count {
+            font-size: 11px;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+        }
+
+        /* Production section */
+        .section-header.production .section-label { color: var(--accent); }
+        .section-header.production .section-line { background: linear-gradient(90deg, var(--border), transparent); }
+        .section-header.production .section-count { color: var(--text-muted); }
+
+        /* Prototype section */
+        .section-header.prototype .section-label { color: var(--text-secondary); }
+        .section-header.prototype .section-line { background: linear-gradient(90deg, var(--proto-border), transparent); }
+        .section-header.prototype .section-count { color: var(--text-muted); }
+
+        /* ── Empty Production ── */
+        .empty-state {
+            border: 1px dashed var(--border);
+            border-radius: 16px;
+            padding: 28px 16px;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .empty-state .accent {
+            color: var(--text-secondary);
+        }
+
         /* ── App Grid ── */
         .app-grid {
             display: grid;
@@ -120,6 +179,8 @@
         }
 
         .app-card {
+            position: relative;
+            overflow: hidden;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 16px;
@@ -158,14 +219,31 @@
             pointer-events: none;
         }
 
-        .app-card {
-            position: relative;
-            overflow: hidden;
-        }
-
         @keyframes cardShimmer {
             0% { background-position: -200% center; }
             100% { background-position: 200% center; }
+        }
+
+        /* Prototype cards — muted style */
+        .app-card.proto {
+            border-color: var(--proto-border);
+        }
+
+        .app-card.proto:hover,
+        .app-card.proto:active {
+            border-color: var(--proto-border-hover);
+        }
+
+        .app-card.proto::after {
+            display: none;
+        }
+
+        .app-card.proto .app-icon {
+            opacity: 0.6;
+        }
+
+        .app-card.proto .app-name {
+            color: var(--text-secondary);
         }
 
         .app-icon {
@@ -197,11 +275,41 @@
             letter-spacing: 0.03em;
         }
 
+        .app-card.proto .app-version {
+            color: var(--text-muted);
+        }
+
+        /* ── Status Badge ── */
+        .status-badge {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .status-badge.production {
+            background: rgba(212,175,55,0.15);
+            color: var(--accent);
+        }
+
+        .status-badge.prototype {
+            background: rgba(245,245,220,0.06);
+            color: var(--text-muted);
+        }
+
         /* ── Divider ── */
         .divider {
             height: 1px;
             background: linear-gradient(90deg, transparent, var(--border), transparent);
             margin: 28px 0;
+        }
+
+        .section-gap {
+            height: 28px;
         }
 
         /* ── Footer ── */
@@ -243,7 +351,13 @@
             Debug builds — Internal &amp; partner use only
         </div>
 
-        <div class="app-grid" id="appGrid"></div>
+        <!-- Production -->
+        <div id="productionSection"></div>
+
+        <div class="section-gap"></div>
+
+        <!-- Prototype Lab -->
+        <div id="prototypeSection"></div>
 
         <div class="divider"></div>
 
@@ -255,19 +369,53 @@
 
     <script>
         fetch('apps.json')
-            .then(r => r.json())
-            .then(apps => {
-                document.getElementById('appCount').textContent = apps.length + ' Apps';
-                var grid = document.getElementById('appGrid');
-                grid.innerHTML = apps.map(function(app) {
-                    return '<a href="' + app.downloadUrl + '" class="app-card reveal">' +
-                        '<div class="app-icon">' + app.icon + '</div>' +
-                        '<div class="app-name">' + app.name.replace('Parksy ', '') + '</div>' +
-                        '<div class="app-version">' + app.version + '</div>' +
-                    '</a>';
-                }).join('');
+            .then(function(r) { return r.json(); })
+            .then(function(apps) {
+                var production = apps.filter(function(a) { return a.status === 'production'; });
+                var prototype = apps.filter(function(a) { return a.status !== 'production'; });
 
-                // IntersectionObserver Reveal
+                document.getElementById('appCount').textContent = apps.length + ' Apps';
+
+                // Production Section
+                var prodHtml = '<div class="section-header production">' +
+                    '<span class="section-label">Production</span>' +
+                    '<span class="section-line"></span>' +
+                    '<span class="section-count">' + production.length + '</span>' +
+                    '</div>';
+
+                if (production.length === 0) {
+                    prodHtml += '<div class="empty-state">' +
+                        '<p><span class="accent">검증 완료된 앱이 여기에 올라옵니다</span><br>' +
+                        'Prototype Lab에서 테스트 후 승격</p>' +
+                        '</div>';
+                } else {
+                    prodHtml += '<div class="app-grid">' +
+                        production.map(function(app) {
+                            return renderCard(app, false);
+                        }).join('') +
+                        '</div>';
+                }
+
+                document.getElementById('productionSection').innerHTML = prodHtml;
+
+                // Prototype Section
+                var protoHtml = '<div class="section-header prototype">' +
+                    '<span class="section-label">Prototype Lab</span>' +
+                    '<span class="section-line"></span>' +
+                    '<span class="section-count">' + prototype.length + '</span>' +
+                    '</div>';
+
+                if (prototype.length > 0) {
+                    protoHtml += '<div class="app-grid">' +
+                        prototype.map(function(app) {
+                            return renderCard(app, true);
+                        }).join('') +
+                        '</div>';
+                }
+
+                document.getElementById('prototypeSection').innerHTML = protoHtml;
+
+                // Reveal animation
                 var observer = new IntersectionObserver(function(entries) {
                     entries.forEach(function(entry) {
                         if (entry.isIntersecting) {
@@ -277,11 +425,20 @@
                     });
                 }, { threshold: 0.1 });
 
-                document.querySelectorAll('.reveal').forEach(function(el, i) {
+                document.querySelectorAll('.app-card').forEach(function(el, i) {
                     el.style.transitionDelay = (i * 0.08) + 's';
                     observer.observe(el);
                 });
             });
+
+        function renderCard(app, isProto) {
+            var cls = isProto ? 'app-card proto' : 'app-card';
+            return '<a href="' + app.downloadUrl + '" class="' + cls + '">' +
+                '<div class="app-icon">' + app.icon + '</div>' +
+                '<div class="app-name">' + app.name.replace('Parksy ', '') + '</div>' +
+                '<div class="app-version">' + app.version + '</div>' +
+                '</a>';
+        }
     </script>
 </body>
 </html>
