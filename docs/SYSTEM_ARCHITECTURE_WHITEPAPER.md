@@ -1,1064 +1,790 @@
 # Parksy APK Lab — System Architecture Whitepaper
 
-> **One Person, Ten Apps, Zero Typed Code.**
-> Voice-Driven Development로 30일 만에 구축한 개인 앱 팩토리의 전체 기술 아키텍처.
-
-**Version:** v1.0
-**Date:** 2026-03-01
-**Author:** Parksy (Voice) + Claude Code (Implementation)
-**Audience:** 기술 블로그 독자, Hacker News, 오픈소스 커뮤니티, 잠재 협력자
-**Companion Docs:** CONTENT_MARKETING_PLAN.md (마케팅), SOURCE_POOL_SCM_WHITEPAPER.md (소스 확보), PARKSY_APK_PHILOSOPHY.md (철학)
+> **Version:** v2.0 — Execution Document
+> **Date:** 2026-03-02
+> **Author:** Parksy (Voice) + Claude Code (Implementation)
+> **선행 문서:** SOURCE_POOL_SCM_WHITEPAPER.md (프로세스), CONTENT_MARKETING_PLAN.md (마케팅)
+> **한 줄 요약:** F-Droid 오픈소스 → 내 앱으로 커스터마이징 → 빌드/배포까지 — 공정 자동화 설계도
 
 ---
 
-## Table of Contents
+## 0. Fact Sheet
 
-1. [Executive Summary](#1-executive-summary)
-2. [System Overview — 세 겹의 팩토리](#2-system-overview)
-3. [Layer 1: App Manufacturing Line](#3-layer-1-app-manufacturing-line)
-4. [Layer 2: Automation Pipeline](#4-layer-2-automation-pipeline)
-5. [Layer 3: Distribution & Storefront](#5-layer-3-distribution--storefront)
-6. [Cross-Cutting: Voice-Driven Development](#6-cross-cutting-voice-driven-development)
-7. [App Portfolio — 10개 앱 기술 명세](#7-app-portfolio)
-8. [Inter-App Communication](#8-inter-app-communication)
-9. [CI/CD Architecture](#9-cicd-architecture)
-10. [Compliance Automation](#10-compliance-automation)
-11. [Monorepo Engineering](#11-monorepo-engineering)
-12. [Infrastructure Map](#12-infrastructure-map)
-13. [Quantitative Profile](#13-quantitative-profile)
-14. [Failure Catalog — 실패에서 배운 것](#14-failure-catalog)
-15. [Roadmap](#15-roadmap)
-16. [Appendix](#appendix)
-
----
-
-## 1. Executive Summary
-
-Parksy APK Lab은 **1인 개발자가 음성 명령만으로 Android 앱 10개를 제조, 배포, 유지보수하는 시스템**이다.
-
-코드를 직접 타이핑하지 않는다. 음성으로 요구사항을 말하면 Claude Code가 구현한다.
-Play Store를 사용하지 않는다. 자체 스토어(Vercel)에서 직접 배포한다.
-클라우드 API에 의존하지 않는다. 가능한 모든 처리를 on-device로 수행한다.
-
-이 백서는 그 시스템의 **실제 작동 구조**를 문서화한다. 설계 의도가 아니라 돌아가는 코드에 근거한다.
-
-### 핵심 수치
-
-| 지표 | 값 | 근거 |
-|------|-----|------|
-| 앱 수 | 10개 (8 등록 + 2 개발중) | `dashboard/apps.json` + `apps/` 디렉토리 |
-| 총 코드 | **23,913줄** (Dart) + **4,949줄** (Kotlin) | `find apps -name "*.dart"` wc -l |
-| 자동화 스크립트 | 6개, **1,168줄** (Python + Shell) | `scripts/` |
-| CI/CD 워크플로우 | **21개** | `.github/workflows/` |
-| 의존성 | 68개 패키지, **GPL 위반 0건** | `license-audit.py` |
-| 개발 기간 | 30일 (2026-01-31 → 2026-03-01) | `git log --reverse` |
+| 항목 | 수치 | 출처 |
+|------|------|------|
+| 앱 수 | **10** (8 스토어 등록 + 2 개발 중) | `apps/` + `dashboard/apps.json` |
+| 총 코드 | **23,913줄** (Dart 18,964 + Kotlin 4,949) | `find apps -name "*.dart"` wc -l |
+| 자동화 스크립트 | **6개**, 1,168줄 | `scripts/` |
+| CI/CD 워크플로우 | **21개**, 1,188줄 YAML | `.github/workflows/` |
+| 런타임 의존성 | **68 패키지**, GPL 위반 **0건** | `license-audit.py` |
+| 헌법 금지 패턴 | **10종** | `constitution_guard.py` |
+| 버전 동기화 파일 | **6개/앱** | `CONTROL_KEYS.md §2` |
+| 개발 기간 | 30일 (2026-01-31 ~ 2026-03-01) | `git log --reverse` |
 | 커밋 수 | 62개 | `git log --oneline --all` |
 | 직접 타이핑한 코드 | **0줄** | VDD 프로토콜 |
-| 스토어 | Vercel (dtslib-apk-lab.vercel.app) | 라이브 |
+| 월 비용 | **~$5** (Whisper API only) | — |
+| 스토어 | dtslib-apk-lab.vercel.app | Vercel 배포 |
 
 ---
 
-## 2. System Overview
-
-전체 시스템은 세 겹의 동심원으로 구성된다.
+## 1. System Overview — 3-Layer × 5-Stage
 
 ```
-┌─────────────────────────────────────────────────┐
-│           Layer 3: DISTRIBUTION                 │
-│                                                 │
-│   Vercel Store ← apps.json ← build_store_index  │
-│   GitHub Releases ← CI/CD ← APK artifacts      │
-│   nightly.link ← workflow artifacts             │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│           Layer 2: AUTOMATION                   │
-│                                                 │
-│   21 GitHub Actions workflows                   │
-│   6 automation scripts                          │
-│   Constitution Guard (policy enforcement)       │
-│   License Audit (compliance)                    │
-│   Store Index Sync (metadata SSOT)              │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│           Layer 1: APP MANUFACTURING            │
-│                                                 │
-│   10 Flutter+Kotlin hybrid apps                 │
-│   Shared architecture patterns                  │
-│   Platform Channel IPC                          │
-│   F-Droid Source Pool references                │
-│                                                 │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  Layer 3: DISTRIBUTION                      │
+│  Vercel Store ← apps.json ← build_store_index.py           │
+│  GitHub Releases ← CI/CD ← APK artifacts                   │
+│  nightly.link ← workflow artifacts                          │
+├─────────────────────────────────────────────────────────────┤
+│                  Layer 2: AUTOMATION                        │
+│                                                             │
+│  ┌─────────┐ ┌────────┐ ┌──────────┐ ┌───────┐ ┌────────┐ │
+│  │ Stage 1 │→│Stage 2 │→│ Stage 3  │→│Stage 4│→│Stage 5 │ │
+│  │INGESTION│ │ANALYSIS│ │TRANSFORM │ │ BUILD │ │DISTRIB │ │
+│  │ clone   │ │ parse  │ │ AI edit  │ │ CI/CD │ │ deploy │ │
+│  └─────────┘ └────────┘ └──────────┘ └───────┘ └────────┘ │
+│        │          │           │           │          │      │
+│        └──────────┴───────────┴───────────┴──────────┘      │
+│                    GOVERNANCE LAYER                          │
+│         Constitution Guard + License Audit + Signing        │
+├─────────────────────────────────────────────────────────────┤
+│                  Layer 1: APP MANUFACTURING                 │
+│  10 Flutter+Kotlin hybrid apps                              │
+│  Shared architecture: Platform Channel IPC                  │
+│  F-Droid Source Pool references                             │
+└─────────────────────────────────────────────────────────────┘
 
-        ↑ 모든 레이어를 관통하는 입력:
-        🎤 Voice → Claude Code → Git Commit
+      ↑ 모든 레이어를 관통하는 입력:
+      🎤 Voice → Claude Code → Git Commit
 ```
 
-**핵심 설계 원칙: 모든 것이 git에 기록된다.**
+### 자동화 현황
 
-커밋이 전표이고, 브랜치가 챕터이고, `git log --reverse`가 줄거리다.
-삽질, 실패, 방향 전환을 squash로 뭉개지 않는다. 31번 빌드한 Parksy Pen의 모든 실패가 레포에 남아 있다.
+| Stage | 현재 | 자동화율 | 목표 |
+|-------|------|----------|------|
+| 1 Ingestion | `source-pool-clone.sh` 실장 | 60% | 90% |
+| 2 Analysis | 수작업 | 0% | 70% |
+| 3 Transform | Claude Code 반자동 | 40% | 60% (반자동 유지) |
+| 4 Build | GitHub Actions 21개 | **90%** | 95% |
+| 5 Distribution | Release 자동, 설치 수동 | 60% | 80% |
+| **총합** | | **~45%** | **~79%** |
 
 ---
 
-## 3. Layer 1: App Manufacturing Line
+## 2. Layer 1: App Manufacturing Line
 
-### 3.1 공통 아키텍처 패턴
-
-10개 앱 전체가 동일한 하이브리드 구조를 따른다:
+### 2.1 공통 아키텍처
 
 ```
-┌──────────────────────────────────────────────┐
-│                Flutter (Dart)                 │
-│                                              │
-│   UI Layer        Business Logic    State    │
-│   ┌─────────┐    ┌──────────────┐  ┌──────┐ │
-│   │ Screens │ →  │  Services    │  │ Prefs│ │
-│   │ Widgets │    │  Models      │  │ State│ │
-│   └─────────┘    └──────────────┘  └──────┘ │
-│         │                                    │
-│         ↓                                    │
-│   ┌──────────────────────────────────┐       │
-│   │     MethodChannel / EventChannel │       │
-│   └──────────────────────────────────┘       │
-│         │                                    │
-├─────────┼────────────────────────────────────┤
-│         ↓        Android (Kotlin)            │
-│                                              │
-│   ┌─────────────────────────────────────┐    │
-│   │  MainActivity (Channel Handler)     │    │
-│   ├─────────────────────────────────────┤    │
-│   │  OverlayService / AudioCapture /    │    │
-│   │  AccessibilityService / FileIO      │    │
-│   └─────────────────────────────────────┘    │
-│                                              │
-│   AndroidManifest.xml (permissions, intents) │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│            Flutter (Dart)                 │
+│  UI Layer → Services → State (Prefs)     │
+│         │                                │
+│  MethodChannel / EventChannel            │
+├──────────────────────────────────────────┤
+│            Android (Kotlin)              │
+│  MainActivity (Channel Handler)          │
+│  OverlayService / AudioCapture / FileIO  │
+│  AndroidManifest.xml (permissions)       │
+└──────────────────────────────────────────┘
 ```
 
-**왜 순수 Flutter가 아닌가:**
-Android OS 레벨 기능(오버레이, 스크린 오디오 캡처, 접근성 서비스, 파일시스템 직접 접근)은 Flutter 플러그인만으로는 제어할 수 없다. 10개 앱 중 7개가 Kotlin 네이티브 레이어를 필요로 한다.
+### 2.2 앱 포트폴리오
 
-### 3.2 기술 스택 매트릭스
+| 앱 | Dart | Kotlin | 합계 | 핵심 기술 | 오버레이 |
+|----|------|--------|------|----------|---------|
+| Parksy Glot | 3,774 | 1,478 | 5,252 | 실시간 STT + 오버레이 | Yes |
+| Parksy Audio Tools | 3,359 | 699 | 4,058 | MediaProjection + MIDI | Yes |
+| Parksy Capture | 2,452 | 654 | 3,106 | Share Intent + GitHub API | No |
+| Parksy Axis | 2,618 | 5 | 2,623 | FSM 상태 전이, 8테마 | Yes |
+| Parksy Pen | 995 | 1,583 | 2,578 | S Pen 터치 분리 + 접근성 | Yes |
+| ChronoCall | 2,110 | 145 | 2,255 | FFmpeg + Whisper STT | No |
+| Parksy Wavesy | 1,940 | 5 | 1,945 | MP3 트림 + MIDI 편집 | No |
+| Parksy TTS | 783 | 5 | 788 | Cloud TTS 배치 | No |
+| Parksy Liner | 615 | 370 | 985 | XDoG 선화 추출 | No |
+| MIDI Converter | 318 | 5 | 323 | Basic Pitch 변환 | No |
+| **합계** | **18,964** | **4,949** | **23,913** | | |
 
-| 기술 | 역할 | 사용 앱 |
-|------|------|---------|
-| **Flutter 3.x** | UI + 비즈니스 로직 | 전체 10개 |
-| **Kotlin** | Android 네이티브 | 7개 (Pen, Capture, Glot, Audio Tools, Liner, Axis, ChronoCall) |
-| **MethodChannel** | Dart↔Kotlin IPC | 7개 |
-| **WindowManager** | 오버레이 렌더링 | 3개 (Pen, Axis, Glot) |
-| **AccessibilityService** | 터치 주입 | 1개 (Pen) |
-| **MediaProjection** | 스크린 오디오 캡처 | 1개 (Audio Tools) |
-| **FFmpeg** | 오디오 전처리 | 3개 (Wavesy, ChronoCall, Audio Tools) |
-| **OpenAI Whisper API** | STT | 1개 (ChronoCall) |
-| **Google Cloud TTS** | 음성 합성 | 1개 (TTS Factory) |
-| **SharedPreferences** | 로컬 저장 | 전체 |
-| **just_audio** | 오디오 재생 | 2개 (ChronoCall, Wavesy) |
-| **XDoG Algorithm** | 선화 추출 | 1개 (Liner) |
-| **flutter_midi_pro** | MIDI 재생/편집 | 1개 (Wavesy) |
+### 2.3 Inter-App Communication
 
-### 3.3 앱별 코드 규모
-
-| 앱 | Dart (줄) | Kotlin (줄) | 합계 | 파일 수 | 핵심 난이도 |
-|----|-----------|-------------|------|---------|------------|
-| **Parksy Glot** | 3,774 | 1,478 | 5,252 | 25+ | 실시간 STT + 오버레이 |
-| **Parksy Audio Tools** | 3,359 | 699 | 4,058 | 20+ | MediaProjection + MIDI |
-| **Parksy Axis** | 2,618 | 5 | 2,623 | 12 | FSM 상태 전이 |
-| **Parksy Capture** | 2,452 | 654 | 3,106 | 8 | Share Intent + GitHub API |
-| **Parksy Pen** | 995 | 1,583 | 2,578 | 12 | 터치 분리 + 접근성 |
-| **ChronoCall** | 2,110 | 145 | 2,255 | 10 | FFmpeg + Whisper |
-| **Parksy Wavesy** | 1,940 | 5 | 1,945 | 10 | MIDI 편집 엔진 |
-| **Parksy TTS** | 783 | 5 | 788 | 6 | Cloud TTS 클라이언트 |
-| **Parksy Liner** | 615 | 370 | 985 | 5 | XDoG 이미지 처리 |
-| **MIDI Converter** | 318 | 5 | 323 | 3 | Basic Pitch 변환 |
-| **합계** | **18,964** | **4,949** | **23,913** | **111+** | — |
+```
+ChronoCall ──(Share Intent: text)──→ Capture ──→ GitHub 레포
+외부 앱 ──(Share Intent: audio/*)──→ ChronoCall ──→ STT 변환
+Audio Tools ──(파일시스템: WAV)──→ Wavesy ──→ 편집/트림
+Android OS ──(Quick Settings Tile)──→ Pen ──→ 오버레이 시작
+```
 
 ---
 
-## 4. Layer 2: Automation Pipeline
+## 3. 5-Stage Pipeline — Execution Spec
 
-### 4.1 자동화 스크립트 일람
+### Stage 1: Ingestion (소스 확보)
 
-6개 스크립트가 수동 작업을 제거한다:
+| 항목 | 값 |
+|------|-----|
+| **입력** | F-Droid URL 또는 패키지명 |
+| **출력** | `~/references/fdroid/{name}/` + 라이선스 검증 |
+| **스크립트** | `scripts/source-pool-clone.sh` (163줄, 실장 완료) |
+| **자동화율** | 60% (clone 자동, 탐색 수동) |
+
+```bash
+# 실행
+./scripts/source-pool-clone.sh              # 전체 clone/update
+./scripts/source-pool-clone.sh --shallow     # shallow clone
+./scripts/source-pool-clone.sh ringdroid     # 특정 레포만
+```
+
+**등록된 소스풀 (5개):**
+
+| 참조 앱 | 라이선스 | → Parksy 앱 |
+|---------|----------|-------------|
+| Ringdroid | Apache 2.0 | Wavesy |
+| sherpa-onnx | Apache 2.0 | ChronoCall, TTS |
+| Transcribro | Apache 2.0 | ChronoCall |
+| whisper-keyboard | Apache 2.0 | ChronoCall |
+| Clipboard Cleaner | MIT | Capture |
+
+### Stage 2: Analysis (파싱/분석)
+
+| 항목 | 값 |
+|------|-----|
+| **입력** | clone된 소스 디렉토리 |
+| **출력** | `analysis-report.json` |
+| **스크립트** | **미구현** — Phase 2 구현 대상 |
+| **자동화율** | 0% |
+
+**분석 항목 (구현 시):**
+
+| 분석 | 명령 | 출력 |
+|------|------|------|
+| 디렉토리 구조 | `tree -L 3` | 구조 맵 |
+| 빌드 시스템 | `build.gradle` 파싱 | compileSdk, minSdk, AGP |
+| 의존성 | dependencies 블록 | 패키지 + 버전 |
+| 라이선스 | LICENSE + SPDX 헤더 | GPL/Apache/MIT 판정 |
+| 코드 규모 | `wc -l *.kt *.java` | 줄 수 |
+| 헌법 호환 | `constitution_guard.py` | HARD/SOFT/PASS |
+
+### Stage 3: Transformation (AI 편집)
+
+| 항목 | 값 |
+|------|-----|
+| **입력** | 분석 리포트 + `transform-spec.json` |
+| **출력** | 수정된 소스 + app-meta.json |
+| **실행자** | Claude Code (Termux) |
+| **자동화율** | 40% (AI가 편집, 사람이 지시 + 승인) |
+
+이 Stage는 **반자동이 정답이다.** 완전 자동은 위험하다. "AI가 diff 생성 → 사람이 승인" 구조.
+
+#### transform-spec.json — Field Definition
+
+| 필드 | 타입 | 필수 | 기본값 | 설명 |
+|------|------|------|--------|------|
+| `schema_version` | string | Y | — | `"transform-spec-v1"` |
+| `source_package` | string | Y | — | 원본 패키지명 (예: `com.example.app`) |
+| `target_package` | string | Y | — | 대상 패키지명 (예: `kr.parksy.newapp`) |
+| `app_name` | string | Y | — | 대상 앱 이름 (예: `"Parksy NewApp"`) |
+| `preset` | object | Y | — | 프리셋 3단계 (아래 §4 참조) |
+| `keep_features` | string[] | N | `["*"]` | 유지할 기능 목록 |
+| `remove_features` | string[] | N | `[]` | 제거할 기능 (예: `["login","analytics"]`) |
+| `remove_permissions` | string[] | N | `[]` | 제거할 Android 권한 |
+| `ui_screens_max` | int | N | `3` | 최대 화면 수 (헌법 §4) |
+| `theme` | string | N | `"parksy-dark"` | 테마 프리셋 |
+| `icon_source` | string | N | `null` | 커스텀 아이콘 경로 |
+| `constitution_check` | bool | N | `true` | 변환 후 헌법 검사 실행 |
+| `license_gate` | bool | N | `true` | 변환 전 라이선스 감사 실행 |
+| `source_origin` | string | Y | — | `"forked:{url}"` 또는 `"hybrid:{url}"` |
+
+**예시 (실행 가능):**
+
+```json
+{
+  "schema_version": "transform-spec-v1",
+  "source_package": "org.nicenoise.ringdroid",
+  "target_package": "kr.parksy.wavesy",
+  "app_name": "Parksy Wavesy",
+  "preset": {
+    "base": {
+      "jdk": "17",
+      "gradle": "8.4",
+      "agp": "8.2.0",
+      "min_sdk": 26,
+      "target_sdk": 34,
+      "compile_sdk": 34,
+      "ndk": null
+    },
+    "build": {
+      "flavor": null,
+      "build_type": "debug",
+      "signing": "debug-key",
+      "proguard": false
+    },
+    "patch": {
+      "package_rename": true,
+      "app_name_rename": true,
+      "icon_replace": false,
+      "remove_activities": ["LoginActivity", "SettingsActivity"],
+      "remove_services": [],
+      "remove_receivers": [],
+      "add_permissions": [],
+      "remove_permissions": ["INTERNET"]
+    }
+  },
+  "keep_features": ["audio_trim", "waveform_view"],
+  "remove_features": ["login", "analytics", "ads", "in_app_purchase"],
+  "ui_screens_max": 3,
+  "theme": "parksy-dark",
+  "constitution_check": true,
+  "license_gate": true,
+  "source_origin": "forked:https://github.com/nicenoise/ringdroid"
+}
+```
+
+### Stage 4: Build (빌드/검증)
+
+| 항목 | 값 |
+|------|-----|
+| **입력** | 수정된 소스 (git push) |
+| **출력** | debug APK + GitHub Release |
+| **스크립트** | GitHub Actions (21개 워크플로우) |
+| **자동화율** | 90% |
+
+```
+git push → build-{app}.yml 트리거 (path-scoped)
+  → Flutter setup → pub get → build apk --debug
+  → constitution-guard.yml (정책 검사)
+  → upload-artifact → GitHub Release (tag: {app}-latest)
+```
+
+**워크플로우 구성:**
+
+| 카테고리 | 수량 | 트리거 |
+|----------|------|--------|
+| 앱 빌드 | 11 | push to main (앱 경로 변경 시) |
+| 서비스 배포 | 5 | push/manual |
+| 정책/테스트 | 3 | push/PR |
+| 메타데이터 동기화 | 1 | pubspec 변경 시 |
+| 기타 | 1 | — |
+
+### Stage 5: Distribution (배포)
+
+| 항목 | 값 |
+|------|-----|
+| **입력** | 빌드된 APK |
+| **출력** | 스토어 갱신 + 기기 설치 |
+| **스크립트** | `build_store_index.py` + `deploy-vercel.yml` |
+| **자동화율** | 60% |
+
+```
+GitHub Release (자동)
+  → nightly.link URL 생성 (자동)
+  → build_store_index.py → apps.json 갱신 (반자동)
+  → deploy-vercel.yml → Vercel 스토어 배포 (수동 트리거)
+  → gh release download + termux-open (수동)
+```
+
+---
+
+## 4. Preset System — 3-Tier
+
+앱마다 빌드 스택이 다르다. "URL 하나 넣으면 끝"은 80%만 된다.
+나머지 20%는 **프리셋(레시피)**으로 해결한다.
+
+### 4.1 구조
+
+```
+preset/
+├── base     ← JDK/Gradle/AGP/SDK 버전 (빌드 환경)
+├── build    ← flavor/buildType/signing (빌드 설정)
+└── patch    ← 패키지명/앱명/아이콘/기능 제거 (커스터마이징)
+```
+
+### 4.2 Base Preset — Field Definition
+
+| 필드 | 타입 | 필수 | 기본값 | 유효값 |
+|------|------|------|--------|--------|
+| `jdk` | string | Y | `"17"` | `"11"`, `"17"`, `"21"` |
+| `gradle` | string | Y | `"8.4"` | semver |
+| `agp` | string | Y | `"8.2.0"` | semver (Android Gradle Plugin) |
+| `min_sdk` | int | Y | `26` | 21-35 |
+| `target_sdk` | int | Y | `34` | 26-35 |
+| `compile_sdk` | int | Y | `34` | 26-35 |
+| `ndk` | string | N | `null` | `"25.1.8937393"` 등 (FFmpeg 사용 시) |
+| `kotlin_version` | string | N | `"1.9.0"` | semver |
+
+**프리셋 템플릿 (미리 정의):**
+
+| 프리셋 ID | JDK | AGP | minSdk | 용도 |
+|-----------|-----|-----|--------|------|
+| `flutter-standard` | 17 | 8.2.0 | 26 | 대부분 앱 |
+| `flutter-legacy` | 11 | 7.3.0 | 21 | 구형 플러그인 필요 시 |
+| `flutter-ndk` | 17 | 8.2.0 | 26 | FFmpeg/네이티브 빌드 필요 시 |
+
+### 4.3 Build Preset — Field Definition
+
+| 필드 | 타입 | 필수 | 기본값 | 설명 |
+|------|------|------|--------|------|
+| `flavor` | string | N | `null` | Gradle flavor (없으면 default) |
+| `build_type` | string | Y | `"debug"` | `"debug"` only (헌법 §2) |
+| `signing` | string | Y | `"debug-key"` | 서명 키 (아래 §7.4 참조) |
+| `proguard` | bool | N | `false` | 코드 난독화 (debug에서 불필요) |
+| `split_abi` | bool | N | `false` | ABI별 APK 분리 |
+
+### 4.4 Patch Preset — Field Definition
+
+| 필드 | 타입 | 필수 | 기본값 | 설명 |
+|------|------|------|--------|------|
+| `package_rename` | bool | Y | `true` | 패키지명 변경 실행 여부 |
+| `app_name_rename` | bool | Y | `true` | 앱 이름 변경 실행 여부 |
+| `icon_replace` | bool | N | `false` | 아이콘 교체 여부 |
+| `remove_activities` | string[] | N | `[]` | 제거할 Activity 클래스명 |
+| `remove_services` | string[] | N | `[]` | 제거할 Service 클래스명 |
+| `remove_receivers` | string[] | N | `[]` | 제거할 BroadcastReceiver |
+| `add_permissions` | string[] | N | `[]` | 추가할 권한 |
+| `remove_permissions` | string[] | N | `[]` | 제거할 권한 |
+
+### 4.5 프리셋 선택 로직
+
+```
+입력: F-Droid URL
+
+1. clone 후 build.gradle 파싱
+2. AGP 버전 확인
+   → ≥ 8.0: flutter-standard
+   → < 8.0: flutter-legacy
+3. 네이티브 의존성 확인
+   → FFmpeg/OpenCV 등 존재: flutter-ndk
+4. 실패 시 폴백
+   → flutter-standard → flutter-legacy → 수동 설정
+```
+
+---
+
+## 5. Data Model — Execution Spec
+
+### 5.1 app-registry.json (신규 — 중앙 레지스트리)
+
+**목적:** 10개 앱 전체를 하나의 SSOT로 관리. `CONTROL_KEYS.md`와 `dashboard/apps.json`의 불일치 해소.
+
+**현재 문제:**
+- apps.json: 8앱, CONTROL_KEYS.md: 9앱, apps/ 디렉토리: 10앱
+- `build_store_index.py`: 6앱만 하드코딩 (ChronoCall, Liner 누락)
+- Pen 버전: app-meta.json `v25.12.0` vs apps.json `v1.0.31`
+
+**Field Definition:**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `id` | string | Y | 앱 슬러그 (예: `parksy-axis`) |
+| `name` | string | Y | 표시 이름 (예: `"Parksy Axis"`) |
+| `package` | string | Y | Android 패키지명 (예: `kr.parksy.axis`) |
+| `directory` | string | Y | 소스 경로 (예: `apps/parksy-axis`) |
+| `version` | string | Y | 현재 버전 (예: `"v11.1.0"`) — pubspec.yaml SSOT |
+| `status` | enum | Y | `store-registered` \| `in-development` \| `archived` |
+| `category` | string | Y | 기능 분류 (예: `broadcast`, `audio`, `utility`) |
+| `overlay` | bool | Y | 오버레이 앱 여부 |
+| `description` | string | Y | 한 줄 설명 |
+| `icon_emoji` | string | N | 스토어 이모지 아이콘 |
+| `release_tag` | string | N | GitHub Release 태그 (예: `parksy-axis-latest`) |
+| `workflow` | string | Y | 빌드 워크플로우 파일명 |
+| `dependencies` | string[] | Y | 주요 Flutter 의존성 |
+| `source_origin` | string | Y | `"original"` \| `"forked:{url}"` \| `"hybrid:{url}"` |
+| `dart_lines` | int | N | Dart 코드 줄 수 |
+| `kotlin_lines` | int | N | Kotlin 코드 줄 수 |
+
+### 5.2 build-status.json (신규 — 빌드 대시보드)
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `id` | string | Y | 앱 슬러그 |
+| `workflow` | string | Y | 워크플로우 파일명 |
+| `last_build` | ISO8601 | Y | 마지막 빌드 시각 |
+| `status` | enum | Y | `passing` \| `failing` \| `no_ci` |
+| `apk_size_mb` | float | N | APK 크기 (MB) |
+| `build_duration_sec` | int | N | 빌드 소요 시간 (초) |
+
+### 5.3 source-map.json (소스풀 참조 추적)
+
+`~/references/source-map.json` — `setup-source-pool.sh`가 자동 생성.
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `parksy_id` | string | Y | Parksy 앱 슬러그 |
+| `source_url` | string | Y | 원본 레포 URL |
+| `fdroid_id` | string | N | F-Droid 패키지명 |
+| `clone_date` | ISO8601 | Y | 최초 clone 일시 |
+| `original_version` | string | Y | clone 시 원본 버전 |
+| `original_license` | string | Y | 원본 라이선스 |
+| `transformation_log` | string[] | N | 변환 작업 이력 |
+
+---
+
+## 6. Automation Scripts — 현황
+
+6개 스크립트 전부 `scripts/`에 실장 완료.
 
 ```
 scripts/
-├── build_store_index.py    (121줄)  스토어 메타데이터 동기화
-├── constitution_guard.py   (124줄)  헌법 위반 검출 (금지 패턴)
-├── license-audit.py        (293줄)  의존성 라이선스 감사
-├── extract-apk.sh          (249줄)  APK 추출 + 감사 증빙
-├── setup-source-pool.sh    (218줄)  소스풀 디렉토리 구축
-└── source-pool-clone.sh    (163줄)  F-Droid 참조 소스 clone
+├── build_store_index.py    (121줄)  pubspec → apps.json 동기화
+├── constitution_guard.py   (124줄)  헌법 위반 검출 (금지 패턴 10종)
+├── license-audit.py        (293줄)  의존성 라이선스 자동 감사
+├── extract-apk.sh          (249줄)  APK 추출 + apktool 디컴파일 + 감사증빙
+├── setup-source-pool.sh    (218줄)  소스풀 디렉토리 초기화
+└── source-pool-clone.sh    (163줄)  F-Droid 참조 clone + 라이선스 검증
                            ───────
                            1,168줄
 ```
 
-### 4.2 build_store_index.py — SSOT 동기화
-
-**문제:** 10개 앱의 버전 정보가 `pubspec.yaml`, `app-meta.json`, `dashboard/apps.json` 3곳에 흩어져 있다. 수동 동기화는 반드시 어긋난다.
-
-**해결:**
+### 파이프라인 위치
 
 ```
-pubspec.yaml (Source of Truth)
-       │
-       ↓  build_store_index.py
-       │
-       ├── dashboard/apps.json (자동 생성)
-       │         │
-       │         ↓
-       │    Vercel Store (자동 반영)
-       │
-       └── GitHub Actions trigger:
-            push to apps/*/pubspec.yaml
-            → publish-store-index.yml
-            → python scripts/build_store_index.py
-            → git commit + push (자동)
-```
+Stage 1 ← source-pool-clone.sh, setup-source-pool.sh
+Stage 2 ← (미구현: source-pool-analyze.sh)
+Stage 3 ← (미구현: transform-spec.json 기반 자동 패치)
+Stage 4 ← GitHub Actions (constitution_guard.py 포함)
+Stage 5 ← build_store_index.py, deploy-vercel.yml
 
-`pubspec.yaml`의 `version:` 필드에서 정규식으로 버전을 추출하고, 사전 정의된 앱 설정(이름, 설명, 아이콘, 다운로드 URL)과 합쳐서 `apps.json`을 생성한다.
-
-### 4.3 constitution_guard.py — 정책 자동 집행
-
-이 프로젝트에는 헌법이 있다. **"개인용 앱은 Firebase, Analytics, AdMob, Play Store, 인증, 결제를 사용하지 않는다."**
-
-```python
-FORBIDDEN_PATTERNS = [
-    (r'firebase',                 'Firebase is forbidden (§1.1)'),
-    (r'analytics',                'Analytics is forbidden (§1.1)'),
-    (r'crashlytics',              'Crashlytics is forbidden (§1.1)'),
-    (r'admob',                    'AdMob is forbidden (§1.1)'),
-    (r'play[_\-\s]?store',       'Play Store prep is forbidden (§1.1)'),
-    (r'subscription|payment',     'Payments are forbidden (§1.1)'),
-    (r'telemetry|tracking',       'Telemetry is forbidden (§1.1)'),
-    (r'multi[_\-\s]?user',       'Multi-user is forbidden (§1.1)'),
-]
-```
-
-**동작 모드:**
-- **HARD BLOCK** (CI 실패): `.github/`, `scripts/`, `dashboard/apps.json`에서 위반 발생 시
-- **SOFT WARNING** (경고만): `apps/`에서 위반 발생 시 (실험 허용)
-
-이 스크립트는 `constitution-guard.yml` 워크플로우에서 **모든 PR과 main push에** 실행된다.
-
-### 4.4 license-audit.py — GPL 방어선
-
-293줄짜리 Python 스크립트가 `pubspec.yaml`의 모든 의존성을 스캔하고 라이선스를 검증한다.
-
-**검사 항목:**
-- GPL 2.0/3.0 의존성 → **빌드 차단**
-- LGPL → 동적 링킹 확인 (Flutter 플러그인 = OK)
-- Unknown 라이선스 → **경고**
-- Apache 2.0 / MIT / BSD → **통과**
-
-**최신 감사 결과 (2026-03-01):**
-```
-앱 9개 스캔 완료
-의존성 68개 검사
-GPL 위반: 0건
-LGPL (FFmpeg): 2개 앱 — 동적 링킹으로 의무 해소
-```
-
-### 4.5 Source Pool 자동화 (extract-apk.sh + setup/clone)
-
-3-Tier 소스 확보 아키텍처를 자동화한다:
-
-```
-Tier 1: F-Droid Open Source (Primary)
-  └── source-pool-clone.sh
-        → 참조 앱 clone
-        → LICENSE 파일 검증
-        → 라이선스 불일치 시 거부
-
-Tier 2: Samsung SDK (Secondary)
-  └── 공식 문서 참조 (스크립트 불필요)
-
-Tier 3: APK 구조 분석 (Conditional)
-  └── extract-apk.sh
-        → apktool 디컴파일
-        → .extraction-audit.json 자동 생성 (감사 증빙)
-        → 구조 참조만, 코드 복사 금지
+크로스:  license-audit.py (Stage 1~4 어디서든 게이트)
+크로스:  extract-apk.sh (Tier 3 참조 시만 사용)
 ```
 
 ---
 
-## 5. Layer 3: Distribution & Storefront
+## 7. Governance Layer — Execution Spec
 
-### 5.1 배포 아키텍처
-
-Play Store를 사용하지 않는다. 세 가지 채널로 배포한다:
+### 7.1 Constitution Guard
 
 ```
-                ┌─────────────────────┐
-                │    Vercel Store     │
-                │  (dtslib-apk-lab    │
-                │   .vercel.app)     │
-                │                     │
-                │  Production    0개  │
-                │  Prototype Lab 8개  │
-                └────────┬────────────┘
-                         │ apps.json
-                         │
-       ┌─────────────────┼──────────────────┐
-       │                 │                  │
-       ↓                 ↓                  ↓
-  GitHub Releases   nightly.link       직접 설치
-  (수동 태깅)     (워크플로우 아티팩트)   (termux-open)
+HARD BLOCK (CI 실패):  .github/**  scripts/**  dashboard/apps.json
+SOFT WARNING (경고만):  apps/**  dashboard/**
+NONE (스킵):           docs/**  *.md
 ```
 
-### 5.2 스토어 페이지 기술 구조
+**금지 패턴 10종:** firebase, analytics, crashlytics, admob, play_store, app_store, login/signup, subscription/payment, telemetry/tracking, multi_user/multi_device
 
-`dashboard/index.html` (444줄)은 **정적 SPA**다:
+**실행:** `constitution-guard.yml` — 모든 PR + main push에 자동 실행.
 
-- **데이터:** `apps.json`을 fetch하여 동적 렌더링
-- **섹션:** Production / Prototype Lab 2단 구조
-- **디자인:** 다크 테마, Cinzel 세리프 + Inter 산세리프
-- **색상:** `#0D0D0D` 배경, `#D4AF37` 골드 액센트, `#253A2F` 그린
-- **애니메이션:** IntersectionObserver 기반 카드 reveal, CSS shimmer
-- **PWA:** manifest.json + apple-touch-icon
-- **배포:** Vercel (GitHub 연동 자동 배포) + GitHub Pages (fallback)
+### 7.2 License Audit Pipeline
 
-### 5.3 2-Track 배포 파이프라인
+```bash
+# 전체 감사
+python3 scripts/license-audit.py
 
-```
-개발자 (Parksy)
-    │
-    ↓ voice command
-Claude Code
-    │
-    ↓ git commit + push
-GitHub
-    │
-    ├── CI: build-{app}.yml → APK artifact
-    │     └── nightly.link 자동 배포
-    │
-    ├── CI: publish-store-index.yml
-    │     └── apps.json 자동 갱신
-    │
-    ├── CI: constitution-guard.yml
-    │     └── 정책 위반 차단
-    │
-    └── Vercel webhook
-          └── 스토어 페이지 자동 배포
+# 특정 앱
+python3 scripts/license-audit.py --app chrono-call
+
+# CI 게이트 (GPL 시 exit 1)
+python3 scripts/license-audit.py --strict
+
+# JSON 리포트
+python3 scripts/license-audit.py --json
 ```
 
-**별도 서버 인프라:**
+**판정 매트릭스:**
 
-| 서비스 | 호스팅 | 앱 |
-|--------|--------|-----|
-| TTS Server | GCP Cloud Run (asia-northeast3) | TTS Factory |
-| MIDI Server | GCP Cloud Run (us-central1) | MIDI Converter |
-| Audio Web | Vercel (Flutter Web) | Audio Tools |
-| Store | Vercel | Dashboard |
+| 카테고리 | 판정 | 예시 |
+|----------|------|------|
+| PERMISSIVE | `[O]` PASS | MIT, BSD, Apache-2.0 |
+| WEAK_COPYLEFT | `[~]` WARN | LGPL-3.0 (동적 링크 시 OK) |
+| STRONG_COPYLEFT | `[X]` FAIL | GPL-2.0, GPL-3.0 → **빌드 차단** |
+| UNKNOWN | `[?]` WARN | DB 미등록 → 수동 확인 후 등록 |
+
+**현재 감사 현황:** 9개 앱, 68개 의존성, GPL 위반 0건, LGPL 2건 (FFmpeg, 동적 링크).
+
+### 7.3 6-File Version Sync
+
+버전 올릴 때 6개 파일 수동 수정 → 하나라도 빠지면 불일치.
+
+| # | 파일 | 필드 | 형식 |
+|---|------|------|------|
+| 1 | `pubspec.yaml` | `version:` | `X.Y.Z+N` **(SSOT)** |
+| 2 | `lib/core/constants.dart` | `version =`, `versionCode =` | `'X.Y.Z'`, `N` |
+| 3 | `app-meta.json` | `"version"` | `"vX.Y.Z"` |
+| 4 | `README.md` | 버전 표기 | 다양 |
+| 5 | `lib/screens/home.dart` | 주석 내 버전 | `// vX.Y.Z` |
+| 6 | `dashboard/apps.json` | 해당 앱 `version`, `lastUpdated` | `"vX.Y.Z"` |
+
+**version-sync.sh 설계 (Phase 1 구현 대상):**
+
+```bash
+# 사용법
+./scripts/version-sync.sh parksy-axis 11.2.0
+
+# 동작
+# 1. pubspec.yaml → version: 11.2.0+{auto-increment}
+# 2. constants.dart → version = '11.2.0', versionCode = N
+# 3. app-meta.json → "version": "v11.2.0"
+# 4. README.md → 버전 표기 갱신
+# 5. home.dart 주석 갱신
+# 6. dashboard/apps.json → 해당 앱 version + lastUpdated
+# 7. 변경 파일 목록 출력
+
+# 출력: "6 files synced to v11.2.0"
+```
+
+### 7.4 Signing Rules
+
+현재: debug APK only (헌법 §2). 향후 phoneparis F-Droid 레포 전환 시 필요.
+
+| 규칙 | 값 | 비고 |
+|------|-----|------|
+| **debug vs release 분리** | debug: Android 기본 키, release: 전용 keystore | debug만 사용 중 |
+| **keystore 보관** | 로컬: `~/.android/parksy-release.jks`, CI: GitHub Secrets `SIGNING_KEY` | 미생성 |
+| **key rotation/분실** | keystore 백업: Google Drive (암호화 ZIP), 분실 시 신규 키 생성 + 앱 재설치 | 개인용이라 재설치 OK |
+| **서명 실패 시** | **빌드 중단** (게이트). 서명 없이 배포 금지. | CI에서 강제 |
+
+**Phase별 적용:**
+
+| Phase | 서명 방식 | keystore |
+|-------|----------|----------|
+| 현재 (debug) | Android debug key (자동) | `~/.android/debug.keystore` |
+| Phase 2 (release) | 전용 keystore | `parksy-release.jks` (GitHub Secrets) |
+| Phase 3 (F-Droid) | F-Droid 서명 정책 준수 | F-Droid 서버가 재서명 |
 
 ---
 
-## 6. Cross-Cutting: Voice-Driven Development
+## 8. Automation Decision Matrix
 
-### 6.1 VDD 프로토콜
-
-이 시스템의 모든 코드는 다음 프로세스로 생산된다:
-
-```
-┌──────────────────────────────────────────────┐
-│              VDD Pipeline                    │
-│                                              │
-│  1. Parksy speaks requirement (Korean)       │
-│          │                                   │
-│          ↓                                   │
-│  2. Claude Code interprets                   │
-│          │                                   │
-│          ↓                                   │
-│  3. Claude reads source pool (F-Droid refs)  │
-│          │                                   │
-│          ↓                                   │
-│  4. Claude generates new code                │
-│     (Independent Implementation)             │
-│          │                                   │
-│          ↓                                   │
-│  5. flutter build apk --debug                │
-│          │                                   │
-│          ├── SUCCESS → git commit + push     │
-│          │                                   │
-│          └── FAIL → voice feedback           │
-│                → Claude fixes                │
-│                → goto 5                      │
-│                                              │
-│  Feedback loop: avg 3-5 iterations/feature   │
-└──────────────────────────────────────────────┘
-```
-
-### 6.2 증거: Parksy Pen의 31 빌드
-
-`apps/laser-pen-overlay/`는 v1부터 v25.12까지 **31번의 빌드 이터레이션**을 거쳤다. git log에 모든 시도와 실패가 남아있다.
-
-| 버전 범위 | 시도 | 결과 |
-|-----------|------|------|
-| v7-v18 | 기본 구현 | 성공 |
-| v19 | 화면 녹화 감지 | 부분 성공 |
-| **v20** | FLAG_SECURE로 UI 숨기기 | **완전 실패** — 시스템 전체 녹화 차단됨 |
-| **v21** | willContinue 실시간 터치 스트리밍 | **완전 실패** — API가 스트리밍 미지원 |
-| v22 | 터치 주입 롤백 | 복구 |
-| **v24** | Ghost Mode (alpha 5-50) | 성공 — 극한 투명도로 우회 |
-| v25.12 | 아이콘 + 마무리 | 출시 |
-
-이 31번의 시행착오가 squash 없이 레포에 남아있다. **"레포지토리는 소설이다"** 원칙의 실증.
-
-### 6.3 Human이 타이핑하는 것
-
-- **커밋 메시지:** 아니오 (Claude가 작성, Human이 승인)
-- **코드:** 아니오 (Claude Code 생성)
-- **음성 명령:** 예 (한국어, 자연어)
-- **APK 테스트:** 예 (실기기에서 수동 테스트)
-- **방향 결정:** 예 ("이 기능 빼고 저걸 넣어")
+| 프로세스 | 현재 | 목표 | 우선순위 | 필요 도구 | 다음 액션 |
+|----------|------|------|----------|-----------|-----------|
+| 스토어 인덱스 (6/10앱) | 60% | 100% | **P1** | build_store_index.py 확장 | 10앱 하드코딩 추가 |
+| 버전 동기화 | 0% | 90% | **P1** | version-sync.sh 신규 | 스크립트 작성 |
+| app-registry.json | 없음 | 생성 | **P1** | 수동 초기 생성 | JSON 작성 |
+| 코드 구조 분석 | 0% | 70% | P2 | source-pool-analyze.sh 신규 | Stage 2 스크립트 |
+| 라이선스 감사 | 90% | 유지 | — | license-audit.py | 완료 |
+| 헌법 준수 검사 | 90% | 유지 | — | constitution_guard.py | 완료 |
+| 빌드 | 90% | 유지 | — | GitHub Actions | 완료 |
+| 앱 온보딩 템플릿 | 0% | 70% | P2 | transform-spec.json 기반 | 프리셋 정의 |
+| F-Droid API 연동 | 0% | 50% | P3 | curl + jq | API 클라이언트 |
+| 기기 설치 자동화 | 0% | 50% | P3 | gh + termux-open | 원커맨드 스크립트 |
 
 ---
 
-## 7. App Portfolio
+## 9. FMEA (Failure Mode & Effects Analysis)
 
-### 7.1 Parksy Pen — S Pen 오버레이 판서
+| # | 장애 모드 | 심각도 | 빈도 | 탐지 | RPN | 대응 |
+|---|----------|--------|------|------|-----|------|
+| F1 | 빌드 실패 | 중 | 높음 | 자동 | 6 | CI 에러 로그 → 의존성 업데이트 → 재빌드 |
+| F2 | 라이선스 위반 | **상** | 낮음 | 자동 | 6 | license-audit.py --strict 게이트 |
+| F3 | 버전 불일치 (6-file) | 중 | **높음** | 없음 | **9** | version-sync.sh 구현 (P1) |
+| F4 | APK 크기 초과 | 하 | 낮음 | 없음 | 3 | 빌드 후 사이즈 체크 추가 |
+| F5 | 헌법 위반 | 상 | 중 | 자동 | 4 | HARD → CI 차단 |
+| F6 | 크로스레포 동기화 깨짐 | 중 | 중 | 없음 | 6 | 매니페스트 경유 강제 |
+| F7 | build_store_index.py 불완전 | 하 | **확정** | 수동 | 5 | 10앱 확장 (P1) |
+| F8 | 프리셋 불일치 (AGP 버전) | 중 | 중 | 없음 | 6 | 프리셋 자동 탐지 로직 |
 
-**난이도: ★★★★★ (시스템 최고)**
-
-Android에서 "S Pen은 그리고, 손가락은 스크롤"을 구현하는 것은 OS가 허용하지 않는 영역이다. FLAG_NOT_TOUCHABLE은 all-or-nothing이다.
-
-**해결 아키텍처:**
-
-```
-S Pen Touch                  Finger Touch
-    │                            │
-    ↓                            ↓
-OverlayCanvasView            OverlayCanvasView
-(TOOL_TYPE_STYLUS 감지)      (TOOL_TYPE_FINGER 감지)
-    │                            │
-    ↓                            ↓
-Canvas에 직접 드로잉          FLAG_NOT_TOUCHABLE 활성화
-                                 │
-                                 ↓
-                        TouchInjectionService
-                        (AccessibilityService)
-                                 │
-                                 ↓
-                        dispatchGesture() →
-                        하위 앱에 터치 전달
-                                 │
-                                 ↓
-                        100ms 후 FLAG 해제
-```
-
-**핵심 Kotlin 코드:**
-```kotlin
-// OverlayCanvasView.kt — 터치 타입 분기
-override fun onTouchEvent(event: MotionEvent): Boolean {
-    return if (isStylus(event)) {
-        handleStylusTouch(event)   // Canvas 드로잉
-    } else {
-        handleFingerTouch(event)   // 터치 주입
-    }
-}
-```
-
-**구성 요소:** OverlayService (416줄) + FloatingControlBar (278줄) + TouchInjectionService (225줄) + OverlayCanvasView + LaserPenTileService + MainActivity
-
-**권한:** SYSTEM_ALERT_WINDOW, FOREGROUND_SERVICE, POST_NOTIFICATIONS, AccessibilityService
-
-### 7.2 Parksy Capture — 텍스트 캡처 → GitHub 아카이브
-
-다른 앱에서 텍스트를 공유하면 자동으로 GitHub 레포에 아카이브한다. ChronoCall의 STT 결과물도 여기로 흘러간다.
-
-```
-다른 앱 → Share Intent → Capture → GitHub API → 레포 저장
-                                  → 로컬 저장 (fallback)
-```
-
-**Kotlin 네이티브:** content:// URI 처리, 파일 로컬 복사 (654줄)
-
-### 7.3 Parksy Axis — 방송용 사고 단계 오버레이
-
-FSM(Finite State Machine) 기반 상태 전이로 방송 중 현재 단계를 오버레이 표시한다.
-
-```
-State Machine:
-  INTRO → MAIN → Q&A → OUTRO
-    ↑                    │
-    └────── RESET ───────┘
-```
-
-**특징:** 8개 테마, shareData IPC 동기화, 탭 UI, flutter_overlay_window 플러그인
-
-### 7.4 Parksy ChronoCall — 통화 녹음 STT
-
-삼성 통화 녹음 파일을 자동 감지하고, FFmpeg으로 전처리한 뒤, Whisper API로 STT 변환한다.
-
-```
-삼성 녹음 폴더 자동 탐지 (4개 경로 시도)
-    │
-    ↓
-FFmpeg 전처리
-  stereo 44.1kHz → mono 16kHz 64kbps
-  ~5MB/분 → ~0.5MB/분 (90% 압축)
-    │
-    ↓
-Whisper API (verbose_json)
-  segments[] + timestamps
-    │
-    ↓
-TranscriptScreen
-  just_audio 재생 + 세그먼트 seek
-  하이라이트 동기화 (AnimatedContainer)
-    │
-    ↓
-Export: Markdown / Share → Parksy Capture
-```
-
-**삼성 경로 탐지 순서:**
-```
-1. /storage/emulated/0/Recordings/Call          (One UI 4+)
-2. /storage/emulated/0/DCIM/.Recordings/Call    (One UI 3)
-3. /storage/emulated/0/Call                     (구형)
-4. /storage/emulated/0/Record/Call              (통신사 커스텀)
-```
-
-### 7.5 Parksy Wavesy — 음원 편집 가위
-
-MP3 트리밍 + MIDI 편집 엔진. v4.0.0에서 MIDI 편집 기능 추가.
-
-```
-Audio Pipeline:
-  MP3/M4A → FFmpeg trim → WAV/MP3 출력
-
-MIDI Pipeline:
-  MIDI 파일 파싱 → 트랙 시각화
-  → 노트 편집 (추가/삭제/이동)
-  → MIDI 파일 재생성
-```
-
-**MIDI 엔진 (v4.0.0 신규):** `midi_file.dart` (510줄) + `midi_editor.dart` (339줄) — MIDI 바이너리 파서, 트랙/노트/이벤트 모델, 비파괴 편집
-
-### 7.6 Parksy Glot — 실시간 다국어 자막 오버레이
-
-**가장 복잡한 앱** (5,252줄). 실시간 음성을 Whisper로 STT하고 GPT-4o로 번역하여 오버레이 자막 표시.
-
-```
-Mic/Screen Audio
-    ↓ MediaProjection / MicAudioCapturer
-AudioCaptureService (Kotlin)
-    ↓ PCM stream
-SubtitleStreamClient (WebSocket)
-    ↓ STT + Translation
-OverlayWindowController
-    ↓
-SubtitleBoxComposable (원문)
-BubbleComposable (번역)
-    ↓
-Screen Overlay (SYSTEM_ALERT_WINDOW)
-```
-
-**독특한 점:** Flutter 버전 + 순수 Kotlin/Compose 버전 두 가지가 공존 (`lib/` + `app/`)
-
-### 7.7 Parksy TTS — 배치 TTS 생성기
-
-```
-Flutter Client → GCP Cloud Run → Google TTS API
-    │                  │
-    │                  ├── POST /v1/jobs (생성)
-    │                  ├── GET /v1/jobs/{id} (상태)
-    │                  └── GET /v1/jobs/{id}/download (ZIP)
-    │
-    └── ZIP: audio/*.mp3 + logs/report.csv
-```
-
-**서버:** FastAPI, Docker, Cloud Run (asia-northeast3)
-**제한:** 배치당 25유닛, 유닛당 1,100자
-
-### 7.8 Parksy Liner — 사진 → 스케치
-
-XDoG(eXtended Difference of Gaussians) 알고리즘으로 사진에서 선화를 추출한다. Samsung Notes에서 S Pen으로 오버드로잉하는 용도.
-
-### 7.9 Parksy Audio Tools — 스크린 오디오 녹음 + MIDI 변환
-
-MediaProjection으로 화면 오디오를 캡처하고, 서버사이드 Basic Pitch로 MIDI 변환한다. AIVA(AI 작곡) 입력용.
-
-**고유 기술:** FloatingRecordButton (Kotlin, 오버레이 녹음 버튼), AudioCaptureService (MediaProjection 세션 관리)
-
-### 7.10 MIDI Converter — 오디오 → MIDI 변환기
-
-Audio Tools의 MIDI 변환 기능을 경량 앱으로 분리. GCP Cloud Run 서버 연동.
+**RPN** = 심각도(1-3) × 빈도(1-3) × 탐지난이도(1-3). **6 이상 즉시 대응.**
 
 ---
 
-## 8. Inter-App Communication
+## 10. Implementation Roadmap (3-Phase)
 
-앱들은 독립적이지 않다. Android Intent와 파일시스템을 통해 연결된다.
+### Phase 1: Foundation (즉시)
 
-```
-┌──────────────┐   Share Intent    ┌──────────────┐
-│  ChronoCall  │ ─── (text) ────→  │   Capture    │
-│  (STT 결과)  │                   │  (아카이브)   │
-└──────────────┘                   └──────┬───────┘
-                                          │
-                                     GitHub API
-                                          │
-                                          ↓
-                                   GitHub 레포 저장
+| 태스크 | 산출물 | 완료 기준 |
+|--------|--------|-----------|
+| `build_store_index.py` 10앱 확장 | 전체 커버 | `python3 scripts/build_store_index.py` → 10앱 출력 |
+| `version-sync.sh` 작성 | 6-file 원커맨드 | `./scripts/version-sync.sh parksy-axis 11.2.0` → 6파일 갱신 |
+| `app-registry.json` 초기 생성 | 10앱 중앙 레지스트리 | 모든 앱 필드 완성 |
+| transform-spec.json 예시 2개 | 실행 가능 스펙 | Wavesy + ChronoCall 예시 |
 
-┌──────────────┐   Share Intent    ┌──────────────┐
-│    외부 앱    │ ── (audio/*) ──→  │  ChronoCall  │
-│  (녹음기 등)  │                   │  (STT 변환)  │
-└──────────────┘                   └──────────────┘
+### Phase 2: Pipeline (다음)
 
-┌──────────────┐   파일시스템       ┌──────────────┐
-│ Audio Tools  │ ── (WAV/MP3) ──→  │   Wavesy     │
-│  (오디오 캡처) │                  │  (편집/트림)  │
-└──────────────┘                   └──────────────┘
+| 태스크 | 산출물 | 의존성 |
+|--------|--------|--------|
+| `source-pool-analyze.sh` 작성 | 코드 분석 자동 리포트 | Phase 1 |
+| 프리셋 자동 탐지 로직 | build.gradle → 프리셋 매칭 | Phase 1 |
+| 앱 온보딩 템플릿 | 신규 앱 뼈대 자동 생성 | app-registry.json |
+| `build-status.json` 자동 생성 | CI 상태 대시보드 | GitHub API |
 
-┌──────────────┐   Quick Settings  ┌──────────────┐
-│  Android OS  │ ── (Tile Tap) ──→ │   Pen        │
-│  (알림 패널)  │                   │  (오버레이)   │
-└──────────────┘                   └──────────────┘
-```
+### Phase 3: Intelligence (나중)
 
-### Platform Channel 규약
-
-| 앱 | Channel ID | Methods |
-|----|-----------|---------|
-| ChronoCall | `com.parksy.chronocall/intent` | getSharedAudio, copyUriToLocal, getAudioMetadata |
-| Capture | `com.parksy.capture/...` | processShareIntent, copyToLocal |
-| Pen | `com.dtslib.laser_pen_overlay/overlay` | startOverlay, stopOverlay, updateSettings |
+| 태스크 | 산출물 | 의존성 |
+|--------|--------|--------|
+| 의존성 그래프 시각화 | 앱 간 공유 패키지 맵 | app-registry.json |
+| Release signing 도입 | parksy-release.jks + CI 연동 | Phase 2 |
+| F-Droid API 연동 | URL 입력 → 메타데이터 자동 추출 | Phase 2 |
+| 회귀 탐지 | 의존성 업데이트 → 영향 범위 계산 | 의존성 그래프 |
 
 ---
 
-## 9. CI/CD Architecture
-
-### 9.1 워크플로우 맵 (21개)
+## 11. Matrix Architecture — ERP × FAB
 
 ```
-.github/workflows/
-│
-├── BUILD (11개) ─────────────────────────────────
-│   ├── build-parksy-axis.yml
-│   ├── build-laser-pen.yml
-│   ├── build-capture-pipeline.yml
-│   ├── build-parksy-wavesy.yml
-│   ├── build-tts-factory.yml
-│   ├── build-chrono-call.yml
-│   ├── build-parksy-liner.yml
-│   ├── build-parksy-glot.yml
-│   ├── build-parksy-audio-tools.yml
-│   ├── build-midi-converter.yml
-│   └── build-aiva-trimmer.yml
-│
-├── DEPLOY (5개) ─────────────────────────────────
-│   ├── deploy-vercel.yml           (스토어 → Vercel)
-│   ├── deploy-pages.yml            (스토어 → GitHub Pages)
-│   ├── deploy-tts-server.yml       (서버 → Cloud Run)
-│   ├── deploy-midi-server.yml      (서버 → Cloud Run)
-│   └── deploy-parksy-audio-web.yml (웹앱 → Vercel)
-│
-├── GUARD (2개) ──────────────────────────────────
-│   ├── constitution-guard.yml      (정책 위반 차단)
-│   └── flutter-test.yml            (단위 테스트)
-│
-├── SYNC (1개) ───────────────────────────────────
-│   └── publish-store-index.yml     (메타데이터 동기화)
-│
-└── LEGACY (2개) ─────────────────────────────────
-    ├── overlay-dual-sub.yml
-    └── (기타)
+               ERP (가로축: 원장)
+               │
+               │  커밋=전표  git log=원장  크로스레포=인터페이스
+               │
+     ──────────┼──────────────────────────
+               │
+   FAB         │       ┌──────────────────┐
+   (세로축:    │       │  JSON 매니페스트  │
+    공정)      │       │  (교차점)         │
+               │       └──────────────────┘
+   BOM         │
+   =pubspec    │   app-meta.json      = 제품 사양서 × 거래 증빙
+   라우팅      │   apps.json          = 출하 목록 × 재고 현황
+   =CI         │   source-map.json    = 원자재 입고 × 매입 전표
+   WIP         │   build-status.json  = 수율 보고 × 손익 계산
+   =브랜치     │   app-registry.json  = 제품 마스터 × 계정 과목
+   수율        │   transform-spec.json= 작업 지시서 × 변경 전표
+   =빌드성공률 │
 ```
 
-### 9.2 트리거 매트릭스
+**4대 원칙 × 파이프라인:**
 
-모든 빌드 워크플로우는 **path-scoped trigger**를 사용한다:
-
-```yaml
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/{app-name}/**'
-      - '.github/workflows/build-{app-name}.yml'
-  workflow_dispatch:  # 수동 트리거
-```
-
-**효과:** Wavesy만 수정하면 Wavesy만 빌드된다. 10개 앱이 동시에 빌드되지 않는다.
-
-### 9.3 빌드 파이프라인 표준
-
-```
-checkout → flutter setup → pub get → build apk --debug
-                                          │
-                                          ↓
-                                    upload-artifact
-                                          │
-                                          ↓
-                                    GitHub Release
-                                    (tag: {app}-latest)
-```
+| 원칙 | 파이프라인 적용 |
+|------|----------------|
+| 삭제 없다, 반대 분개 | source-map.json에 원본 기록. 삭제 아닌 변환 이력 |
+| 증빙 없는 거래 없다 | transform-spec.json이 모든 변환의 증빙 |
+| BOM 확인 후 착공 | Stage 2 Analysis + license-audit.py 통과 전 Stage 3 진입 금지 |
+| 재공품 방치 금지 | WIP 브랜치 3개 이상 → 정리 강제 |
 
 ---
 
-## 10. Compliance Automation
+## 12. Failure Catalog
 
-### 10.1 3중 방어선
+실패는 삭제하지 않는다. 서사의 갈등이다.
 
-```
-Defense Line 1: Source Pool (사전)
-  └── F-Droid 우선, GPL 소스 참조 시 코드 미복사
-  └── source-pool-clone.sh로 LICENSE 자동 검증
+### F-1: FLAG_SECURE (Pen v20)
+**시도:** 컨트롤 바에만 FLAG_SECURE 적용 → **실패:** 앱 전체 녹화 차단됨.
+**원인:** FLAG_SECURE는 Window 단위. View 단위 불가. **교훈:** Android 보안 모델에 절충 없음.
 
-Defense Line 2: License Audit (개발 중)
-  └── license-audit.py --strict
-  └── pubspec.yaml 의존성 전수 스캔
-  └── GPL 감지 시 빌드 차단
+### F-2: willContinue 실시간 스트리밍 (Pen v21)
+**시도:** dispatchGesture() 실시간 터치 → **실패:** 완전 정지.
+**원인:** 완성된 경로를 한 번에 전달하는 API. 실시간은 root 필요. **교훈:** API 파라미터가 존재해도 의도대로 동작하지 않을 수 있다.
 
-Defense Line 3: Constitution Guard (CI)
-  └── constitution-guard.yml
-  └── PR/push 시 자동 실행
-  └── 금지 패턴 감지 → HARD BLOCK / SOFT WARN
-```
+### F-3: jadx 메모리 실패 (Source Pool v1)
+**시도:** Termux jadx → **실패:** OutOfMemoryError.
+**해결:** apktool로 교체 (Termux 네이티브 패키지, 안정적).
 
-### 10.2 Independent Implementation 원칙
+### F-4: FFmpeg Kit 충돌 (Wavesy)
+**시도:** ffmpeg_kit + flutter_midi_pro 동시 사용 → `libc++_shared.so` 충돌.
+**해결:** `pickFirst` 전략.
 
-| 행위 | 허용 여부 | 근거 |
-|------|----------|------|
-| F-Droid 오픈소스 코드 읽기 | **허용** | 라이선스가 허용 |
-| 패턴/구조 학습 후 새 코드 작성 | **허용** | 독립 구현 |
-| 코드 복사-붙여넣기 | **금지** | 라이선스 오염 위험 |
-| 상용 앱 디컴파일 코드 복사 | **금지** | 저작권 위반 |
-| 상용 앱 구조 참조 (Tier 3) | **조건부** | 역공학 예외, 감사 증빙 필수 |
-
-### 10.3 감사 증적
-
-모든 Tier 3 작업은 `extract-apk.sh`가 자동 생성하는 `.extraction-audit.json`에 기록된다:
-- 추출 일시
-- 대상 APK
-- 참조 목적
-- "코드 복사 없음" 선언
+### F-5: Clean Room → Independent Implementation (백서 v1)
+**시도:** "Clean Room" 주장 → **실패:** 실제로 소스를 읽고 학습했으므로 Clean Room 아님.
+**해결:** "Independent Implementation"으로 정직하게 재정의. "읽되 복사하지 않는다."
 
 ---
 
-## 11. Monorepo Engineering
-
-### 11.1 왜 모노레포인가
-
-10개 앱을 10개 레포로 분리하면:
-- CI/CD 워크플로우 10x 중복
-- 크로스레포 의존성 관리 지옥
-- 버전 동기화 불가능
-- 1인 개발자에게 10개 레포 관리는 오버헤드
-
-모노레포에서:
-- path-scoped CI가 앱별 독립 빌드 보장
-- `scripts/`의 자동화가 전체 앱에 일괄 적용
-- `dashboard/apps.json`이 단일 진실 원천
-- 한 번의 `git clone`으로 전체 시스템 확보
-
-### 11.2 디렉토리 구조 원칙
+## 13. Infrastructure Map
 
 ```
-/
-├── apps/          # 제조 라인 (10개 앱)
-│   └── {app}/
-│       ├── lib/           # Dart 소스
-│       ├── android/       # Android 네이티브
-│       ├── pubspec.yaml   # 의존성 (SSOT)
-│       └── app-meta.json  # 메타데이터
-│
-├── dashboard/     # 스토어 (배포 전면)
-│   ├── index.html
-│   └── apps.json  # 자동 생성
-│
-├── scripts/       # 자동화 도구 (공정 장비)
-│
-├── docs/          # 백서/철학서/기술문서
-│
-├── .github/
-│   └── workflows/ # CI/CD (21개)
-│
-└── CLAUDE.md      # 개발 헌법 + 핸드오프 매뉴얼
+┌───────────────────────────────────────────────────────┐
+│                      CLOUD                             │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────┐   │
+│  │  GitHub   │  │  Vercel  │  │  GCP Cloud Run     │   │
+│  │ Repo+CI   │  │ Store    │  │ TTS (asia-ne3)     │   │
+│  │ Releases  │  │ Audio Web│  │ MIDI (us-central1) │   │
+│  └─────┬─────┘  └────┬─────┘  └──────┬─────────────┘   │
+└────────┼──────────────┼───────────────┼────────────────┘
+         │    HTTPS     │    HTTPS      │   HTTPS
+┌────────┼──────────────┼───────────────┼────────────────┐
+│        ↓              ↓               ↓                │
+│  ┌──────────────────────────────────────────────┐      │
+│  │            Galaxy Tab S9                      │      │
+│  │  ┌────┐ ┌────┐ ┌──────┐ ┌──────┐ ┌────┐     │      │
+│  │  │Axis│ │Pen │ │Captur│ │Wavesy│ │TTS │     │      │
+│  │  └────┘ └────┘ └──────┘ └──────┘ └────┘     │      │
+│  │  ┌──────┐ ┌─────┐ ┌────┐ ┌─────┐ ┌────┐    │      │
+│  │  │Chrono│ │Liner│ │Glot│ │Audio│ │MIDI│    │      │
+│  │  └──────┘ └─────┘ └────┘ └─────┘ └────┘    │      │
+│  │  Termux + Claude Code (VDD Interface)        │      │
+│  └──────────────────────────────────────────────┘      │
+│                      DEVICE                             │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### 11.3 크로스레포 연동
-
-이 레포는 독립적이지 않다. 3개 형제 레포와 연동된다:
-
-```
-dtslib-apk-lab (이 레포)
-    ↕ 오디오 에셋
-parksy-audio
-    ↕ 이미지 에셋
-parksy-image
-    ↕ 관제탑 (상태 동기화)
-dtslib-localpc
-    └── repos/status.json (3개 레포 현황)
-    └── repos/dtslib-apk-lab.md (세션 로그)
-```
-
-**동기화 프로토콜:**
-매 커밋 시 `dtslib-localpc/repos/status.json`을 갱신한다. 이 파일이 다른 세션(다른 기기의 Claude)에게 현재 상태를 전달하는 IPC 역할을 한다.
+**비용:** GitHub $0, Vercel $0, GCP ~$0, Whisper ~$5/월. **합계 ~$5/월.**
 
 ---
 
-## 12. Infrastructure Map
+## 14. Quantitative Profile
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLOUD                                    │
-│                                                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │   GitHub     │  │   Vercel     │  │   GCP Cloud Run      │  │
-│  │              │  │              │  │                      │  │
-│  │ Repository   │  │ Store Page   │  │ TTS Server           │  │
-│  │ Actions CI   │  │ Audio Web    │  │  (asia-northeast3)   │  │
-│  │ Releases     │  │              │  │ MIDI Server           │  │
-│  │ Pages        │  │              │  │  (us-central1)       │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
-│         │                 │                      │              │
-└─────────┼─────────────────┼──────────────────────┼──────────────┘
-          │                 │                      │
-          │    HTTPS        │    HTTPS             │   HTTPS
-          │                 │                      │
-┌─────────┼─────────────────┼──────────────────────┼──────────────┐
-│         ↓                 ↓                      ↓              │
-│  ┌──────────────────────────────────────────────────────┐       │
-│  │                  Galaxy Tab S9                       │       │
-│  │                                                      │       │
-│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │       │
-│  │  │ Axis │ │ Pen  │ │Capture│ │Wavesy│ │ TTS  │      │       │
-│  │  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘      │       │
-│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │       │
-│  │  │Chrono│ │Liner │ │ Glot │ │Audio │ │ MIDI │      │       │
-│  │  │ Call │ │      │ │      │ │Tools │ │ Conv │      │       │
-│  │  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘      │       │
-│  │                                                      │       │
-│  │  Termux + Claude Code (VDD Interface)               │       │
-│  └──────────────────────────────────────────────────────┘       │
-│                                                                 │
-│                        DEVICE                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 13. Quantitative Profile
-
-### 13.1 코드 언어 분포
+### 코드 언어 분포
 
 | 언어 | 줄 수 | 비율 | 용도 |
 |------|-------|------|------|
 | Dart | 18,964 | 58.7% | Flutter UI + 비즈니스 로직 |
 | Kotlin | 4,949 | 15.3% | Android 네이티브 |
 | Python | 2,116 | 6.5% | 자동화 스크립트 + 서버 |
-| YAML | 263+ | — | pubspec + CI/CD |
-| HTML/JS/CSS | 686 | 2.1% | 스토어 대시보드 |
 | Shell | 630 | 1.9% | 소스풀 자동화 |
-| Markdown | 5,000+ | — | 문서 (9개 + CLAUDE.md) |
-| **합계 (코드)** | **~27,000** | **100%** | — |
+| HTML/JS/CSS | 686 | 2.1% | 스토어 대시보드 |
+| YAML | 1,188 | 3.7% | CI/CD 워크플로우 |
+| **코드 합계** | **~28,500** | | |
 
-### 13.2 의존성 프로필
-
-| 카테고리 | 패키지 수 | 예시 |
-|---------|----------|------|
-| UI/위젯 | 12 | flutter_overlay_window, file_picker |
-| 오디오 | 8 | just_audio, ffmpeg_kit, flutter_midi_pro |
-| 네트워크 | 6 | dio, http, web_socket_channel |
-| 스토리지 | 5 | shared_preferences, path_provider |
-| 유틸리티 | 15 | intl, share_plus, permission_handler |
-| 이미지 | 4 | image, photo_view |
-| 서버사이드 | 8 | fastapi, google-cloud-texttospeech |
-| AI/ML | 10 | openai (Whisper, GPT-4o) |
-| **합계** | **68** | **GPL: 0, LGPL: 2 (FFmpeg)** |
-
-### 13.3 Android 타겟 매트릭스
-
-| 설정 | 최솟값 | 최댓값 | 의미 |
-|------|--------|--------|------|
-| minSdk | 21 (Axis) | 29 (Glot, Audio Tools) | Android 5.0 ~ 10 |
-| targetSdk | 34 | 35 (Pen) | Android 14~15 |
-| compileSdk | 34 | 35 | — |
-| NDK | 25.1.8937393 | — | FFmpeg 빌드용 |
-
-### 13.4 생산성 지표
+### 생산성 지표
 
 | 지표 | 값 |
 |------|-----|
 | 총 개발 기간 | 30일 |
-| 총 커밋 | 62개 |
-| 커밋/일 평균 | 2.07개 |
-| 코드/커밋 평균 | ~435줄 |
-| 앱/주 평균 | 2.5개 |
-| 코드/앱 평균 | 2,391줄 (Dart) |
-| 빌드 워크플로우/앱 | 1:1 매칭 |
+| 커밋/일 | 2.07 |
+| 코드/커밋 | ~435줄 |
+| 앱/주 | 2.5개 |
 
 ---
 
-## 14. Failure Catalog
+## 15. YouTube Content Mapping
 
-실패는 삭제하지 않는다. 여기에 기록한다.
-
-### 14.1 FLAG_SECURE 실패 (Pen v20)
-
-**시도:** FLAG_SECURE를 컨트롤 바에만 적용하여 화면 녹화 시 UI 숨기기
-**기대:** 특정 뷰만 녹화에서 제외
-**실제:** 앱 전체의 화면 녹화가 차단됨 ("Security policy prevents screen recording")
-**원인:** FLAG_SECURE는 Window 단위. 개별 View 단위 적용 불가.
-**교훈:** Android 보안 모델은 절충이 없다. 허용되지 않은 것은 안 된다.
-
-### 14.2 willContinue 실시간 스트리밍 실패 (Pen v21)
-
-**시도:** `GestureDescription.StrokeDescription(path, 0, 16, willContinue=true)`로 실시간 터치 전달
-**기대:** ACTION_MOVE 이벤트를 실시간 스트리밍
-**실제:** "Everything stops working"
-**원인:** dispatchGesture()는 완성된 경로를 한 번에 전달하도록 설계됨. 실시간 스트리밍은 InputManager.injectInputEvent() (root 필요)로만 가능.
-**교훈:** API 파라미터가 존재한다고 의도대로 동작하는 것은 아니다.
-
-### 14.3 jadx 메모리 실패 (Source Pool v1)
-
-**시도:** Termux에서 jadx로 APK 디컴파일
-**기대:** Java 소스 복원
-**실제:** OutOfMemoryError (Termux 메모리 제한)
-**해결:** apktool로 교체 (smali + 리소스 추출, 메모리 효율적)
-
-### 14.4 FFmpeg Kit 의존성 충돌 (Wavesy)
-
-**시도:** ffmpeg_kit_flutter_audio + flutter_midi_pro 동시 사용
-**기대:** 정상 빌드
-**실제:** `libc++_shared.so` 충돌 — 두 플러그인이 같은 네이티브 라이브러리를 다른 버전으로 번들링
-**해결:** `pickFirst` 전략으로 하나만 선택
-
-### 14.5 Clean Room → Independent Implementation (백서 v1)
-
-**시도:** "Clean Room Implementation" (원본 코드를 전혀 보지 않고 구현) 주장
-**기대:** 법적 방어력 극대화
-**실제:** 실제로는 F-Droid 소스를 읽고 패턴을 학습함 → Clean Room 정의에 부합하지 않음
-**해결:** "Independent Implementation"으로 정직하게 재정의. "읽되 복사하지 않는다."
+| 섹션 | 무기 | 콘텐츠 형태 |
+|------|------|------------|
+| §0 Fact Sheet | 무기 2 "Zero Lines" | 인포그래픽 |
+| §1 3-Layer × 5-Stage | 무기 3 "Source Pool" | 아키텍처 데모 |
+| §3 5-Stage Pipeline | 무기 3 | 단계별 워크스루 |
+| §7 Governance | 무기 4 "My Own Store" | 헌법 시연 |
+| §12 Failure Catalog | 무기 1 "31 Builds" | 실패 서사 |
+| §11 Matrix Architecture | 무기 5 "Repo is Novel" | 메타 콘텐츠 |
 
 ---
 
-## 15. Roadmap
+## Appendix A: CLI Quick Reference
 
-### Phase 현재: App Factory (v1.0)
+```bash
+# === Stage 1: Ingestion ===
+./scripts/setup-source-pool.sh              # 소스풀 초기화 (최초 1회)
+./scripts/source-pool-clone.sh              # F-Droid 참조 전체 clone
+./scripts/source-pool-clone.sh --shallow    # shallow clone
+./scripts/source-pool-clone.sh ringdroid    # 특정 레포만
 
-```
-[✅] 10개 앱 코드 완성
-[✅] CI/CD 21개 워크플로우
-[✅] 자동화 스크립트 6개
-[✅] Vercel 스토어 배포
-[✅] 3중 컴플라이언스 방어선
-[⏳] ChronoCall flutter create + 빌드
-[⏳] Production 승격 (Prototype Lab → Production)
+# === Stage 2: Analysis ===
+python3 scripts/license-audit.py            # 전체 라이선스 감사
+python3 scripts/license-audit.py --strict   # GPL 시 exit 1
+python3 scripts/license-audit.py --json     # JSON 리포트
+
+# === Stage 3: Transform (Tier 3 참조 시) ===
+./scripts/extract-apk.sh --connect IP:PORT  # ADB 연결
+./scripts/extract-apk.sh --list samsung     # 패키지 검색
+./scripts/extract-apk.sh com.example.app    # 추출 + 디컴파일
+
+# === Stage 4: Build ===
+git push origin main                        # CI 자동 트리거
+python3 scripts/constitution_guard.py       # 로컬 헌법 검사
+
+# === Stage 5: Distribution ===
+python3 scripts/build_store_index.py        # pubspec → apps.json
+gh release download {tag} -p app-debug.apk  # APK 다운로드
+termux-open app-debug.apk                   # 기기 설치
 ```
 
-### Phase 다음: Content Factory (v2.0)
+## Appendix B: 문서 계보
 
-```
-[ ] Show HN 포스트 발행
-[ ] YouTube 개발 시리즈 시작
-[ ] 서사 추출 도구 (narrative-extract.py) 구현
-[ ] Source Pool 파이프라인 실전 가동
-[ ] Speaker Diarization (ChronoCall v2)
-[ ] On-device Whisper (whisper.cpp, 클라우드 API 제거)
-```
-
-### Phase 장기: Hardware + Education
-
-```
-[ ] IoT 디바이스 + Claude Code 펌웨어
-[ ] eae.kr PatchTech 커리큘럼
-[ ] parksy.kr 퍼소나 허브
-[ ] VDD 방법론 교육 콘텐츠
-```
+| 문서 | 상태 | 역할 |
+|------|------|------|
+| **이 문서** | **v2.0 실행 문서** | 시스템 설계도 + 실행 스펙 |
+| SOURCE_POOL_SCM_WHITEPAPER.md | v2 확정 | 프로세스 정의 + 법적 방어 |
+| CONTENT_MARKETING_PLAN.md | v2.0 확정 | 마케팅 전략 + 콘텐츠 무기 |
+| PARKSY_APK_PHILOSOPHY.md | 확정 | 개발 철학 5원칙 |
+| CONSTITUTION.md | v1.3 확정 | 거버넌스 13조 |
+| CONTROL_KEYS.md | 운영 중 | 운영 프로토콜 |
+| VDD-Report.md | 확정 | 방법론 논문 |
+| MARKETING_STRATEGY_DRAFT.md | **DEPRECATED** | CONTENT_MARKETING_PLAN.md로 통합 |
 
 ---
 
-## Appendix
-
-### A. 파일 구조 전체 맵
-
-```
-dtslib-apk-lab/                    (414 files)
-│
-├── apps/                          (10 apps, 366 files)
-│   ├── capture-pipeline/          (Dart 2,452 + Kt 654 = 3,106줄)
-│   ├── chrono-call/               (Dart 2,110 + Kt 145 = 2,255줄)
-│   ├── laser-pen-overlay/         (Dart 995 + Kt 1,583 = 2,578줄)
-│   ├── midi-converter/            (Dart 318 + Kt 5 = 323줄)
-│   ├── parksy-audio-tools/        (Dart 3,359 + Kt 699 = 4,058줄)
-│   ├── parksy-axis/               (Dart 2,618 + Kt 5 = 2,623줄)
-│   ├── parksy-glot/               (Dart 3,774 + Kt 1,478 = 5,252줄)
-│   ├── parksy-liner/              (Dart 615 + Kt 370 = 985줄)
-│   ├── parksy-wavesy/             (Dart 1,940 + Kt 5 = 1,945줄)
-│   └── tts-factory/               (Dart 783 + Kt 5 + Py 524 = 1,312줄)
-│
-├── dashboard/                     (HTML 444 + JSON)
-│   ├── index.html
-│   ├── apps.json
-│   └── manifest.json
-│
-├── scripts/                       (1,168줄)
-│   ├── build_store_index.py       (121줄)
-│   ├── constitution_guard.py      (124줄)
-│   ├── license-audit.py           (293줄)
-│   ├── extract-apk.sh            (249줄)
-│   ├── setup-source-pool.sh      (218줄)
-│   └── source-pool-clone.sh      (163줄)
-│
-├── docs/                          (9 documents, ~5,000줄)
-│
-├── .github/workflows/             (21 workflows)
-│
-└── CLAUDE.md                      (~500줄, 개발 헌법)
-```
-
-### B. Git 기여자
-
-| 이름 | 역할 |
-|------|------|
-| Parksy / Uncle, Parksy | 프로젝트 오너, 음성 지시, 방향 결정 |
-| Claude | AI 코드 생성, 커밋 작성 |
-| dtslib1979 / dimas-40 | GitHub 계정 (동일인) |
-
-### C. 참조 소스 (F-Droid Source Pool)
-
-| 참조 앱 | 라이선스 | 참조 대상 앱 | 참조 범위 |
-|---------|----------|------------|----------|
-| Ringdroid | Apache 2.0 | Wavesy | 파형 편집 패턴 |
-| sherpa-onnx | Apache 2.0 | ChronoCall, TTS | STT/TTS 아키텍처 |
-| whisperIME | Apache 2.0 | ChronoCall | on-device Whisper 패턴 |
-| Clipboard Cleaner | MIT | Capture | 클립보드 처리 |
-| Transcribro | Apache 2.0 | ChronoCall | STT UI 패턴 |
-
-### D. 보안 프로필
-
-| 항목 | 현재 상태 | 위험도 | 계획 |
-|------|----------|--------|------|
-| API 키 저장 | SharedPreferences (평문) | 낮음 (개인용) | flutter_secure_storage 고려 |
-| 네트워크 통신 | HTTPS only | 낮음 | — |
-| 사용자 인증 | 없음 (단일 사용자) | 없음 | — |
-| 데이터 수집 | 없음 (헌법 §1.1 금지) | 없음 | — |
-| 권한 | 최소 필요 권한만 요청 | 낮음 | — |
-
-### E. 비용 구조
-
-| 항목 | 월 비용 | 비고 |
-|------|---------|------|
-| GitHub | $0 | Free tier |
-| Vercel | $0 | Hobby plan |
-| GCP Cloud Run | ~$0 | Pay-per-request, 거의 미사용 |
-| Google TTS | $0 | 1M 무료 문자/월 |
-| OpenAI Whisper | ~$5 | 사용량 기반 |
-| Play Store | $0 | **미사용** |
-| **합계** | **~$5/월** | — |
+> **"코드를 짜는 게 아니라 공장을 돌리고 있다.**
+> **다만 그 공장의 원장이 git이고, 라인이 파이프라인일 뿐이다."**
 
 ---
 
-> **"코드를 짜는 게 아니라 공장을 돌리고 있다.
-> 다만 그 공장의 원장이 git이고, 라인이 파이프라인일 뿐이다."**
->
-> — CLAUDE.md, 헌법 제2조
-
----
-
-*End of Document*
-*Version 1.0 — 2026-03-01*
-*Generated by: Parksy (Voice Direction) + Claude Code (Implementation)*
+*v2.0 — 실행 문서. v1 (as-is 현황) + to-be 설계를 통합. 스키마 필드 정의, 프리셋 시스템, 서명 규칙 추가.*
+*최종 갱신: 2026-03-02*
