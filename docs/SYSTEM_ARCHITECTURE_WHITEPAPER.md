@@ -1,6 +1,6 @@
 # Parksy APK Lab — System Architecture Whitepaper
 
-> **Version:** v2.0 — Execution Document
+> **Version:** v2.1 — Execution Document + Meta-Automation Layer
 > **Date:** 2026-03-02
 > **Author:** Parksy (Voice) + Claude Code (Implementation)
 > **선행 문서:** SOURCE_POOL_SCM_WHITEPAPER.md (프로세스), CONTENT_MARKETING_PLAN.md (마케팅)
@@ -68,6 +68,44 @@
 | 4 Build | GitHub Actions 21개 | **90%** | 95% |
 | 5 Distribution | Release 자동, 설치 수동 | 60% | 80% |
 | **총합** | | **~45%** | **~79%** |
+
+### 3-Level Hierarchy
+
+```
+레벨 0: 앱을 만든다              (수작업 — 완료)
+레벨 1: 앱을 찍어내는 파이프라인    (생산 자동화 — 구축 중)
+레벨 2: 기존 앱을 일괄 업데이트     (메타 자동화 — 설계 단계)
+```
+
+| 레벨 | 입력 | 출력 | 상태 |
+|------|------|------|------|
+| **Level 1: Production** | F-Droid URL | 새 앱 1개 | 5-Stage Pipeline (§3) |
+| **Level 2: Propagation** | 변경 지시 1개 | 기존 앱 N개 일괄 업데이트 | Update Pipeline (§3A) |
+
+**왜 Level 2가 가능한가:**
+
+```
+10개 앱이 전부:
+  - 같은 헌법      (CONSTITUTION.md)
+  - 같은 테마      (다크 + 골드 액센트, kBackground/kSurface/kAccent)
+  - 같은 패턴      (Flutter + Kotlin, Platform Channel IPC)
+  - 같은 브랜드    (Parksy)
+  - 같은 빌드 스택  (AGP 8.x, compileSdk 34-35, GitHub Actions)
+```
+
+규격이 통일돼 있으니까 **하나의 변경이 전체에 전파 가능**하다.
+반도체 팹의 공정 레시피와 같다 — 레시피 하나 바꾸면 라인에서 나오는 칩 전부가 바뀐다.
+
+```
+메타 프로그래밍 계층:
+
+  코드          = 앱을 만드는 것
+  파이프라인      = 코드를 만드는 것          ← Level 1
+  프리셋/헌법    = 파이프라인을 만드는 것      ← Level 2
+```
+
+Level 2에서 프리셋을 바꾸면 → 파이프라인이 바뀌고 → 앱 전체가 바뀐다.
+**유저 인풋 1개 → 전체 변경.** 이것이 메타 자동화다.
 
 ---
 
@@ -280,6 +318,181 @@ GitHub Release (자동)
   → build_store_index.py → apps.json 갱신 (반자동)
   → deploy-vercel.yml → Vercel 스토어 배포 (수동 트리거)
   → gh release download + termux-open (수동)
+```
+
+---
+
+## 3A. Update Pipeline (Level 2: Propagation)
+
+> Level 1이 "새 앱 생산"이라면, Level 2는 "기존 앱 일괄 개선"이다.
+> Level 1만 있으면 조립 라인이다. Level 2가 있어야 공장이다.
+
+### 3A.1 파이프라인 구조
+
+```
+입력: change-spec.json (변경 지시 1개)
+  │
+  ├─ 1. Scope Resolution
+  │     app-registry.json에서 대상 앱 필터링
+  │     scope: "all" | ["parksy-axis", "parksy-wavesy"]
+  │
+  ├─ 2. Pattern Matching
+  │     각 앱에서 변경 대상 파일/패턴 탐색
+  │     glob + grep으로 매칭
+  │
+  ├─ 3. Transformation
+  │     type별 처리:
+  │       theme    → sed/replace (constants.dart 색상값)
+  │       dependency → pubspec.yaml 버전 갱신
+  │       config   → build.gradle 설정 변경
+  │       feature  → Claude Code 반자동 (템플릿 + 사람 승인)
+  │       constitution → constitution_guard.py 규칙 추가
+  │
+  ├─ 4. Validation
+  │     constitution_guard.py + license-audit.py 통과 확인
+  │
+  ├─ 5. Version Bump
+  │     version-sync.sh × N앱 (patch 자동 증가)
+  │
+  └─ 6. Build & Deploy
+        git push → CI 전체 빌드 → 스토어 갱신
+
+출력: N개 앱 업데이트된 새 버전
+```
+
+### 3A.2 change-spec.json — Field Definition
+
+| 필드 | 타입 | 필수 | 기본값 | 설명 |
+|------|------|------|--------|------|
+| `schema_version` | string | Y | — | `"change-spec-v1"` |
+| `type` | enum | Y | — | `theme` \| `dependency` \| `config` \| `feature` \| `constitution` |
+| `scope` | string \| string[] | Y | `"all"` | `"all"` 또는 앱 ID 배열 |
+| `description` | string | Y | — | 변경 설명 (커밋 메시지 겸용) |
+| `targets` | object[] | Y | — | 변경 대상 목록 (아래 참조) |
+| `version_bump` | enum | N | `"patch"` | `"major"` \| `"minor"` \| `"patch"` \| `"none"` |
+| `constitution_check` | bool | N | `true` | 변경 후 헌법 검사 |
+| `dry_run` | bool | N | `false` | 미리보기만 (실제 변경 안 함) |
+
+**targets 배열 항목:**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `files` | glob | Y | 대상 파일 패턴 (예: `lib/**/*.dart`) |
+| `pattern` | string | Y | 찾을 패턴 (정규식 또는 리터럴) |
+| `replacement` | string | Y | 대체할 값 |
+| `mode` | enum | N | `"literal"` \| `"regex"` (기본: `"literal"`) |
+
+### 3A.3 변경 유형별 자동화 가능성
+
+| type | 자동화 | 방법 | 예시 |
+|------|--------|------|------|
+| `theme` | **100%** | sed/grep — constants.dart 색상값 일괄 교체 | 배경색 `0xFF1A1A2E` → `0xFF0D1117` |
+| `dependency` | **100%** | pubspec.yaml 버전 교체 + pub get | `just_audio: ^0.9.36` → `^0.9.40` |
+| `config` | **90%** | build.gradle 값 교체 | `compileSdk 34` → `35` |
+| `constitution` | **100%** | constitution_guard.py 패턴 추가 | 금지 패턴 11번째 추가 |
+| `feature` | **30%** | Claude Code 반자동 — 템플릿 생성 + 사람 승인 | "About 화면 추가" |
+| `brand` | **90%** | AndroidManifest + app-meta.json + strings.xml | 앱 이름 프리픽스 변경 |
+
+`theme`/`dependency`/`config`는 grep+sed로 완전 자동. 사람이 개입할 필요 없다.
+`feature`만 반자동 — 이건 Level 1의 Stage 3과 같은 이유다 (코드 이해 필요).
+
+### 3A.4 실행 예시
+
+**예시 1: 테마 색상 일괄 변경 (100% 자동)**
+
+```json
+{
+  "schema_version": "change-spec-v1",
+  "type": "theme",
+  "scope": "all",
+  "description": "다크모드 배경색 변경: 네이비 → 퓨어블랙",
+  "targets": [
+    {
+      "files": "lib/core/constants.dart",
+      "pattern": "Color(0xFF1A1A2E)",
+      "replacement": "Color(0xFF0D1117)"
+    },
+    {
+      "files": "lib/core/constants.dart",
+      "pattern": "Color(0xFF16213E)",
+      "replacement": "Color(0xFF161B22)"
+    }
+  ],
+  "version_bump": "patch"
+}
+```
+
+결과: 10개 앱 × constants.dart 2줄 변경 → 10개 새 버전 → CI 빌드 10개.
+
+**예시 2: 의존성 일괄 업데이트 (100% 자동)**
+
+```json
+{
+  "schema_version": "change-spec-v1",
+  "type": "dependency",
+  "scope": "all",
+  "description": "shared_preferences 3.0.0 마이그레이션",
+  "targets": [
+    {
+      "files": "pubspec.yaml",
+      "pattern": "shared_preferences: ^2.2.2",
+      "replacement": "shared_preferences: ^3.0.0"
+    }
+  ],
+  "version_bump": "minor"
+}
+```
+
+**예시 3: 특정 앱만 SDK 업그레이드 (90% 자동)**
+
+```json
+{
+  "schema_version": "change-spec-v1",
+  "type": "config",
+  "scope": ["parksy-axis", "parksy-wavesy", "chrono-call"],
+  "description": "compileSdk 35 업그레이드 (Android 16 대응)",
+  "targets": [
+    {
+      "files": "android/app/build.gradle",
+      "pattern": "compileSdk 34",
+      "replacement": "compileSdk 35"
+    },
+    {
+      "files": "android/app/build.gradle",
+      "pattern": "targetSdkVersion 34",
+      "replacement": "targetSdkVersion 35"
+    }
+  ],
+  "version_bump": "minor",
+  "dry_run": true
+}
+```
+
+### 3A.5 구현 스크립트: propagate.sh (Phase 2 구현 대상)
+
+```bash
+# 사용법
+./scripts/propagate.sh change-specs/theme-pure-black.json          # 실행
+./scripts/propagate.sh change-specs/theme-pure-black.json --dry-run # 미리보기
+
+# 동작
+# 1. change-spec.json 파싱
+# 2. app-registry.json에서 scope 필터링
+# 3. 각 앱 디렉토리에서 targets 패턴 매칭
+# 4. dry_run이면 diff만 출력, 아니면 실제 변경
+# 5. constitution_guard.py 실행
+# 6. version-sync.sh × N앱
+# 7. 변경 요약 출력
+
+# 출력 예:
+# [propagate] change-spec: theme-pure-black.json
+# [propagate] scope: all (10 apps)
+# [propagate] parksy-axis: 2 files changed
+# [propagate] parksy-wavesy: 2 files changed
+# [propagate] ... (×10)
+# [propagate] constitution: PASS
+# [propagate] version bump: patch (10 apps)
+# [propagate] DONE: 10 apps updated, 20 files changed
 ```
 
 ---
@@ -556,6 +769,10 @@ python3 scripts/license-audit.py --json
 | 앱 온보딩 템플릿 | 0% | 70% | P2 | transform-spec.json 기반 | 프리셋 정의 |
 | F-Droid API 연동 | 0% | 50% | P3 | curl + jq | API 클라이언트 |
 | 기기 설치 자동화 | 0% | 50% | P3 | gh + termux-open | 원커맨드 스크립트 |
+| **Level 2: 일괄 전파** | 0% | 80% | **P2** | `propagate.sh` + change-spec.json | §3A 참조 |
+| change-spec.json 스키마 | 설계 완료 | 실행 | P2 | JSON + propagate.sh | 첫 change-spec 작성 |
+| 테마 일괄 변경 | 0% | **100%** | P2 | sed/grep | theme type 구현 |
+| 의존성 일괄 업데이트 | 0% | **100%** | P2 | pubspec 파싱 | dependency type 구현 |
 
 ---
 
@@ -571,6 +788,8 @@ python3 scripts/license-audit.py --json
 | F6 | 크로스레포 동기화 깨짐 | 중 | 중 | 없음 | 6 | 매니페스트 경유 강제 |
 | F7 | build_store_index.py 불완전 | 하 | **확정** | 수동 | 5 | 10앱 확장 (P1) |
 | F8 | 프리셋 불일치 (AGP 버전) | 중 | 중 | 없음 | 6 | 프리셋 자동 탐지 로직 |
+| F9 | Level 2 전파 실패 (일부 앱만 변경) | **상** | 중 | 없음 | **9** | propagate.sh dry-run 필수 + 전체 diff 확인 |
+| F10 | change-spec 패턴 미매칭 (앱마다 다른 형식) | 중 | 높음 | 없음 | **9** | app-registry.json으로 구조 통일 선행 |
 
 **RPN** = 심각도(1-3) × 빈도(1-3) × 탐지난이도(1-3). **6 이상 즉시 대응.**
 
@@ -587,7 +806,7 @@ python3 scripts/license-audit.py --json
 | `app-registry.json` 초기 생성 | 10앱 중앙 레지스트리 | 모든 앱 필드 완성 |
 | transform-spec.json 예시 2개 | 실행 가능 스펙 | Wavesy + ChronoCall 예시 |
 
-### Phase 2: Pipeline (다음)
+### Phase 2: Pipeline + Level 2 (다음)
 
 | 태스크 | 산출물 | 의존성 |
 |--------|--------|--------|
@@ -595,6 +814,8 @@ python3 scripts/license-audit.py --json
 | 프리셋 자동 탐지 로직 | build.gradle → 프리셋 매칭 | Phase 1 |
 | 앱 온보딩 템플릿 | 신규 앱 뼈대 자동 생성 | app-registry.json |
 | `build-status.json` 자동 생성 | CI 상태 대시보드 | GitHub API |
+| **`propagate.sh` 작성** | **Level 2 일괄 전파 엔진** | **app-registry.json + version-sync.sh** |
+| **change-spec.json 첫 실행** | **테마 or 의존성 일괄 변경 1건** | **propagate.sh** |
 
 ### Phase 3: Intelligence (나중)
 
@@ -626,8 +847,9 @@ python3 scripts/license-audit.py --json
    =CI         │   source-map.json    = 원자재 입고 × 매입 전표
    WIP         │   build-status.json  = 수율 보고 × 손익 계산
    =브랜치     │   app-registry.json  = 제품 마스터 × 계정 과목
-   수율        │   transform-spec.json= 작업 지시서 × 변경 전표
-   =빌드성공률 │
+   수율        │   transform-spec.json= 작업 지시서 × 변경 전표  (Level 1)
+   =빌드성공률 │   change-spec.json   = 공정 레시피 × 일괄 전표  (Level 2)
+               │
 ```
 
 **4대 원칙 × 파이프라인:**
@@ -786,5 +1008,6 @@ termux-open app-debug.apk                   # 기기 설치
 
 ---
 
+*v2.1 — Level 2 메타 자동화 추가. change-spec.json 스키마, propagate.sh 설계, Update Pipeline (§3A) 신설.*
 *v2.0 — 실행 문서. v1 (as-is 현황) + to-be 설계를 통합. 스키마 필드 정의, 프리셋 시스템, 서명 규칙 추가.*
 *최종 갱신: 2026-03-02*
