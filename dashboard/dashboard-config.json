@@ -1,0 +1,90 @@
+{
+  "brand": {
+    "name": "DTSLIB",
+    "highlight": "APK Lab",
+    "subtitle": "Internal Build Distribution",
+    "logoText": "APK",
+    "githubUrl": "https://github.com/dtslib1979/dtslib-apk-lab",
+    "footer": "DTSLIB FRANCHISE OS"
+  },
+  "github": {
+    "owner": "dtslib1979",
+    "repo": "dtslib-apk-lab",
+    "branch": "main"
+  },
+  "theme": {
+    "bg": "#0D0D0D",
+    "bgCard": "#1A1A1A",
+    "bgCardHover": "#222222",
+    "surface": "#253A2F",
+    "surfaceAlt": "#1a2e23",
+    "accent": "#D4AF37",
+    "accentGlow": "rgba(212,175,55,0.4)",
+    "border": "rgba(212,175,55,0.15)",
+    "borderHover": "rgba(212,175,55,0.35)",
+    "text": "#F5F5DC",
+    "textSecondary": "rgba(245,245,220,0.6)",
+    "textMuted": "rgba(245,245,220,0.3)"
+  },
+  "layout": {
+    "maxWidth": "540px",
+    "gridColumns": 3
+  },
+  "sections": {
+    "stats": true,
+    "categoryFilter": true,
+    "timeline": true,
+    "pipeline": true,
+    "warning": true,
+    "warningText": "Debug builds — Internal & partner use only"
+  },
+  "stats": {
+    "total_apps": 10,
+    "store_apps": 9,
+    "total_dart_lines": 18646,
+    "total_kotlin_lines": 4949,
+    "total_code_lines": 23595,
+    "automation_rate": 72,
+    "total_workflows": 10
+  },
+  "pipeline": {
+    "stages": [
+      { "num": 1, "name": "Ingestion", "icon": "📥", "tool": "source-pool-clone.sh", "pct": 60 },
+      { "num": 2, "name": "Analysis", "icon": "🔍", "tool": "source-pool-analyze.sh", "pct": 70 },
+      { "num": 3, "name": "Transform", "icon": "⚙️", "tool": "Claude + propagate.sh", "pct": 60 },
+      { "num": 4, "name": "Build", "icon": "🔨", "tool": "GitHub Actions (21)", "pct": 90 },
+      { "num": 5, "name": "Distrib", "icon": "🚀", "tool": "Vercel + Releases", "pct": 80 }
+    ],
+    "total_pct": 72
+  },
+  "categories": {
+    "all": {
+      "label": "All",
+      "color": "#D4AF37"
+    },
+    "audio": {
+      "label": "Audio",
+      "color": "#FF6B6B"
+    },
+    "overlay": {
+      "label": "Overlay",
+      "color": "#4ECDC4"
+    },
+    "utility": {
+      "label": "Utility",
+      "color": "#45B7D1"
+    },
+    "broadcast": {
+      "label": "Broadcast",
+      "color": "#96CEB4"
+    },
+    "subtitle": {
+      "label": "Subtitle",
+      "color": "#FFEAA7"
+    },
+    "creative": {
+      "label": "Creative",
+      "color": "#DDA0DD"
+    }
+  }
+}
