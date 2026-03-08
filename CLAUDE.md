@@ -523,3 +523,15 @@ D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md  ← 이 레포 상세
 **재구축 힌트**: D: 유실 시 이걸 다시 만들려면 Claude에게 이렇게 시켜라
 ---
 ```
+---
+
+## Browser Runtime
+
+> Parksy OS 2+2 매트릭스 — 이 레포 전담 브라우저
+
+| 항목 | 값 |
+|------|-----|
+| **브라우저** | Google Chrome |
+| **이유** | APK 실험실 — Store+Factory IT 튜토리얼 |
+| **URL** | https://dtslib-apk-lab.vercel.app |
+
