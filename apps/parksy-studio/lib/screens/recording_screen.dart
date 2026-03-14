@@ -26,6 +26,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    if (_recording) RecordingService.stop();
     super.dispose();
   }
 

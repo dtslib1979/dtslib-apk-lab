@@ -108,16 +108,18 @@ state.json         = 공정 현황판
 - Parksy Pen (laser-pen-overlay)
 - Parksy Wavesy (parksy-wavesy)
 - Parksy TTS (tts-factory)
-- **Parksy ChronoCall (chrono-call)** ← NEW
+- Parksy ChronoCall (chrono-call)
+- **Parksy Studio (parksy-studio)** ← ACTIVE DEV
 
 ## Project Structure
 ```
 apps/
-├── capture-pipeline/    # 공유 텍스트 캡처 앱
-├── laser-pen-overlay/   # S Pen 오버레이 앱
+├── capture-pipeline/    # 공유 텍스트 캡처 → GitHub 아카이브
+├── laser-pen-overlay/   # S Pen 레이저펜 오버레이
 ├── parksy-wavesy/       # 음원 편집 가위 (MP3/MIDI)
-├── tts-factory/         # TTS 변환 앱
-└── chrono-call/         # 통화 녹음 STT 변환 앱 ← NEW
+├── tts-factory/         # TTS 배치 생성기
+├── chrono-call/         # 통화 녹음 STT 변환
+└── parksy-studio/       # 방송 제작 파이프라인 APK ← ACTIVE DEV
 
 dashboard/
 ├── apps.json            # 스토어 표시용 앱 목록
@@ -143,6 +145,100 @@ dashboard/
 
 ## Available Commands
 - `/sync-store` - pubspec.yaml 기준으로 스토어 메타데이터 동기화
+
+---
+
+# Parksy Studio — 개발 핸드오프 매뉴얼
+
+> **방송 제작 파이프라인 전체를 하나의 APK 안에.**
+> v1.0 코드 완성 + 핫픽스 적용. v2.0 아키텍처 백서: `apps/parksy-studio/docs/WHITEPAPER-v2.md`
+
+## 현재 상태
+
+| 항목 | 값 |
+|------|-----|
+| 앱 이름 | Parksy Studio |
+| 패키지명 | com.parksy.studio |
+| 버전 | 1.0.0+1 |
+| Dart 파일 | 9개, ~1,300줄 |
+| Kotlin 파일 | 2개 (MainActivity, RecordingService) |
+| HTML 에셋 | 3개 (trimmer, interpreter, bgm) |
+| 빌드 상태 | **v1.0 핫픽스 완료, CI 빌드 가능** |
+
+## v1.0 기능별 실행률 (코드 검증 완료)
+
+| 기능 | 실행률 | 비고 |
+|------|--------|------|
+| 런처 (cloud-appstore 13개 도구) | **100%** | 완전 동작 |
+| 화면녹화 | **60%** | 버그 3개 핫픽스 완료 |
+| BGM 플레이어 | **75%** | YouTube embed 자동재생 불확실, WebViewController dispose 누락 |
+| YouTube 업로드 | **65%** | OAuth Implicit Flow 불안정, 재시도 없음 (v2.0에서 개선) |
+| 동시통역 | **5%** | let final 수정됨 but webkitSpeechRecognition → Android WebView 미지원 |
+| 영상트리머 | **0%** | FFmpeg WASM → SharedArrayBuffer 미지원. 변환 비활성화, 미리보기만 |
+
+**전체 실행률: 약 50%**
+
+## 핫픽스 적용 이력
+
+| # | 버그 | 수정 | 상태 |
+|---|------|------|------|
+| 1 | `let final` JS 예약어 (interpreter.html:126) | `let finalText` | ✅ 완료 |
+| 2 | WebView blob 다운로드 불가 (trimmer) | TrimmerChannel base64 방식 | ✅ 완료 |
+| 3 | FFmpeg WASM SharedArrayBuffer 미지원 | 변환 기능 비활성화, "v2.0 예정" 표시 | ✅ 완료 |
+| 4 | stopRecording 비동기 레이스 (MainActivity.kt:39) | 500ms 지연 후 path 리턴 | ✅ 완료 (v2.0 콜백으로 교체 예정) |
+| 5 | OAuth redirect ERR_CONNECTION_REFUSED | onNavigationRequest 가로채기 (동작 가능) | ⚠️ 불안정 (v2.0 AppAuth로 교체 예정) |
+| 6 | startForeground early return stopSelf 미호출 | `?: run { stopForeground; stopSelf; return }` | ✅ 완료 |
+| 7 | dispose에서 녹화 중지 안 함 (recording_screen) | `if (_recording) RecordingService.stop()` | ✅ 완료 |
+| 8 | WebView 마이크 권한 자동 거부 | setOnPlatformPermissionRequest grant() | ✅ 완료 |
+| 9 | BGM autoplay 차단 | setMediaPlaybackRequiresUserGesture(false) | ✅ 완료 |
+
+## v2.0 백서 요약
+
+**핵심:** WebView에 핵심 로직 → 네이티브 엔진으로 이전
+- 트리머: FFmpeg WASM → Android MediaCodec (HW 가속, ~5초/분)
+- 동시통역: Web Speech API → Android SpeechRecognizer (온디바이스)
+- 번역: Google Translate URL → ML Kit (온디바이스, 무료)
+- OAuth: Implicit Flow → AppAuth + PKCE + refresh_token
+- 업로드: List<int> 메모리 → RandomAccessFile + 청크별 재시도
+
+**백서:** `apps/parksy-studio/docs/WHITEPAPER-v2.md` — 지금 당장 실행 계획 아님. 트리머가 실제로 필요할 때 꺼낼 설계도.
+
+## 파일 구조
+
+```
+apps/parksy-studio/
+├── pubspec.yaml
+├── docs/
+│   ├── PLAN.md              # v1.0 기획문서
+│   └── WHITEPAPER-v2.md     # v2.0 아키텍처 백서
+├── lib/
+│   ├── main.dart
+│   ├── core/constants.dart  # 색상 + StudioTool 모델
+│   └── screens/
+│       ├── launcher_screen.dart     # 도구 그리드 ✅
+│       ├── studio_webview.dart      # WebView 래퍼 ✅
+│       ├── recording_screen.dart    # 화면녹화 ⚠️ 부분 동작
+│       ├── trimmer_screen.dart      # 트리머 (미리보기만) ⚠️
+│       ├── interpreter_screen.dart  # 동시통역 (WebView STT 미지원) ❌
+│       ├── bgm_screen.dart          # BGM 플레이어 ⚠️ 부분 동작
+│       └── upload_screen.dart       # YouTube 업로드 ⚠️ OAuth 불안정
+├── android/app/src/main/kotlin/com/parksy/studio/
+│   ├── MainActivity.kt
+│   └── RecordingService.kt
+└── assets/
+    ├── trimmer/trimmer.html         # 미리보기 전용 (변환 비활성화)
+    ├── interpreter/interpreter.html # Web Speech API (Android WebView 미지원)
+    └── bgm/channels.json
+```
+
+## 색상 팔레트
+
+```dart
+const kBackground = Color(0xFF0A0A0A);
+const kSurface    = Color(0xFF1A1A1A);
+const kAccent     = Color(0xFFE8D5B7);  // Parksy 골드
+const kDim        = Color(0xFF333333);
+```
 
 ---
 

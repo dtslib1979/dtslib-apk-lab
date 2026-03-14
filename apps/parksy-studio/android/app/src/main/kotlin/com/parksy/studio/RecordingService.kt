@@ -44,11 +44,11 @@ class RecordingService : Service() {
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra("data")
-        } ?: return
+        } ?: run { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf(); return }
 
         val width = intent.getIntExtra("width", 1080)
         val height = intent.getIntExtra("height", 1920)
-        outputPath = intent.getStringExtra("outputPath") ?: return
+        outputPath = intent.getStringExtra("outputPath") ?: run { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf(); return }
 
         val projectionManager =
             getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager

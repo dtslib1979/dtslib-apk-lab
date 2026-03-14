@@ -38,7 +38,10 @@ class MainActivity : FlutterActivity() {
                     }
                     "stopRecording" -> {
                         stopRecordingService()
-                        result.success(RecordingService.outputPath)
+                        // 서비스 Intent 비동기 → 500ms 대기 후 path 리턴 (v2.0에서 콜백으로 교체 예정)
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            result.success(RecordingService.outputPath.ifEmpty { null })
+                        }, 500)
                     }
                     "isRecording" -> result.success(RecordingService.isRecording)
                     else -> result.notImplemented()
