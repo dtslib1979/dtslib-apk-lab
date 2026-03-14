@@ -27,6 +27,7 @@ class RecordingService : Service() {
         const val EXTRA_AUDIO_PROFILE = "audioProfile" // "lecture" | "podcast" | "raw"
         var isRecording = false
         var outputPath  = ""
+        @Volatile var isStopped = false  // stopRecording() 완전 완료 후 true
     }
 
     private var mediaProjection: MediaProjection? = null
@@ -279,6 +280,7 @@ class RecordingService : Service() {
     // ──────────────────────────────────────────────────────────────
     private fun stopRecording() {
         isRecording = false
+        isStopped   = false
 
         audioThread?.join(2_000)
         videoThread?.join(2_000)
@@ -305,6 +307,7 @@ class RecordingService : Service() {
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+        isStopped = true  // 완전 완료 시그널
     }
 
     // ──────────────────────────────────────────────────────────────

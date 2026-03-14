@@ -32,13 +32,21 @@ class _LauncherScreenState extends State<LauncherScreen> {
   void _selectScenario(StudioScenario s) {
     setState(() => _selected = s);
     if (s.isCustom) {
+      // 커스텀: 풀 설정 UI
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => const RecordingScreen(),
       ));
     } else if (s.autoOpenTool == 'bgm') {
+      // BGM 먼저 설정 → 돌아오면 REC 패널에서 녹화 시작
       Navigator.push(context, MaterialPageRoute(builder: (_) => const BgmScreen()));
     } else if (s.autoOpenTool == 'interpreter') {
+      // 통역 먼저 설정 → 돌아오면 REC 패널에서 녹화 시작
       Navigator.push(context, MaterialPageRoute(builder: (_) => const InterpreterScreen()));
+    } else {
+      // 사이드 툴 없음 (shorts_lecture, long_lecture 등) → 원터치로 바로 녹화
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => RecordingScreen(scenario: s),
+      ));
     }
   }
 

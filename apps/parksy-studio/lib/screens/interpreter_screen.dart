@@ -119,6 +119,39 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
     if (mounted) setState(() { _listening = false; _status = '대기 중'; _interim = ''; });
   }
 
+  // 언어 변경 → translator 재생성 (Bug 2 fix)
+  Future<void> _changeSrcLang(String newLang) async {
+    if (_listening) await _stop();
+    setState(() { _srcLang = newLang; _translated = ''; });
+
+    final mlkitLang = _langMap[newLang]!['mlkit'] as TranslateLanguage?;
+    _translator?.close();
+    _translator = null;
+
+    if (mlkitLang == null) {
+      // auto 모드 — translator 없이 원문만 표시
+      setState(() { _translatorReady = false; _status = '대기 중 (자동 언어 — 번역 없음)'; });
+      return;
+    }
+
+    setState(() => _status = '모델 확인 중...');
+    try {
+      final mgr = OnDeviceTranslatorModelManager();
+      if (!await mgr.isModelDownloaded(mlkitLang)) {
+        setState(() => _status = '$newLang 모델 다운로드 중...');
+        await mgr.downloadModel(mlkitLang);
+      }
+      if (!mounted) return;
+      _translator = OnDeviceTranslator(
+        sourceLanguage: mlkitLang,
+        targetLanguage: TranslateLanguage.korean,
+      );
+      setState(() { _translatorReady = true; _status = '대기 중'; });
+    } catch (_) {
+      if (mounted) setState(() { _translatorReady = false; _status = '모델 로드 실패'; });
+    }
+  }
+
   void _clear() => setState(() { _original = ''; _interim = ''; _translated = ''; });
 
   @override
@@ -152,7 +185,7 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
             children: _langMap.entries.map((e) {
               final sel = _srcLang == e.key;
               return GestureDetector(
-                onTap: () { if (_listening) _stop(); setState(() => _srcLang = e.key); },
+                onTap: () => _changeSrcLang(e.key),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(

@@ -41,10 +41,20 @@ class MainActivity : FlutterActivity() {
                         requestProjectionPermission()
                     }
                     "stopRecording" -> {
+                        RecordingService.isStopped = false
                         stopRecordingService()
-                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                            result.success(RecordingService.outputPath.ifEmpty { null })
-                        }, 800) // DAW 모드는 muxer stop에 시간이 더 필요
+                        // isStopped 폴링 — 최대 4초 (DAW 모드 thread.join 2+2초 대비)
+                        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                        var attempts = 0
+                        fun checkDone() {
+                            attempts++
+                            if (RecordingService.isStopped || attempts >= 40) {
+                                result.success(RecordingService.outputPath.ifEmpty { null })
+                            } else {
+                                handler.postDelayed(::checkDone, 100)
+                            }
+                        }
+                        handler.postDelayed(::checkDone, 100)
                     }
                     "isRecording" -> result.success(RecordingService.isRecording)
                     else -> result.notImplemented()
