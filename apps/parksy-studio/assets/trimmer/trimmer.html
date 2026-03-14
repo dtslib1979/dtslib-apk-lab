@@ -126,21 +126,26 @@ async function process() {
     );
 
     const data = ffmpeg.FS('readFile', 'output.mp4');
-    const blob = new Blob([data.buffer], { type: 'video/mp4' });
-    const url = URL.createObjectURL(blob);
-
     const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `PS_${fmt.id.toUpperCase()}_${ts}.mp4`;
-    a.click();
+    const filename = `PS_${fmt.id.toUpperCase()}_${ts}.mp4`;
 
-    status.textContent = '✅ 저장 완료!';
+    status.textContent = '✅ 변환 완료! Flutter로 전송 중...';
     prog.value = 100;
 
-    // Flutter에 완료 알림
+    // Uint8Array → base64 (chunk 방식, 스택오버플로우 방지)
+    function uint8ToBase64(arr) {
+      let bin = '';
+      const chunk = 8192;
+      for (let i = 0; i < arr.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, arr.subarray(i, i + chunk));
+      }
+      return btoa(bin);
+    }
+
+    // Flutter에 base64 전송 → Dart에서 파일 저장
     if (window.TrimmerChannel) {
-      window.TrimmerChannel.postMessage('done:' + a.download);
+      const b64 = uint8ToBase64(data);
+      window.TrimmerChannel.postMessage('download|' + filename + '|' + b64);
     }
   } catch (e) {
     status.textContent = '❌ 오류: ' + e.message;

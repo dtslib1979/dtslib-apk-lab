@@ -190,6 +190,8 @@ class _UploadScreenState extends State<UploadScreen> {
           throw Exception('청크 업로드 실패: ${res.statusCode}');
         }
       }
+      // 루프 정상 종료 시 (마지막 청크에서 200/201 없이 끝난 경우)
+      setState(() { _uploading = false; _status = '⚠️ 업로드 상태 불명확. YouTube Studio 확인 필요.'; });
     } catch (e) {
       setState(() { _uploading = false; _status = '❌ 오류: $e'; });
     }

@@ -1,9 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../core/constants.dart';
 
 class TrimmerScreen extends StatefulWidget {
@@ -18,6 +18,8 @@ class TrimmerScreen extends StatefulWidget {
 
 class _TrimmerScreenState extends State<TrimmerScreen> {
   late final WebViewController _controller;
+  HttpServer? _server;
+  int _port = 0;
   String _status = '로드 중...';
 
   @override
@@ -30,15 +32,18 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
         'TrimmerChannel',
         onMessageReceived: (msg) {
           if (msg.message == 'ready') {
-            final encoded = Uri.encodeFull(widget.videoPath);
-            _controller.runJavaScript("receiveVideoPath('file://$encoded')");
+            // 로컬 서버에서 영상 서빙 — same-origin이라 cross-origin 이슈 없음
+            _controller.runJavaScript(
+              "receiveVideoPath('http://localhost:$_port/video.mp4')",
+            );
             if (widget.format == 'long') {
               _controller.runJavaScript(
                 "document.querySelectorAll('.format-btn')[1].click()",
               );
             }
-          } else if (msg.message.startsWith('done:')) {
-            setState(() => _status = '✅ ${msg.message.substring(5)}');
+          } else if (msg.message.startsWith('download|')) {
+            // JS에서 FFmpeg 출력 base64로 수신 → 파일 저장
+            _saveFile(msg.message);
           }
         },
       )
@@ -46,22 +51,58 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
         onPageFinished: (_) => setState(() => _status = '준비됨'),
       ));
 
-    // file:// → file:// fetch 허용
-    if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController).setAllowFileAccess(true);
-    }
-
-    _loadHtml();
+    _startServer();
   }
 
-  // asset을 temp 파일로 복사 → file:// 로드
-  // (flutter asset URL에서 fetch('file://...')는 cross-origin 차단됨)
-  Future<void> _loadHtml() async {
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/trimmer.html');
-    final content = await rootBundle.loadString('assets/trimmer/trimmer.html');
-    await file.writeAsString(content);
-    _controller.loadRequest(Uri.parse('file://${file.path}'));
+  Future<void> _startServer() async {
+    final htmlContent = await rootBundle.loadString('assets/trimmer/trimmer.html');
+    final videoFile = File(widget.videoPath);
+
+    // 동적 포트 할당
+    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    _port = _server!.port;
+
+    _server!.listen((req) async {
+      if (req.uri.path == '/video.mp4') {
+        req.response.statusCode = 200;
+        req.response.headers.contentType = ContentType('video', 'mp4');
+        await req.response.addStream(videoFile.openRead());
+      } else {
+        req.response.statusCode = 200;
+        req.response.headers.contentType = ContentType.html;
+        req.response.write(htmlContent);
+      }
+      await req.response.close();
+    });
+
+    _controller.loadRequest(Uri.parse('http://localhost:$_port/'));
+  }
+
+  Future<void> _saveFile(String raw) async {
+    // format: 'download|filename|base64data'
+    final firstPipe = raw.indexOf('|');
+    final secondPipe = raw.indexOf('|', firstPipe + 1);
+    final filename = raw.substring(firstPipe + 1, secondPipe);
+    final b64 = raw.substring(secondPipe + 1);
+
+    try {
+      setState(() => _status = '💾 저장 중...');
+      final bytes = base64Decode(b64);
+      final extDir = await getExternalStorageDirectory();
+      final outDir = Directory('${extDir!.path}/ParksyStudio');
+      await outDir.create(recursive: true);
+      final file = File('${outDir.path}/$filename');
+      await file.writeAsBytes(bytes);
+      if (mounted) setState(() => _status = '✅ $filename');
+    } catch (e) {
+      if (mounted) setState(() => _status = '❌ 저장 실패: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _server?.close(force: true);
+    super.dispose();
   }
 
   @override
