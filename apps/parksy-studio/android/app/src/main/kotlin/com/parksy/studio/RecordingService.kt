@@ -6,6 +6,9 @@ import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.*
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
@@ -19,19 +22,18 @@ class RecordingService : Service() {
     companion object {
         const val CHANNEL_ID = "parksy_recording"
         const val ACTION_START = "START"
-        const val ACTION_STOP = "STOP"
-        const val EXTRA_AUDIO_MODE = "audioMode" // "mic" | "unprocessed" | "daw"
+        const val ACTION_STOP  = "STOP"
+        const val EXTRA_AUDIO_MODE    = "audioMode"    // "mic" | "unprocessed" | "daw"
+        const val EXTRA_AUDIO_PROFILE = "audioProfile" // "lecture" | "podcast" | "raw"
         var isRecording = false
-        var outputPath = ""
+        var outputPath  = ""
     }
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
 
-    // 단순 모드 (MediaRecorder — MIC / UNPROCESSED)
-    private var mediaRecorder: MediaRecorder? = null
-
-    // DAW 모드 (AudioPlaybackCapture + MediaCodec + MediaMuxer)
+    // 통합 파이프라인 (AudioRecord + MediaCodec + MediaMuxer)
+    // — MIC, UNPROCESSED, DAW 모드 모두 동일 파이프라인 사용
     private var audioRecord: AudioRecord? = null
     private var videoCodec: MediaCodec? = null
     private var audioCodec: MediaCodec? = null
@@ -39,9 +41,13 @@ class RecordingService : Service() {
     private val videoTrackIdx = AtomicInteger(-1)
     private val audioTrackIdx = AtomicInteger(-1)
     @Volatile private var muxerStarted = false
-    @Volatile private var isDawMode = false
     private var videoThread: Thread? = null
     private var audioThread: Thread? = null
+
+    // AudioEffect references (need to keep reference to prevent GC)
+    private var noiseSuppressor: NoiseSuppressor? = null
+    private var agc: AutomaticGainControl? = null
+    private var aec: AcousticEchoCanceler? = null
 
     // ──────────────────────────────────────────────────────────────
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -70,86 +76,57 @@ class RecordingService : Service() {
         outputPath = intent.getStringExtra("outputPath") ?: run {
             stopForeground(STOP_FOREGROUND_REMOVE); stopSelf(); return
         }
-        val audioMode = intent.getStringExtra(EXTRA_AUDIO_MODE) ?: "mic"
-        isDawMode = audioMode == "daw"
+        val audioMode    = intent.getStringExtra(EXTRA_AUDIO_MODE)    ?: "mic"
+        val audioProfile = intent.getStringExtra(EXTRA_AUDIO_PROFILE) ?: "raw"
 
         val projectionMgr = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = projectionMgr.getMediaProjection(resultCode, data)
 
-        if (isDawMode) {
-            startDawMode(width, height)
-        } else {
-            startSimpleMode(width, height, audioMode)
-        }
+        startUnifiedMode(width, height, audioMode, audioProfile)
         isRecording = true
     }
 
-    // ── 단순 모드 (MediaRecorder) ──────────────────────────────────
-    private fun startSimpleMode(width: Int, height: Int, audioMode: String) {
-        mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            MediaRecorder(this)
-        } else {
-            @Suppress("DEPRECATION")
-            MediaRecorder()
-        }
-        // UNPROCESSED = AGC/노이즈게이트 우회 (Shure MOTIV 직접 캡처용)
-        val audioSource = if (audioMode == "unprocessed")
-            MediaRecorder.AudioSource.UNPROCESSED
-        else
-            MediaRecorder.AudioSource.MIC
-
-        mediaRecorder!!.apply {
-            setAudioSource(audioSource)
-            setVideoSource(MediaRecorder.VideoSource.SURFACE)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setVideoSize(width, height)
-            setVideoFrameRate(30)
-            setVideoEncodingBitRate(6_000_000)
-            // UNPROCESSED: 256kbps / 48kHz — Shure MOTIV 기본 출력
-            setAudioEncodingBitRate(if (audioMode == "unprocessed") 256_000 else 128_000)
-            setAudioSamplingRate(if (audioMode == "unprocessed") 48_000 else 44_100)
-            setOutputFile(outputPath)
-            prepare()
-        }
-        virtualDisplay = mediaProjection!!.createVirtualDisplay(
-            "ParksyStudio", width, height,
-            resources.displayMetrics.densityDpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            mediaRecorder!!.surface, null, null
-        )
-        mediaRecorder!!.start()
-    }
-
-    // ── DAW 모드 (AudioPlaybackCapture + MediaCodec + MediaMuxer) ──
-    private fun startDawMode(width: Int, height: Int) {
-        val sampleRate = 44_100
+    // ── 통합 파이프라인 (MIC / UNPROCESSED / DAW 공통) ─────────────
+    private fun startUnifiedMode(width: Int, height: Int, audioMode: String, audioProfile: String) {
+        val sampleRate  = if (audioMode == "unprocessed") 48_000 else 44_100
         val channelMask = AudioFormat.CHANNEL_IN_STEREO
-        val encoding = AudioFormat.ENCODING_PCM_16BIT
-        val bufSize = AudioRecord.getMinBufferSize(sampleRate, channelMask, encoding) * 4
+        val encoding    = AudioFormat.ENCODING_PCM_16BIT
+        val bufSize     = AudioRecord.getMinBufferSize(sampleRate, channelMask, encoding) * 4
 
-        // AudioPlaybackCapture: 시스템 오디오 전부 (BGM + DAW 출력)
-        // minSdk 29 (Android 10) → AudioPlaybackCaptureConfiguration 사용 가능
-        val playbackCfg = AudioPlaybackCaptureConfiguration.Builder(mediaProjection!!)
-            .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
-            .addMatchingUsage(AudioAttributes.USAGE_GAME)
-            .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
-            .build()
+        // ── AudioRecord 생성 ──────────────────────────────────────
+        audioRecord = if (audioMode == "daw") {
+            // DAW 모드: 시스템 재생 오디오 캡처 (minSdk 29)
+            val playbackCfg = AudioPlaybackCaptureConfiguration.Builder(mediaProjection!!)
+                .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                .addMatchingUsage(AudioAttributes.USAGE_GAME)
+                .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
+                .build()
+            AudioRecord.Builder()
+                .setAudioPlaybackCaptureConfig(playbackCfg)
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(channelMask)
+                        .setEncoding(encoding)
+                        .build()
+                )
+                .setBufferSizeInBytes(bufSize)
+                .build()
+        } else {
+            // MIC / UNPROCESSED: 마이크 캡처
+            val source = if (audioMode == "unprocessed")
+                MediaRecorder.AudioSource.UNPROCESSED
+            else
+                MediaRecorder.AudioSource.MIC
+            AudioRecord(source, sampleRate, channelMask, encoding, bufSize)
+        }
 
-        audioRecord = AudioRecord.Builder()
-            .setAudioPlaybackCaptureConfig(playbackCfg)
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(channelMask)
-                    .setEncoding(encoding)
-                    .build()
-            )
-            .setBufferSizeInBytes(bufSize)
-            .build()
+        // ── AudioEffect 적용 (DAW 모드 제외 — 이미 처리된 오디오) ──
+        if (audioMode != "daw") {
+            applyAudioEffects(audioRecord!!.audioSessionId, audioProfile)
+        }
 
-        // 비디오 인코더 (H.264)
+        // ── 비디오 인코더 (H.264) ─────────────────────────────────
         val vFmt = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_BIT_RATE, 6_000_000)
@@ -161,9 +138,10 @@ class RecordingService : Service() {
         val inputSurface = videoCodec!!.createInputSurface()
         videoCodec!!.start()
 
-        // 오디오 인코더 (AAC)
+        // ── 오디오 인코더 (AAC) ───────────────────────────────────
+        val audioBitrate = if (audioMode == "unprocessed") 256_000 else 192_000
         val aFmt = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, 2).apply {
-            setInteger(MediaFormat.KEY_BIT_RATE, 192_000)
+            setInteger(MediaFormat.KEY_BIT_RATE, audioBitrate)
             setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
             setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, bufSize)
         }
@@ -171,13 +149,13 @@ class RecordingService : Service() {
         audioCodec!!.configure(aFmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         audioCodec!!.start()
 
-        // Muxer
+        // ── Muxer ─────────────────────────────────────────────────
         muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         muxerStarted = false
         videoTrackIdx.set(-1)
         audioTrackIdx.set(-1)
 
-        // VirtualDisplay → 비디오 코덱 surface
+        // ── VirtualDisplay → 비디오 코덱 surface ─────────────────
         virtualDisplay = mediaProjection!!.createVirtualDisplay(
             "ParksyStudio", width, height,
             resources.displayMetrics.densityDpi,
@@ -187,9 +165,9 @@ class RecordingService : Service() {
 
         audioRecord!!.startRecording()
 
-        // ── 오디오 스레드 ──────────────────────────────────────────
+        // ── 오디오 스레드 ─────────────────────────────────────────
         audioThread = Thread {
-            val pcm = ByteArray(bufSize)
+            val pcm    = ByteArray(bufSize)
             val startUs = System.nanoTime() / 1000L
             while (isRecording) {
                 val read = audioRecord!!.read(pcm, 0, pcm.size)
@@ -220,7 +198,33 @@ class RecordingService : Service() {
         }.also { it.start() }
     }
 
-    // muxer 트랙 조율: 양쪽 다 등록돼야 start
+    // ── AudioEffect 적용 ──────────────────────────────────────────
+    private fun applyAudioEffects(sessionId: Int, profile: String) {
+        when (profile) {
+            "lecture" -> {
+                if (NoiseSuppressor.isAvailable()) {
+                    noiseSuppressor = NoiseSuppressor.create(sessionId)?.also { it.enabled = true }
+                }
+                if (AutomaticGainControl.isAvailable()) {
+                    agc = AutomaticGainControl.create(sessionId)?.also { it.enabled = true }
+                }
+                if (AcousticEchoCanceler.isAvailable()) {
+                    aec = AcousticEchoCanceler.create(sessionId)?.also { it.enabled = true }
+                }
+            }
+            "podcast" -> {
+                if (NoiseSuppressor.isAvailable()) {
+                    noiseSuppressor = NoiseSuppressor.create(sessionId)?.also { it.enabled = true }
+                }
+                if (AutomaticGainControl.isAvailable()) {
+                    agc = AutomaticGainControl.create(sessionId)?.also { it.enabled = true }
+                }
+            }
+            // "music", "raw": 이펙트 없음
+        }
+    }
+
+    // ── Muxer 조율: 비디오 + 오디오 트랙 양쪽 등록 후 start ──────
     @Synchronized
     private fun tryStartMuxer() {
         if (!muxerStarted && videoTrackIdx.get() >= 0 && audioTrackIdx.get() >= 0) {
@@ -275,23 +279,30 @@ class RecordingService : Service() {
     // ──────────────────────────────────────────────────────────────
     private fun stopRecording() {
         isRecording = false
-        if (isDawMode) {
-            audioThread?.join(2_000)
-            videoThread?.join(2_000)
-            try { audioRecord?.stop() } catch (_: Exception) {}
-            audioRecord?.release(); audioRecord = null
-            try { videoCodec?.stop() } catch (_: Exception) {}
-            videoCodec?.release(); videoCodec = null
-            try { audioCodec?.stop() } catch (_: Exception) {}
-            audioCodec?.release(); audioCodec = null
-            try { if (muxerStarted) muxer?.stop() } catch (_: Exception) {}
-            muxer?.release(); muxer = null
-        } else {
-            try { mediaRecorder?.stop() } catch (_: Exception) {}
-            mediaRecorder?.release(); mediaRecorder = null
-        }
+
+        audioThread?.join(2_000)
+        videoThread?.join(2_000)
+
+        // AudioEffect 해제
+        noiseSuppressor?.release(); noiseSuppressor = null
+        agc?.release(); agc = null
+        aec?.release(); aec = null
+
+        try { audioRecord?.stop() } catch (_: Exception) {}
+        audioRecord?.release(); audioRecord = null
+
+        try { videoCodec?.stop() } catch (_: Exception) {}
+        videoCodec?.release(); videoCodec = null
+
+        try { audioCodec?.stop() } catch (_: Exception) {}
+        audioCodec?.release(); audioCodec = null
+
+        try { if (muxerStarted) muxer?.stop() } catch (_: Exception) {}
+        muxer?.release(); muxer = null
+
         virtualDisplay?.release(); virtualDisplay = null
         mediaProjection?.stop(); mediaProjection = null
+
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

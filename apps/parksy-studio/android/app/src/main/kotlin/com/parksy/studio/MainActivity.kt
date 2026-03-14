@@ -18,8 +18,9 @@ class MainActivity : FlutterActivity() {
     private val RECORDING_CHANNEL = "com.parksy.studio/recording"
     private val PROJECTION_REQUEST = 100
     private var pendingResult: MethodChannel.Result? = null
-    private var pendingFormat = "shorts"
-    private var pendingAudioMode = "mic"
+    private var pendingFormat       = "shorts"
+    private var pendingAudioMode    = "mic"
+    private var pendingAudioProfile = "raw"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,9 +34,10 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "startRecording" -> {
-                        pendingResult    = result
-                        pendingFormat    = call.argument<String>("format")    ?: "shorts"
-                        pendingAudioMode = call.argument<String>("audioMode") ?: "mic"
+                        pendingResult       = result
+                        pendingFormat       = call.argument<String>("format")       ?: "shorts"
+                        pendingAudioMode    = call.argument<String>("audioMode")    ?: "mic"
+                        pendingAudioProfile = call.argument<String>("audioProfile") ?: "raw"
                         requestProjectionPermission()
                     }
                     "stopRecording" -> {
@@ -68,7 +70,8 @@ class MainActivity : FlutterActivity() {
                     putExtra("width", width)
                     putExtra("height", height)
                     putExtra("outputPath", outputPath)
-                    putExtra(RecordingService.EXTRA_AUDIO_MODE, pendingAudioMode)
+                    putExtra(RecordingService.EXTRA_AUDIO_MODE,    pendingAudioMode)
+                    putExtra(RecordingService.EXTRA_AUDIO_PROFILE, pendingAudioProfile)
                 }
                 startForegroundService(serviceIntent)
                 pendingResult?.success(outputPath)
