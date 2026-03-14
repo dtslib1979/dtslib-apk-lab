@@ -172,7 +172,7 @@ class RecordingService : Service() {
             val startUs = System.nanoTime() / 1000L
             while (isRecording) {
                 val read = audioRecord!!.read(pcm, 0, pcm.size)
-                if (read <= 0) continue
+                if (read <= 0) { Thread.sleep(1); continue }
                 val ac = audioCodec ?: break
                 val inIdx = ac.dequeueInputBuffer(5_000)
                 if (inIdx >= 0) {

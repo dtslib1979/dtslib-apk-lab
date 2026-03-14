@@ -63,7 +63,8 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
         targetLanguage: TranslateLanguage.korean,
       );
       _translatorReady = true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Interpreter] 번역기 초기화 실패: $e');
       _translatorReady = false;
     }
 
@@ -158,7 +159,8 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
         targetLanguage: TranslateLanguage.korean,
       );
       setState(() { _translatorReady = true; _status = '대기 중'; });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Interpreter] 모델 로드 실패: $e');
       if (mounted) setState(() { _translatorReady = false; _status = '모델 로드 실패'; });
     }
   }
