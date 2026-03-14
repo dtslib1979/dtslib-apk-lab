@@ -1,8 +1,22 @@
-// AudioMode는 여기서 정의 — recording_service.dart에서 re-export
+// AudioMode, CameraFrame 모두 model layer에서 정의
 enum AudioMode { mic, unprocessed, daw }
 
-// CameraFrame은 camera_overlay.dart에서 정의 — 여기서 re-export
-export '../widgets/camera_overlay.dart' show CameraFrame;
+// #7 fix: CameraFrame을 widget layer 아닌 model layer에 정의
+// camera_overlay.dart가 여기서 import함
+enum CameraFrame { plain, iphone, retroTv }
+
+extension CameraFrameLabel on CameraFrame {
+  String get icon => switch (this) {
+    CameraFrame.plain   => '⭕',
+    CameraFrame.iphone  => '📱',
+    CameraFrame.retroTv => '📺',
+  };
+  String get label => switch (this) {
+    CameraFrame.plain   => '원형',
+    CameraFrame.iphone  => '아이폰',
+    CameraFrame.retroTv => 'TV',
+  };
+}
 
 // 오디오 이펙트 프로파일
 class AudioProfile {

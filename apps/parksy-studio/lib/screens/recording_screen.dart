@@ -65,11 +65,14 @@ class _RecordingScreenState extends State<RecordingScreen> {
     super.dispose();
   }
 
-  // ── 카메라 초기화 ─────────────────────────────────────────────
+  // ── 카메라 초기화 (#2 fix: 실패 시 유저에게 피드백) ──────────
   Future<void> _initCamera() async {
     try {
       final cameras = await availableCameras();
-      if (cameras.isEmpty) return;
+      if (cameras.isEmpty) {
+        _showCameraError('카메라를 찾을 수 없습니다');
+        return;
+      }
       final front = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
@@ -78,7 +81,20 @@ class _RecordingScreenState extends State<RecordingScreen> {
       await ctrl.initialize();
       if (!mounted) { ctrl.dispose(); return; }
       setState(() => _camCtrl = ctrl);
-    } catch (_) {}
+    } on CameraException catch (e) {
+      _showCameraError('카메라 오류: ${e.description ?? e.code}');
+      setState(() => _cameraEnabled = false);
+    } catch (e) {
+      _showCameraError('카메라를 열 수 없습니다');
+      setState(() => _cameraEnabled = false);
+    }
+  }
+
+  void _showCameraError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800),
+    );
   }
 
   Future<void> _toggleCamera() async {

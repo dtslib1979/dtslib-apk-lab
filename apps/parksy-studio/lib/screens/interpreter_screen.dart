@@ -129,8 +129,19 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
     _translator = null;
 
     if (mlkitLang == null) {
-      // auto 모드 — translator 없이 원문만 표시
-      setState(() { _translatorReady = false; _status = '대기 중 (자동 언어 — 번역 없음)'; });
+      // auto 모드 — STT 자동 감지 + EN→KO 폴백 번역 유지 (#5 fix)
+      final fallback = TranslateLanguage.english;
+      final mgr = OnDeviceTranslatorModelManager();
+      if (!await mgr.isModelDownloaded(fallback)) {
+        setState(() => _status = 'EN 모델 다운로드 중...');
+        await mgr.downloadModel(fallback);
+      }
+      if (!mounted) return;
+      _translator = OnDeviceTranslator(
+        sourceLanguage: fallback,
+        targetLanguage: TranslateLanguage.korean,
+      );
+      setState(() { _translatorReady = true; _status = '대기 중 (자동 — EN→KO 폴백)'; });
       return;
     }
 
