@@ -108,16 +108,28 @@ state.json         = 공정 현황판
 - Parksy Pen (laser-pen-overlay)
 - Parksy Wavesy (parksy-wavesy)
 - Parksy TTS (tts-factory)
-- **Parksy ChronoCall (chrono-call)** ← NEW
+- Parksy ChronoCall (chrono-call)
+- Parksy Axis (parksy-axis)
+- Parksy Glot (parksy-glot)
+- Parksy Liner (parksy-liner)
+- Parksy Audio Tools (parksy-audio-tools)
+- Parksy MIDI (midi-converter)
+- **Parksy Studio (parksy-studio)** ← ACTIVE DEV
 
 ## Project Structure
 ```
 apps/
-├── capture-pipeline/    # 공유 텍스트 캡처 앱
-├── laser-pen-overlay/   # S Pen 오버레이 앱
+├── capture-pipeline/    # 공유 텍스트 캡처 → GitHub 아카이브
+├── laser-pen-overlay/   # S Pen 레이저펜 오버레이 판서
 ├── parksy-wavesy/       # 음원 편집 가위 (MP3/MIDI)
-├── tts-factory/         # TTS 변환 앱
-└── chrono-call/         # 통화 녹음 STT 변환 앱 ← NEW
+├── tts-factory/         # TTS 배치 생성기
+├── chrono-call/         # 통화 녹음 STT 변환
+├── parksy-axis/         # 방송용 사고 단계 오버레이 (FSM)
+├── parksy-glot/         # 이중자막 오버레이
+├── parksy-liner/        # 라이너 노트
+├── parksy-audio-tools/  # 오디오 유틸
+├── midi-converter/      # MIDI 변환
+└── parksy-studio/       # 방송 제작 파이프라인 APK ← ACTIVE DEV
 
 dashboard/
 ├── apps.json            # 스토어 표시용 앱 목록
@@ -143,6 +155,111 @@ dashboard/
 
 ## Available Commands
 - `/sync-store` - pubspec.yaml 기준으로 스토어 메타데이터 동기화
+
+---
+
+# Parksy Studio - 개발 핸드오프 매뉴얼
+
+> **방송 제작 파이프라인 전체를 하나의 APK 안에.**
+> v1.0 코드 완성 + 코드 오딧 완료. v2.0 아키텍처 백서 작성됨.
+
+## 현재 상태
+
+| 항목 | 값 |
+|------|-----|
+| 앱 이름 | Parksy Studio |
+| 패키지명 | com.parksy.studio |
+| 버전 | 1.0.0+1 |
+| Dart 파일 | 9개, 1,304줄 |
+| Kotlin 파일 | 2개, 224줄 |
+| HTML 에셋 | 3개 (trimmer, interpreter, bgm channels) |
+| 빌드 상태 | **v1.0 빌드 완료, 치명적 버그 7개 발견** |
+| 스토어 등록 | dashboard/apps.json 등록 완료 |
+
+## v1.0 치명적 버그 (코드 오딧 결과)
+
+| # | 심각도 | 위치 | 문제 |
+|---|--------|------|------|
+| 1 | **크래시** | assets/interpreter/interpreter.html:126 | `let final` — JS 예약어, SyntaxError |
+| 2 | **기능 불가** | assets/trimmer/trimmer.html:133 | WebView에서 blob: 다운로드 미지원 |
+| 3 | **기능 불가** | assets/trimmer/trimmer.html:60 | FFmpeg WASM — WebView에 SharedArrayBuffer 없음 |
+| 4 | **데이터 손상** | MainActivity.kt:39 | stopRecording 비동기인데 path 즉시 리턴 |
+| 5 | **불안정** | upload_screen.dart:35 | OAuth redirect `https://localhost` → ERR_CONNECTION_REFUSED |
+| 6 | **리소스 누수** | RecordingService.kt:38 | startForeground 후 early return 시 stopSelf 미호출 |
+| 7 | **리소스 누수** | recording_screen.dart:27 | dispose에서 녹화 중지 안 함 |
+
+## v2.0 아키텍처 백서
+
+**반드시 읽을 것:** `apps/parksy-studio/docs/WHITEPAPER-v2.md`
+
+핵심 변경점:
+- WebView에서 핵심 로직 전부 제거 → 네이티브 엔진으로 이전
+- 영상 트리밍: FFmpeg WASM → **Android MediaCodec + MediaMuxer** (HW 가속)
+- 음성인식: Web Speech API → **Android SpeechRecognizer** (온디바이스)
+- 번역: Google Translate URL → **ML Kit Translation** (온디바이스)
+- OAuth: Implicit Flow WebView → **AppAuth + PKCE** (Chrome Custom Tab)
+- 업로드: `List<int>` 메모리 → **RandomAccessFile** + 청크별 재시도
+- 데이터: 없음 → **drift DB** 프로젝트 단위 관리
+
+## 파일 구조
+
+```
+apps/parksy-studio/
+├── pubspec.yaml
+├── app-meta.json
+├── docs/
+│   ├── PLAN.md              # v1.0 기획문서
+│   └── WHITEPAPER-v2.md     # v2.0 아키텍처 백서 ★
+├── lib/
+│   ├── main.dart            # 앱 진입점 (38줄)
+│   ├── core/constants.dart  # 상수 + StudioTool 모델 (55줄)
+│   ├── screens/
+│   │   ├── launcher_screen.dart     # cloud-appstore 도구 그리드 (203줄)
+│   │   ├── studio_webview.dart      # WebView 래퍼 (127줄)
+│   │   ├── recording_screen.dart    # 화면녹화 UI (182줄)
+│   │   ├── trimmer_screen.dart      # 영상트리머 WebView (88줄) ⚠️ 동작 안 함
+│   │   ├── interpreter_screen.dart  # 동시통역 WebView (66줄) ⚠️ JS 버그
+│   │   ├── bgm_screen.dart          # BGM 플레이어 (181줄)
+│   │   └── upload_screen.dart       # YouTube 업로드 (338줄) ⚠️ OAuth 불안정
+│   └── services/
+│       └── recording_service.dart   # Platform Channel (26줄)
+├── android/app/src/main/kotlin/com/parksy/studio/
+│   ├── MainActivity.kt             # 녹화 Channel 핸들러 (99줄)
+│   └── RecordingService.kt         # Foreground Service (125줄)
+└── assets/
+    ├── trimmer/trimmer.html         # FFmpeg WASM UI ⚠️ WebView 미지원
+    ├── interpreter/interpreter.html # Web Speech API UI ⚠️ let final 버그
+    └── bgm/channels.json           # BGM 채널 로컬 폴백
+```
+
+## 즉시 핫픽스 (v2.0 전에)
+
+v2.0 풀 리라이트 전에 v1.0을 최소한 돌아가게 하려면:
+```
+1. interpreter.html:126  →  let final → let finalText
+2. recording_screen.dart:27  →  dispose에 RecordingService.stop() 추가
+3. RecordingService.kt:47  →  early return 전 stopSelf() 호출
+4. interpreter_screen.dart:43  →  마이크만 grant, 나머지 deny
+5. trimmer — FFmpeg WASM 제거, "v2에서 네이티브 구현 예정" 표시
+```
+
+## 색상 팔레트
+
+```dart
+const kBackground = Color(0xFF0A0A0A);  // 순검정 (ChronoCall보다 더 어두움)
+const kSurface    = Color(0xFF1A1A1A);  // 카드
+const kAccent     = Color(0xFFE8D5B7);  // 골드 (Parksy 공통)
+const kDim        = Color(0xFF333333);  // 보더
+```
+
+## 버전 동기화 파일
+
+```
+1. apps/parksy-studio/pubspec.yaml           → version: X.Y.Z+N
+2. apps/parksy-studio/lib/core/constants.dart → version = 'X.Y.Z', versionCode = N
+3. apps/parksy-studio/app-meta.json          → "version": "vX.Y.Z"
+4. dashboard/apps.json                        → parksy-studio 항목
+```
 
 ---
 
