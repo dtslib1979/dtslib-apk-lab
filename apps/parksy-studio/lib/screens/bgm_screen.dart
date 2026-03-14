@@ -160,7 +160,7 @@ class _BgmScreenState extends State<BgmScreen> {
                       final isPlaying = _playingTrack == track['url'];
                       return ListTile(
                         tileColor: isPlaying
-                            ? AppConstants.kAccent.withOpacity(0.1)
+                            ? AppConstants.kAccent.withValues(alpha: 0.1)
                             : AppConstants.kSurface,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),

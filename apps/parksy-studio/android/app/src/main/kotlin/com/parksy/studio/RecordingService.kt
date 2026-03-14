@@ -25,6 +25,18 @@ class RecordingService : Service() {
         const val ACTION_STOP  = "STOP"
         const val EXTRA_AUDIO_MODE    = "audioMode"    // "mic" | "unprocessed" | "daw"
         const val EXTRA_AUDIO_PROFILE = "audioProfile" // "lecture" | "podcast" | "raw"
+
+        // 오디오 설정
+        const val SAMPLE_RATE_STANDARD    = 44_100   // MIC / DAW
+        const val SAMPLE_RATE_UNPROCESSED = 48_000   // Shure MOTIV 원본
+        const val AUDIO_BITRATE_STANDARD  = 192_000
+        const val AUDIO_BITRATE_HQ        = 256_000  // UNPROCESSED 모드 고음질
+
+        // 비디오 설정
+        const val VIDEO_BITRATE  = 6_000_000  // 6 Mbps H.264
+        const val VIDEO_FPS      = 30
+        const val I_FRAME_INTERVAL = 1        // 초당 키프레임
+
         var isRecording = false
         var outputPath  = ""
         @Volatile var isStopped = false  // stopRecording() 완전 완료 후 true
@@ -89,7 +101,7 @@ class RecordingService : Service() {
 
     // ── 통합 파이프라인 (MIC / UNPROCESSED / DAW 공통) ─────────────
     private fun startUnifiedMode(width: Int, height: Int, audioMode: String, audioProfile: String) {
-        val sampleRate  = if (audioMode == "unprocessed") 48_000 else 44_100
+        val sampleRate  = if (audioMode == "unprocessed") SAMPLE_RATE_UNPROCESSED else SAMPLE_RATE_STANDARD
         val channelMask = AudioFormat.CHANNEL_IN_STEREO
         val encoding    = AudioFormat.ENCODING_PCM_16BIT
         val bufSize     = AudioRecord.getMinBufferSize(sampleRate, channelMask, encoding) * 4
@@ -130,9 +142,9 @@ class RecordingService : Service() {
         // ── 비디오 인코더 (H.264) ─────────────────────────────────
         val vFmt = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, 6_000_000)
-            setInteger(MediaFormat.KEY_FRAME_RATE, 30)
-            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+            setInteger(MediaFormat.KEY_BIT_RATE, VIDEO_BITRATE)
+            setInteger(MediaFormat.KEY_FRAME_RATE, VIDEO_FPS)
+            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, I_FRAME_INTERVAL)
         }
         videoCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
         videoCodec!!.configure(vFmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -140,7 +152,7 @@ class RecordingService : Service() {
         videoCodec!!.start()
 
         // ── 오디오 인코더 (AAC) ───────────────────────────────────
-        val audioBitrate = if (audioMode == "unprocessed") 256_000 else 192_000
+        val audioBitrate = if (audioMode == "unprocessed") AUDIO_BITRATE_HQ else AUDIO_BITRATE_STANDARD
         val aFmt = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, 2).apply {
             setInteger(MediaFormat.KEY_BIT_RATE, audioBitrate)
             setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
