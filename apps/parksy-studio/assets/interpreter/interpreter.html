@@ -123,20 +123,20 @@ function startRecognition() {
 
   recognition.onresult = (e) => {
     let interim = '';
-    let final = '';
+    let finalText = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) {
-        final += e.results[i][0].transcript;
+        finalText += e.results[i][0].transcript;
       } else {
         interim += e.results[i][0].transcript;
       }
     }
-    if (final) {
+    if (finalText) {
       const p = document.createElement('p');
-      p.textContent = final;
+      p.textContent = finalText;
       originalEl.appendChild(p);
       originalEl.scrollTop = originalEl.scrollHeight;
-      translate(final);
+      translate(finalText);
     }
     interimEl.textContent = interim;
   };

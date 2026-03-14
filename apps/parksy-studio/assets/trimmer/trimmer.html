@@ -16,13 +16,15 @@
   .btn { flex: 1; padding: 14px; border: none; border-radius: 10px; cursor: pointer;
     font-size: 14px; font-weight: bold; }
   .btn-primary { background: #E8D5B7; color: #000; }
+  .btn-primary:disabled { background: #333; color: #666; cursor: not-allowed; }
   .btn-danger { background: #333; color: #fff; }
   .status { color: #aaa; font-size: 12px; text-align: center; margin: 8px 0; min-height: 18px; }
-  progress { width: 100%; height: 6px; margin: 8px 0; border-radius: 3px; }
   .format-row { display: flex; gap: 8px; margin: 8px 0; }
   .format-btn { flex: 1; padding: 10px; background: #1A1A1A; border: 1px solid #333;
     color: #aaa; border-radius: 8px; cursor: pointer; font-size: 12px; text-align: center; }
   .format-btn.active { border-color: #E8D5B7; color: #E8D5B7; }
+  .notice { background: #1A1A1A; border: 1px solid #333; border-radius: 8px;
+    padding: 12px; margin: 8px 0; color: #666; font-size: 12px; text-align: center; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -49,29 +51,23 @@
   </div>
 </div>
 
-<div class="status" id="status">영상을 불러오는 중...</div>
-<progress id="prog" value="0" max="100" style="display:none"></progress>
+<div class="notice">
+  🚧 변환 기능 준비 중<br>
+  v2.0에서 Android MediaCodec 네이티브 엔진으로 구현 예정<br>
+  <span style="color:#555">영상 미리보기는 정상 동작합니다</span>
+</div>
+
+<div class="status" id="status">영상 경로를 기다리는 중...</div>
 
 <div class="row">
   <button class="btn btn-danger" onclick="reload()">↩ 다시</button>
-  <button class="btn btn-primary" id="btnProcess" onclick="process()">⚡ 변환 + 저장</button>
+  <button class="btn btn-primary" id="btnProcess" disabled>🚧 변환 — v2.0 예정</button>
 </div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.0/dist/ffmpeg.min.js"></script>
 <script>
-const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({
-  log: false,
-  progress: ({ ratio }) => {
-    document.getElementById('prog').value = Math.round(ratio * 100);
-  }
-});
-
-let videoFile = null;
 let fmt = { id: 'shorts', w: 1080, h: 1920 };
 const preview = document.getElementById('preview');
 const status = document.getElementById('status');
-const prog = document.getElementById('prog');
 
 function setFmt(id, el) {
   document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
@@ -86,75 +82,16 @@ function receiveVideoPath(path) {
   status.textContent = '영상 로드 중...';
   preview.src = path;
   preview.onloadedmetadata = () => {
-    status.textContent = `✅ 로드됨 — ${Math.round(preview.duration)}초`;
+    status.textContent = `✅ 로드됨 — ${Math.round(preview.duration)}초 | 미리보기 가능`;
   };
-  // fetch로 ArrayBuffer 가져오기
-  fetch(path)
-    .then(r => r.arrayBuffer())
-    .then(buf => { videoFile = new Uint8Array(buf); status.textContent = '✅ 준비됨. 변환 버튼 탭.'; })
-    .catch(() => status.textContent = '⚠️ 파일 로드 실패. 경로 확인 필요.');
-}
-
-async function process() {
-  if (!videoFile) { status.textContent = '⚠️ 영상 없음'; return; }
-  const btn = document.getElementById('btnProcess');
-  btn.disabled = true;
-  status.textContent = 'FFmpeg 로드 중...';
-  prog.style.display = 'block';
-
-  try {
-    if (!ffmpeg.isLoaded()) await ffmpeg.load();
-    ffmpeg.FS('writeFile', 'input.mp4', videoFile);
-
-    const cropTop = parseInt(document.getElementById('cropTop').value) || 0;
-    const cropBot = parseInt(document.getElementById('cropBottom').value) || 0;
-
-    status.textContent = '변환 중...';
-
-    // 크롭 + 리사이즈
-    const cropFilter = cropTop + cropBot > 0
-      ? `crop=iw:ih-${cropTop + cropBot}:0:${cropTop},scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=decrease,pad=${fmt.w}:${fmt.h}:(ow-iw)/2:(oh-ih)/2`
-      : `scale=${fmt.w}:${fmt.h}:force_original_aspect_ratio=decrease,pad=${fmt.w}:${fmt.h}:(ow-iw)/2:(oh-ih)/2`;
-
-    await ffmpeg.run(
-      '-i', 'input.mp4',
-      '-vf', cropFilter,
-      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-      '-c:a', 'aac', '-b:a', '128k',
-      '-movflags', '+faststart',
-      'output.mp4'
-    );
-
-    const data = ffmpeg.FS('readFile', 'output.mp4');
-    const blob = new Blob([data.buffer], { type: 'video/mp4' });
-    const url = URL.createObjectURL(blob);
-
-    const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `PS_${fmt.id.toUpperCase()}_${ts}.mp4`;
-    a.click();
-
-    status.textContent = '✅ 저장 완료!';
-    prog.value = 100;
-
-    // Flutter에 완료 알림
-    if (window.TrimmerChannel) {
-      window.TrimmerChannel.postMessage('done:' + a.download);
-    }
-  } catch (e) {
-    status.textContent = '❌ 오류: ' + e.message;
-  } finally {
-    btn.disabled = false;
-    prog.style.display = 'none';
-  }
+  preview.onerror = () => {
+    status.textContent = '⚠️ 영상 로드 실패';
+  };
 }
 
 function reload() { location.reload(); }
 
-// 초기화 시 Flutter에 준비 완료 알림
 window.addEventListener('load', () => {
-  status.textContent = '영상 경로를 기다리는 중...';
   if (window.TrimmerChannel) window.TrimmerChannel.postMessage('ready');
 });
 </script>

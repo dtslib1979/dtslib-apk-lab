@@ -25,6 +25,12 @@ class _BgmScreenState extends State<BgmScreen> {
     _loadChannels();
   }
 
+  @override
+  void dispose() {
+    _playerController?.loadRequest(Uri.parse('about:blank'));
+    super.dispose();
+  }
+
   Future<void> _loadChannels() async {
     // parksy-audio GitHub에서 먼저 시도
     try {

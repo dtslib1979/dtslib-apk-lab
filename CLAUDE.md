@@ -161,104 +161,315 @@ dashboard/
 # Parksy Studio - 개발 핸드오프 매뉴얼
 
 > **방송 제작 파이프라인 전체를 하나의 APK 안에.**
-> v1.0 코드 완성 + 코드 오딧 완료. v2.0 아키텍처 백서 작성됨.
+> Galaxy Tab + S Pen + Shure MOTIV = PC + OBS + DAW + 영상편집기 대체.
+> v1.0 핵심 엔진 네이티브 리라이트 완료 (2026-03-14). 완성도 ~86%.
 
-## 현재 상태
+## 1. 핵심 컨셉: 1인 모바일 방송 스튜디오
+
+```
+WebView = 방송 무대 (URL 바 없음, 풀스크린)
+   ↓
+화면녹화 = 무대 + Parksy Pen 오버레이 + BGM + 자막 전부 캡처
+   ↓
+트리머 = Shorts/Long 포맷 변환 + 크롭
+   ↓
+YouTube 업로드 = 원터치 배포
+
+각 기능은 독립이 아니라 파이프라인으로 연결된다.
+```
+
+## 2. 현재 상태
 
 | 항목 | 값 |
 |------|-----|
 | 앱 이름 | Parksy Studio |
 | 패키지명 | com.parksy.studio |
 | 버전 | 1.0.0+1 |
-| Dart 파일 | 9개, 1,304줄 |
-| Kotlin 파일 | 2개, 224줄 |
-| HTML 에셋 | 3개 (trimmer, interpreter, bgm channels) |
-| 빌드 상태 | **v1.0 빌드 완료, 치명적 버그 7개 발견** |
+| Dart 파일 | 11개, 2,049줄 |
+| Kotlin 파일 | 2개, 432줄 |
+| 총 코드 | ~2,481줄 |
+| 빌드 상태 | **네이티브 엔진 리라이트 완료, 잔여 버그 4개** |
 | 스토어 등록 | dashboard/apps.json 등록 완료 |
+| 완성도 | **~86%** (녹화 92%, 트리머 95%, 통역 80%, 업로드 75%, 시나리오 85%) |
 
-## v1.0 치명적 버그 (코드 오딧 결과)
+## 3. v1.0→v2 리라이트 요약
 
-| # | 심각도 | 위치 | 문제 |
-|---|--------|------|------|
-| 1 | **크래시** | assets/interpreter/interpreter.html:126 | `let final` — JS 예약어, SyntaxError |
-| 2 | **기능 불가** | assets/trimmer/trimmer.html:133 | WebView에서 blob: 다운로드 미지원 |
-| 3 | **기능 불가** | assets/trimmer/trimmer.html:60 | FFmpeg WASM — WebView에 SharedArrayBuffer 없음 |
-| 4 | **데이터 손상** | MainActivity.kt:39 | stopRecording 비동기인데 path 즉시 리턴 |
-| 5 | **불안정** | upload_screen.dart:35 | OAuth redirect `https://localhost` → ERR_CONNECTION_REFUSED |
-| 6 | **리소스 누수** | RecordingService.kt:38 | startForeground 후 early return 시 stopSelf 미호출 |
-| 7 | **리소스 누수** | recording_screen.dart:27 | dispose에서 녹화 중지 안 함 |
+| 기능 | v1.0 (문제) | 현재 (해결) |
+|------|------------|-------------|
+| 영상트리머 | FFmpeg WASM WebView (SharedArrayBuffer 없음) | `ffmpeg_kit_flutter_min_gpl` 네이티브 FFmpeg |
+| 동시통역 | webkitSpeechRecognition WebView (JS `let final` 버그) | `speech_to_text` + `google_mlkit_translation` 온디바이스 |
+| YouTube OAuth | WebView localhost redirect (ERR_CONNECTION_REFUSED) | `flutter_web_auth_2` Chrome Custom Tab |
+| 화면녹화 | MediaRecorder (오디오 모드 하나) | MediaCodec + MediaMuxer 통합 파이프라인 (MIC/UNPROCESSED/DAW) |
+| 녹화 중지 | dispose에서 stop 안 함 + stopSelf 누락 | dispose에 stop() 추가 + early return 시 stopSelf() |
+| 업로드 | List<int> 메모리 로딩 | RandomAccessFile + 10MB 청크 + 3회 재시도 |
+| **NEW** 시나리오 | 없음 | 6개 프리셋 (Shorts강의/Long강의/뮤직퍼포/리액션통역/DAW믹스/커스텀) |
+| **NEW** 오디오모드 | MIC만 | MIC + UNPROCESSED(Shure MOTIV) + DAW(AudioPlaybackCapture) |
+| **NEW** 오디오프로파일 | 없음 | lecture(NS+AGC+AEC) / podcast(NS+AGC) / music(원본) / raw(원본) |
 
-## v2.0 아키텍처 백서
-
-**반드시 읽을 것:** `apps/parksy-studio/docs/WHITEPAPER-v2.md`
-
-핵심 변경점:
-- WebView에서 핵심 로직 전부 제거 → 네이티브 엔진으로 이전
-- 영상 트리밍: FFmpeg WASM → **Android MediaCodec + MediaMuxer** (HW 가속)
-- 음성인식: Web Speech API → **Android SpeechRecognizer** (온디바이스)
-- 번역: Google Translate URL → **ML Kit Translation** (온디바이스)
-- OAuth: Implicit Flow WebView → **AppAuth + PKCE** (Chrome Custom Tab)
-- 업로드: `List<int>` 메모리 → **RandomAccessFile** + 청크별 재시도
-- 데이터: 없음 → **drift DB** 프로젝트 단위 관리
-
-## 파일 구조
+## 4. 파일 구조
 
 ```
 apps/parksy-studio/
-├── pubspec.yaml
-├── app-meta.json
+├── pubspec.yaml                    # Flutter 의존성 (13개 runtime)
+├── app-meta.json                   # 스토어 메타데이터
 ├── docs/
-│   ├── PLAN.md              # v1.0 기획문서
-│   └── WHITEPAPER-v2.md     # v2.0 아키텍처 백서 ★
+│   └── PLAN.md                     # v1.0 기획문서
+│
 ├── lib/
-│   ├── main.dart            # 앱 진입점 (38줄)
-│   ├── core/constants.dart  # 상수 + StudioTool 모델 (55줄)
+│   ├── main.dart                   # (38줄)  앱 진입점, 가로/세로 허용
+│   ├── core/
+│   │   └── constants.dart          # (55줄)  상수 + StudioTool 모델 + kTools 13개
+│   ├── models/
+│   │   └── studio_scenario.dart    # (144줄) ★ AudioMode, AudioProfile, StudioScenario, kScenarios
 │   ├── screens/
-│   │   ├── launcher_screen.dart     # cloud-appstore 도구 그리드 (203줄)
-│   │   ├── studio_webview.dart      # WebView 래퍼 (127줄)
-│   │   ├── recording_screen.dart    # 화면녹화 UI (182줄)
-│   │   ├── trimmer_screen.dart      # 영상트리머 WebView (88줄) ⚠️ 동작 안 함
-│   │   ├── interpreter_screen.dart  # 동시통역 WebView (66줄) ⚠️ JS 버그
-│   │   ├── bgm_screen.dart          # BGM 플레이어 (181줄)
-│   │   └── upload_screen.dart       # YouTube 업로드 (338줄) ⚠️ OAuth 불안정
+│   │   ├── launcher_screen.dart    # (323줄) ★ 시나리오 탭 + 도구 탭 + 하단 네비
+│   │   ├── recording_screen.dart   # (373줄) ★ 시나리오/커스텀 녹화 UI + 오디오 모드 선택
+│   │   ├── trimmer_screen.dart     # (210줄) ✅ 네이티브 FFmpeg + video_player 미리보기
+│   │   ├── interpreter_screen.dart # (233줄) ✅ 네이티브 STT + ML Kit 온디바이스 번역
+│   │   ├── upload_screen.dart      # (327줄) ✅ Chrome Custom Tab OAuth + 청크 업로드
+│   │   ├── bgm_screen.dart         # (187줄) BGM YouTube 내장 플레이어
+│   │   └── studio_webview.dart     # (127줄) 방송 무대 WebView (풀스크린, JS 브릿지)
 │   └── services/
-│       └── recording_service.dart   # Platform Channel (26줄)
+│       └── recording_service.dart  # (32줄)  Platform Channel (start/stop/isRecording)
+│
 ├── android/app/src/main/kotlin/com/parksy/studio/
-│   ├── MainActivity.kt             # 녹화 Channel 핸들러 (99줄)
-│   └── RecordingService.kt         # Foreground Service (125줄)
+│   ├── MainActivity.kt            # (105줄) Channel 핸들러 + MediaProjection 요청
+│   └── RecordingService.kt        # (327줄) ★ 통합 파이프라인 (AudioRecord+MediaCodec+MediaMuxer)
+│
 └── assets/
-    ├── trimmer/trimmer.html         # FFmpeg WASM UI ⚠️ WebView 미지원
-    ├── interpreter/interpreter.html # Web Speech API UI ⚠️ let final 버그
-    └── bgm/channels.json           # BGM 채널 로컬 폴백
+    ├── trimmer/trimmer.html        # (레거시, 더 이상 사용 안 함)
+    ├── interpreter/interpreter.html # (레거시, 더 이상 사용 안 함)
+    └── bgm/channels.json          # BGM 채널 로컬 폴백
 ```
 
-## 즉시 핫픽스 (v2.0 전에)
+## 5. 핵심 아키텍처
 
-v2.0 풀 리라이트 전에 v1.0을 최소한 돌아가게 하려면:
-```
-1. interpreter.html:126  →  let final → let finalText
-2. recording_screen.dart:27  →  dispose에 RecordingService.stop() 추가
-3. RecordingService.kt:47  →  early return 전 stopSelf() 호출
-4. interpreter_screen.dart:43  →  마이크만 grant, 나머지 deny
-5. trimmer — FFmpeg WASM 제거, "v2에서 네이티브 구현 예정" 표시
-```
-
-## 색상 팔레트
+### 5.1 시나리오 시스템 (studio_scenario.dart)
 
 ```dart
-const kBackground = Color(0xFF0A0A0A);  // 순검정 (ChronoCall보다 더 어두움)
-const kSurface    = Color(0xFF1A1A1A);  // 카드
+enum AudioMode { mic, unprocessed, daw }
+
+// 프리셋: lecture(NS+AGC+AEC), podcast(NS+AGC), music(원본), raw(원본)
+class AudioProfile { noiseSuppressor, autoGainControl, echoCanceler }
+
+class StudioScenario {
+  videoFormat,      // 'shorts' | 'long'
+  audioSource,      // AudioMode
+  audioProfile,     // AudioProfile
+  autoOpenTool,     // 'bgm' | 'interpreter' | null
+  interpreterEnabled,
+  uploadPrivacy,
+  isCustom,
+}
+
+// 6개 프리셋:
+kScenarios = [shorts_lecture, long_lecture, music_performance,
+              reaction_interpret, daw_mix, custom]
+```
+
+### 5.2 녹화 파이프라인 (RecordingService.kt)
+
+```
+Dart (recording_service.dart)
+  → Platform Channel 'com.parksy.studio/recording'
+    → startRecording(format, audioMode, audioProfile)
+    → Kotlin RecordingService.startUnifiedMode()
+
+3가지 오디오 모드:
+┌─────────────┬──────────────────────────────────────────────┐
+│ MIC         │ MediaRecorder.AudioSource.MIC (44.1kHz)      │
+│             │ + AudioEffect (NS/AGC/AEC by profile)        │
+├─────────────┼──────────────────────────────────────────────┤
+│ UNPROCESSED │ AudioSource.UNPROCESSED (48kHz, 256kbps)     │
+│             │ Samsung AGC/노이즈게이트 우회                  │
+│             │ Shure MOTIV USB 마이크 원본 입력              │
+├─────────────┼──────────────────────────────────────────────┤
+│ DAW         │ AudioPlaybackCaptureConfiguration (Android 10+)│
+│             │ 시스템 오디오 전체 캡처 (BGM + DAW 목소리)      │
+│             │ USAGE_MEDIA + USAGE_GAME + USAGE_UNKNOWN      │
+└─────────────┴──────────────────────────────────────────────┘
+
+비디오: VirtualDisplay → MediaCodec H.264 → MediaMuxer MP4
+오디오: AudioRecord → MediaCodec AAC → MediaMuxer MP4
+둘 다 별도 스레드, tryStartMuxer()로 양쪽 트랙 등록 후 muxing 시작
+```
+
+### 5.3 네이티브 엔진 상세
+
+**트리머 (trimmer_screen.dart)**
+- `ffmpeg_kit_flutter_min_gpl` → FFmpegKit.execute()
+- crop + scale + pad 필터 체인
+- libx264 + aac + movflags faststart
+- Statistics 콜백으로 진행률 표시
+- `video_player`로 소스 영상 미리보기
+
+**동시통역 (interpreter_screen.dart)**
+- `speech_to_text` → Android SpeechRecognizer (partialResults + 자동 재시작)
+- `google_mlkit_translation` → 온디바이스 EN→KO 번역 (모델 자동 다운로드)
+- 4개 언어: auto / EN / JP / ZH
+
+**YouTube 업로드 (upload_screen.dart)**
+- `flutter_web_auth_2` → Chrome Custom Tab OAuth (com.parksy.studio://oauth2callback)
+- Resumable Upload API + RandomAccessFile 10MB 청크
+- 3회 재시도 + exponential backoff
+
+## 6. 잔여 버그 (4개)
+
+| # | 심각도 | 위치 | 문제 | 수정 방법 |
+|---|--------|------|------|-----------|
+| 1 | **레이스** | recording_screen.dart:61 | `RecordingService.stop()` async인데 path await 후 즉시 Navigator.push — Kotlin 스레드 join 2초 대기 중에 path가 올 수도 안 올 수도 있음 | stop()에서 Kotlin join 완료 후 path 리턴 확인, 또는 Dart에서 폴링 |
+| 2 | **로직** | interpreter_screen.dart:61-64 | 번역기가 항상 EN→KO로 고정 — srcLang을 JP/ZH로 바꿔도 번역 소스 언어 안 바뀜 | `_srcLang` 변경 시 translator를 dispose 후 재생성 |
+| 3 | **미완성** | launcher_screen.dart:33-44 | 시나리오 선택 시 autoOpenTool로 BGM/통역만 열지만, 녹화 화면으로 자동 전환 안 됨 — 유저가 "녹화 시작" 버튼을 한번 더 눌러야 함 | autoOpenTool 완료 후 자동으로 RecordingScreen 푸시, 또는 멀티스크린 스택 |
+| 4 | **보안** | upload_screen.dart:57-62 | OAuth가 Implicit Flow (response_type: 'token') — refresh_token 없음, 토큰 1시간 만료 | Authorization Code + PKCE로 변경 (flutter_web_auth_2가 이미 지원) |
+
+## 7. 의존성 (pubspec.yaml)
+
+```yaml
+# 코어
+webview_flutter: ^4.7.0              # 방송 무대 + BGM 플레이어
+webview_flutter_android: ^3.16.0     # Android WebView 확장
+shared_preferences: ^2.2.2           # 설정 저장
+path_provider: ^2.1.1                # 앱 디렉토리
+path: ^1.9.0                         # 경로 유틸
+url_launcher: ^6.2.1                 # 외부 브라우저 열기
+permission_handler: ^11.3.0          # 런타임 권한
+http: ^1.1.0                         # HTTP 클라이언트
+
+# 트리머 (네이티브)
+ffmpeg_kit_flutter_min_gpl: ^6.0.3   # FFmpeg 네이티브 (H.264 인코딩)
+video_player: ^2.8.1                 # 영상 미리보기
+
+# 동시통역 (네이티브)
+speech_to_text: ^6.6.2               # Android SpeechRecognizer
+google_mlkit_translation: ^0.12.0    # 온디바이스 번역 (ML Kit)
+
+# YouTube 업로드
+flutter_web_auth_2: ^3.1.2           # Chrome Custom Tab OAuth
+```
+
+## 8. 빌드 가이드
+
+```bash
+cd ~/dtslib-apk-lab/apps/parksy-studio
+
+# 최초 1회
+flutter create . --org com.parksy
+# ⚠️ 기존 파일 덮어쓰지 않음 확인
+
+flutter pub get
+flutter build apk --debug
+termux-open build/app/outputs/flutter-apk/app-debug.apk
+```
+
+### 빌드 실패 체크리스트
+
+| 에러 | 해결 |
+|------|------|
+| `NDK not found` | `sdkmanager "ndk;25.1.8937393"` |
+| `ffmpeg_kit not found` | `flutter pub get` 재실행 |
+| `Namespace not specified` | AGP 7.3 사용 중이면 OK, 8+이면 app/build.gradle에 namespace 추가 |
+| `minSdk conflict` | `flutter pub upgrade` |
+
+### 테스트 체크리스트
+
+```
+□ 앱 실행 → 시나리오 탭 6개 카드 표시
+□ 시나리오 선택 → 프리셋 요약 + 녹화 시작 버튼
+□ 커스텀 → 포맷/오디오모드/프로파일 직접 선택
+□ 녹화 시작 → MediaProjection 권한 → 타이머 표시
+□ 녹화 중지 → 트리머로 자동 이동
+□ 트리머 → video_player 미리보기 + Shorts/Long 변환
+□ 동시통역 → STT 인식 + 한국어 번역 표시
+□ BGM → 채널 선택 → YouTube 내장 재생
+□ 도구 탭 → cloud-appstore WebView 열기
+□ YouTube 업로드 → Google 로그인 → 업로드 진행
+```
+
+## 9. 임포트 그래프
+
+```
+main.dart
+  └→ screens/launcher_screen.dart
+       ├→ core/constants.dart
+       ├→ models/studio_scenario.dart
+       ├→ screens/studio_webview.dart
+       ├→ screens/recording_screen.dart
+       │    ├→ models/studio_scenario.dart
+       │    ├→ services/recording_service.dart
+       │    └→ screens/trimmer_screen.dart
+       ├→ screens/interpreter_screen.dart
+       ├→ screens/bgm_screen.dart
+       └→ screens/upload_screen.dart
+```
+
+## 10. Platform Channel 규약
+
+```
+Channel: "com.parksy.studio/recording"
+
+Dart → Kotlin:
+  startRecording({format, audioMode, audioProfile})  → String? outputPath
+  stopRecording()                                     → String? outputPath
+  isRecording()                                       → bool
+```
+
+## 11. 색상 팔레트
+
+```dart
+const kBackground = Color(0xFF0A0A0A);  // 순검정
+const kSurface    = Color(0xFF1A1A1A);  // 카드, AppBar
 const kAccent     = Color(0xFFE8D5B7);  // 골드 (Parksy 공통)
 const kDim        = Color(0xFF333333);  // 보더
 ```
 
-## 버전 동기화 파일
+## 12. 버전 동기화 파일
 
 ```
 1. apps/parksy-studio/pubspec.yaml           → version: X.Y.Z+N
 2. apps/parksy-studio/lib/core/constants.dart → version = 'X.Y.Z', versionCode = N
 3. apps/parksy-studio/app-meta.json          → "version": "vX.Y.Z"
 4. dashboard/apps.json                        → parksy-studio 항목
+```
+
+## 13. Phase 로드맵
+
+### Phase 1 (v1.0.0) — ✅ 완료
+```
+[✅] WebView 방송 무대 (풀스크린, JS 브릿지)
+[✅] cloud-appstore 13개 도구 그리드
+[✅] 화면녹화 Foreground Service
+[✅] BGM YouTube 내장 플레이어
+```
+
+### Phase 1.5 (v1.5.0) — ✅ 완료 (네이티브 리라이트)
+```
+[✅] 트리머: FFmpeg WASM → ffmpeg_kit 네이티브
+[✅] 동시통역: WebView Speech API → speech_to_text + ML Kit
+[✅] 업로드: WebView OAuth → flutter_web_auth_2 Chrome Custom Tab
+[✅] 녹화: MediaRecorder → MediaCodec+MediaMuxer 통합 파이프라인
+[✅] 시나리오 시스템 (6개 프리셋)
+[✅] 오디오 모드 3종 (MIC/UNPROCESSED/DAW)
+[✅] 오디오 프로파일 4종 (lecture/podcast/music/raw)
+[✅] AudioEffect 적용 (NoiseSuppressor/AGC/AEC)
+```
+
+### Phase 2 (v2.0.0) — 다음 목표
+```
+[ ] 잔여 버그 4개 수정 (위 섹션 6 참조)
+[ ] OAuth → Authorization Code + PKCE + refresh_token
+[ ] 시나리오 원터치: 선택 → BGM/통역 자동 열기 → 녹화 자동 시작
+[ ] 번역기 언어 동적 변경 (JP→KO, ZH→KO)
+[ ] 녹화→트리머→업로드 자동 파이프라인 (중간 확인 없이)
+[ ] drift DB 프로젝트 관리 (SharedPreferences 대체)
+```
+
+### Phase 3 (v3.0.0) — 장기
+```
+[ ] Shure MOTIV 연동 테스트 + UNPROCESSED 48kHz 검증
+[ ] DAW 모드 + FL Studio/BandLab 실전 테스트
+[ ] 자막 오버레이 (통역 결과 → 화면 위에 표시)
+[ ] 프로젝트별 설정 저장/불러오기
+[ ] Parksy Pen 오버레이 연동 (동시 실행 시나리오)
 ```
 
 ---

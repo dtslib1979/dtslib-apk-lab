@@ -17,6 +17,16 @@ dependencies:
   url_launcher: ^6.2.1
   permission_handler: ^11.3.0
   http: ^1.1.0
+  # 트리머 — 네이티브 FFmpeg (H.264 인코딩 포함)
+  ffmpeg_kit_flutter_min_gpl: ^6.0.3
+  # 트리머 — 영상 미리보기
+  video_player: ^2.8.1
+  # 동시통역 — Android 네이티브 SpeechRecognizer
+  speech_to_text: ^6.6.2
+  # 동시통역 — 온디바이스 번역 (ML Kit)
+  google_mlkit_translation: ^0.12.0
+  # OAuth — Chrome Custom Tab 방식
+  flutter_web_auth_2: ^3.1.2
 
 dev_dependencies:
   flutter_test:
