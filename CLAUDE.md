@@ -162,7 +162,7 @@ dashboard/
 
 > **방송 제작 파이프라인 전체를 하나의 APK 안에.**
 > Galaxy Tab + S Pen + Shure MOTIV = PC + OBS + DAW + 영상편집기 대체.
-> v1.0 핵심 엔진 네이티브 리라이트 완료 (2026-03-14). 완성도 ~86%.
+> 네이티브 리라이트 완료 (2026-03-14). 업로드 드롭 결정. **완성도 ~90%.**
 
 ## 1. 핵심 컨셉: 1인 모바일 방송 스튜디오
 
@@ -173,7 +173,7 @@ WebView = 방송 무대 (URL 바 없음, 풀스크린)
    ↓
 트리머 = Shorts/Long 포맷 변환 + 크롭
    ↓
-YouTube 업로드 = 원터치 배포
+YouTube 앱으로 수동 업로드 (인앱 업로드 드롭 — OAuth/과금 이슈)
 
 각 기능은 독립이 아니라 파이프라인으로 연결된다.
 ```
@@ -185,12 +185,12 @@ YouTube 업로드 = 원터치 배포
 | 앱 이름 | Parksy Studio |
 | 패키지명 | com.parksy.studio |
 | 버전 | 1.0.0+1 |
-| Dart 파일 | 11개, 2,049줄 |
+| Dart 파일 | 11개, 2,047줄 (upload_screen.dart 327줄은 데드코드 → 삭제 대상) |
 | Kotlin 파일 | 2개, 432줄 |
-| 총 코드 | ~2,481줄 |
-| 빌드 상태 | **네이티브 엔진 리라이트 완료, 잔여 버그 4개** |
+| 총 코드 | 활성 ~2,152줄 / 데드코드 포함 ~2,479줄 |
+| 빌드 상태 | **네이티브 엔진 리라이트 완료, 업로드 드롭, 잔여 버그 3개** |
 | 스토어 등록 | dashboard/apps.json 등록 완료 |
-| 완성도 | **~86%** (녹화 92%, 트리머 95%, 통역 80%, 업로드 75%, 시나리오 85%) |
+| 완성도 | **~90%** (녹화 92%, 트리머 95%, 통역 80%, BGM 95%, 시나리오 90%, WebView 95%) |
 
 ## 3. v1.0→v2 리라이트 요약
 
@@ -198,10 +198,9 @@ YouTube 업로드 = 원터치 배포
 |------|------------|-------------|
 | 영상트리머 | FFmpeg WASM WebView (SharedArrayBuffer 없음) | `ffmpeg_kit_flutter_min_gpl` 네이티브 FFmpeg |
 | 동시통역 | webkitSpeechRecognition WebView (JS `let final` 버그) | `speech_to_text` + `google_mlkit_translation` 온디바이스 |
-| YouTube OAuth | WebView localhost redirect (ERR_CONNECTION_REFUSED) | `flutter_web_auth_2` Chrome Custom Tab |
+| YouTube 업로드 | WebView OAuth + Implicit Flow + 과금 위험 | **드롭** — YouTube 앱 수동 업로드로 대체 |
 | 화면녹화 | MediaRecorder (오디오 모드 하나) | MediaCodec + MediaMuxer 통합 파이프라인 (MIC/UNPROCESSED/DAW) |
 | 녹화 중지 | dispose에서 stop 안 함 + stopSelf 누락 | dispose에 stop() 추가 + early return 시 stopSelf() |
-| 업로드 | List<int> 메모리 로딩 | RandomAccessFile + 10MB 청크 + 3회 재시도 |
 | **NEW** 시나리오 | 없음 | 6개 프리셋 (Shorts강의/Long강의/뮤직퍼포/리액션통역/DAW믹스/커스텀) |
 | **NEW** 오디오모드 | MIC만 | MIC + UNPROCESSED(Shure MOTIV) + DAW(AudioPlaybackCapture) |
 | **NEW** 오디오프로파일 | 없음 | lecture(NS+AGC+AEC) / podcast(NS+AGC) / music(원본) / raw(원본) |
@@ -210,7 +209,7 @@ YouTube 업로드 = 원터치 배포
 
 ```
 apps/parksy-studio/
-├── pubspec.yaml                    # Flutter 의존성 (13개 runtime)
+├── pubspec.yaml                    # Flutter 의존성 (12개 runtime, flutter_web_auth_2 제거됨)
 ├── app-meta.json                   # 스토어 메타데이터
 ├── docs/
 │   └── PLAN.md                     # v1.0 기획문서
@@ -222,11 +221,11 @@ apps/parksy-studio/
 │   ├── models/
 │   │   └── studio_scenario.dart    # (144줄) ★ AudioMode, AudioProfile, StudioScenario, kScenarios
 │   ├── screens/
-│   │   ├── launcher_screen.dart    # (323줄) ★ 시나리오 탭 + 도구 탭 + 하단 네비
+│   │   ├── launcher_screen.dart    # (321줄) ★ 시나리오 탭 + 도구 탭 + 하단 네비 (업로드 탭 제거됨)
 │   │   ├── recording_screen.dart   # (373줄) ★ 시나리오/커스텀 녹화 UI + 오디오 모드 선택
 │   │   ├── trimmer_screen.dart     # (210줄) ✅ 네이티브 FFmpeg + video_player 미리보기
 │   │   ├── interpreter_screen.dart # (233줄) ✅ 네이티브 STT + ML Kit 온디바이스 번역
-│   │   ├── upload_screen.dart      # (327줄) ✅ Chrome Custom Tab OAuth + 청크 업로드
+│   │   ├── upload_screen.dart      # (327줄) ⚠️ 데드코드 — 삭제 필요 (어디서도 import 안 함)
 │   │   ├── bgm_screen.dart         # (187줄) BGM YouTube 내장 플레이어
 │   │   └── studio_webview.dart     # (127줄) 방송 무대 WebView (풀스크린, JS 브릿지)
 │   └── services/
@@ -237,8 +236,8 @@ apps/parksy-studio/
 │   └── RecordingService.kt        # (327줄) ★ 통합 파이프라인 (AudioRecord+MediaCodec+MediaMuxer)
 │
 └── assets/
-    ├── trimmer/trimmer.html        # (레거시, 더 이상 사용 안 함)
-    ├── interpreter/interpreter.html # (레거시, 더 이상 사용 안 함)
+    ├── trimmer/trimmer.html        # ⚠️ 레거시 데드코드 — 삭제 가능
+    ├── interpreter/interpreter.html # ⚠️ 레거시 데드코드 — 삭제 가능
     └── bgm/channels.json          # BGM 채널 로컬 폴백
 ```
 
@@ -308,19 +307,26 @@ Dart (recording_service.dart)
 - `google_mlkit_translation` → 온디바이스 EN→KO 번역 (모델 자동 다운로드)
 - 4개 언어: auto / EN / JP / ZH
 
-**YouTube 업로드 (upload_screen.dart)**
-- `flutter_web_auth_2` → Chrome Custom Tab OAuth (com.parksy.studio://oauth2callback)
-- Resumable Upload API + RandomAccessFile 10MB 청크
-- 3회 재시도 + exponential backoff
+**YouTube 업로드 — 드롭됨 (a6a0823)**
+- OAuth/과금 이슈로 인앱 업로드 제거
+- YouTube 앱에서 수동 업로드로 대체
+- `upload_screen.dart` 파일은 아직 남아있음 → **삭제 필요** (데드코드)
 
-## 6. 잔여 버그 (4개)
+## 6. 잔여 버그 (3개) + 데드코드 정리
 
 | # | 심각도 | 위치 | 문제 | 수정 방법 |
 |---|--------|------|------|-----------|
 | 1 | **레이스** | recording_screen.dart:61 | `RecordingService.stop()` async인데 path await 후 즉시 Navigator.push — Kotlin 스레드 join 2초 대기 중에 path가 올 수도 안 올 수도 있음 | stop()에서 Kotlin join 완료 후 path 리턴 확인, 또는 Dart에서 폴링 |
 | 2 | **로직** | interpreter_screen.dart:61-64 | 번역기가 항상 EN→KO로 고정 — srcLang을 JP/ZH로 바꿔도 번역 소스 언어 안 바뀜 | `_srcLang` 변경 시 translator를 dispose 후 재생성 |
 | 3 | **미완성** | launcher_screen.dart:33-44 | 시나리오 선택 시 autoOpenTool로 BGM/통역만 열지만, 녹화 화면으로 자동 전환 안 됨 — 유저가 "녹화 시작" 버튼을 한번 더 눌러야 함 | autoOpenTool 완료 후 자동으로 RecordingScreen 푸시, 또는 멀티스크린 스택 |
-| 4 | **보안** | upload_screen.dart:57-62 | OAuth가 Implicit Flow (response_type: 'token') — refresh_token 없음, 토큰 1시간 만료 | Authorization Code + PKCE로 변경 (flutter_web_auth_2가 이미 지원) |
+
+### 데드코드 정리 (삭제 대상)
+
+| 파일 | 이유 |
+|------|------|
+| `lib/screens/upload_screen.dart` (327줄) | 업로드 드롭했는데 파일 남음, flutter_web_auth_2 import 있어서 지저분 |
+| `assets/trimmer/trimmer.html` | 네이티브 FFmpeg로 대체됨 |
+| `assets/interpreter/interpreter.html` | 네이티브 STT로 대체됨 |
 
 ## 7. 의존성 (pubspec.yaml)
 
@@ -343,8 +349,7 @@ video_player: ^2.8.1                 # 영상 미리보기
 speech_to_text: ^6.6.2               # Android SpeechRecognizer
 google_mlkit_translation: ^0.12.0    # 온디바이스 번역 (ML Kit)
 
-# YouTube 업로드
-flutter_web_auth_2: ^3.1.2           # Chrome Custom Tab OAuth
+# ❌ 제거됨: flutter_web_auth_2 (업로드 드롭)
 ```
 
 ## 8. 빌드 가이드
@@ -382,7 +387,7 @@ termux-open build/app/outputs/flutter-apk/app-debug.apk
 □ 동시통역 → STT 인식 + 한국어 번역 표시
 □ BGM → 채널 선택 → YouTube 내장 재생
 □ 도구 탭 → cloud-appstore WebView 열기
-□ YouTube 업로드 → Google 로그인 → 업로드 진행
+□ 트리머 결과 MP4 → YouTube 앱에서 수동 업로드 확인
 ```
 
 ## 9. 임포트 그래프
@@ -398,8 +403,7 @@ main.dart
        │    ├→ services/recording_service.dart
        │    └→ screens/trimmer_screen.dart
        ├→ screens/interpreter_screen.dart
-       ├→ screens/bgm_screen.dart
-       └→ screens/upload_screen.dart
+       └→ screens/bgm_screen.dart
 ```
 
 ## 10. Platform Channel 규약
@@ -445,8 +449,8 @@ const kDim        = Color(0xFF333333);  // 보더
 ```
 [✅] 트리머: FFmpeg WASM → ffmpeg_kit 네이티브
 [✅] 동시통역: WebView Speech API → speech_to_text + ML Kit
-[✅] 업로드: WebView OAuth → flutter_web_auth_2 Chrome Custom Tab
 [✅] 녹화: MediaRecorder → MediaCodec+MediaMuxer 통합 파이프라인
+[✅] 업로드: 인앱 OAuth 드롭 → YouTube 앱 수동 업로드 (과금/보안 리스크 제거)
 [✅] 시나리오 시스템 (6개 프리셋)
 [✅] 오디오 모드 3종 (MIC/UNPROCESSED/DAW)
 [✅] 오디오 프로파일 4종 (lecture/podcast/music/raw)
@@ -455,11 +459,11 @@ const kDim        = Color(0xFF333333);  // 보더
 
 ### Phase 2 (v2.0.0) — 다음 목표
 ```
-[ ] 잔여 버그 4개 수정 (위 섹션 6 참조)
-[ ] OAuth → Authorization Code + PKCE + refresh_token
+[ ] 잔여 버그 3개 수정 (위 섹션 6 참조)
+[ ] 데드코드 정리: upload_screen.dart, 레거시 HTML 에셋 삭제
 [ ] 시나리오 원터치: 선택 → BGM/통역 자동 열기 → 녹화 자동 시작
 [ ] 번역기 언어 동적 변경 (JP→KO, ZH→KO)
-[ ] 녹화→트리머→업로드 자동 파이프라인 (중간 확인 없이)
+[ ] 녹화→트리머 자동 파이프라인 (중간 확인 없이)
 [ ] drift DB 프로젝트 관리 (SharedPreferences 대체)
 ```
 
