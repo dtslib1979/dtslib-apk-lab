@@ -31,7 +31,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
   // YouTube OAuth 설정 (공개 클라이언트 ID — YouTube Data API v3 개인 앱용)
   static const _clientId =
-      'YOUR_YOUTUBE_OAUTH_CLIENT_ID'; // Google Cloud Console에서 발급
+      '390585643473-mqhas2b57qjlefejt7ptl8jrqmlkllge.apps.googleusercontent.com';
   static const _redirectUri = 'https://localhost';
   static const _scope =
       'https://www.googleapis.com/auth/youtube.upload';
