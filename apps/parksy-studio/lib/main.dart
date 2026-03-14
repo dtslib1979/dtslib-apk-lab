@@ -5,7 +5,7 @@ import 'screens/launcher_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // 세로 고정
+  // 세로 + 가로 허용 (방송 중 회전 지원)
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.landscapeLeft,

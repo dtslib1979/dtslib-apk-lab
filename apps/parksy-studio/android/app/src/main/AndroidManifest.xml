@@ -8,8 +8,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
 
-    <!-- 오디오 캡처 - 동시통역 (Phase 4) Android 10+ -->
-    <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT"/>
+    <!-- 마이크 (화면녹화 오디오, 동시통역 STT) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <!-- 미디어 -->

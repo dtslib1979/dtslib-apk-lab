@@ -68,7 +68,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
       backgroundColor: AppConstants.kBackground,
       appBar: AppBar(
         backgroundColor: AppConstants.kSurface,
-        title: Text('영상트리머', style: TextStyle(color: AppConstants.kAccent)),
+        title: Text('화면녹화', style: TextStyle(color: AppConstants.kAccent)),
         iconTheme: const IconThemeData(color: Colors.white70),
       ),
       body: Padding(

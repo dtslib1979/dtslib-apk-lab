@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../core/constants.dart';
 
@@ -114,7 +115,10 @@ class _StudioWebViewState extends State<StudioWebView> {
           ),
           IconButton(
             icon: const Icon(Icons.open_in_browser, color: Colors.white70),
-            onPressed: () => _controller.loadRequest(Uri.parse(widget.url)),
+            onPressed: () => launchUrl(
+              Uri.parse(widget.url),
+              mode: LaunchMode.externalApplication,
+            ),
           ),
         ],
       ),

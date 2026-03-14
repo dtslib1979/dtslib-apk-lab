@@ -200,13 +200,4 @@ class _LauncherScreenState extends State<LauncherScreen> {
     );
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature — Phase 다음 업데이트'),
-        backgroundColor: AppConstants.kSurface,
-        duration: const Duration(seconds: 1),
-      ),
-    );
-  }
 }

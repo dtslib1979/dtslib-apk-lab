@@ -26,8 +26,9 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
         'TrimmerChannel',
         onMessageReceived: (msg) {
           if (msg.message == 'ready') {
-            // 영상 경로 전달 (file:// 프로토콜)
-            final filePath = 'file://${widget.videoPath}';
+            // 영상 경로 전달 (file:// 프로토콜, 특수문자 인코딩)
+            final encoded = Uri.encodeFull(widget.videoPath);
+            final filePath = 'file://$encoded';
             _controller.runJavaScript("receiveVideoPath('$filePath')");
             // 포맷 사전 설정
             if (widget.format == 'long') {

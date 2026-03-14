@@ -183,6 +183,11 @@ class _UploadScreenState extends State<UploadScreen> {
             _progress = 1.0;
           });
           return;
+        } else if (res.statusCode == 308) {
+          // Resume Incomplete — 청크 수신됨, 다음 청크로 계속
+          continue;
+        } else {
+          throw Exception('청크 업로드 실패: ${res.statusCode}');
         }
       }
     } catch (e) {

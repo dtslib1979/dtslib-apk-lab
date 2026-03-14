@@ -31,7 +31,7 @@ class RecordingService : Service() {
             ACTION_START -> startRecording(intent)
             ACTION_STOP -> stopRecording()
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun startRecording(intent: Intent) {
@@ -62,12 +62,16 @@ class RecordingService : Service() {
         }
 
         mediaRecorder!!.apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
             setVideoSource(MediaRecorder.VideoSource.SURFACE)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setVideoSize(width, height)
             setVideoFrameRate(30)
             setVideoEncodingBitRate(6_000_000)
+            setAudioEncodingBitRate(128_000)
+            setAudioSamplingRate(44100)
             setOutputFile(outputPath)
             prepare()
         }
