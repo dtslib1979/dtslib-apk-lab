@@ -1,19 +1,56 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "updated": "2026-03-14",
-  "note": "parksy-audio YouTube 업로드 후 URL 채워 넣을 것",
+  "source": "https://www.youtube.com/@musician-parksy",
   "channels": [
     {
       "id": "ambient",
       "name": "Ambient",
       "icon": "🌊",
-      "tracks": []
+      "tracks": [
+        {
+          "name": "Claire de Lune",
+          "url": "https://www.youtube.com/watch?v=Dc6RP_6axuk",
+          "duration": ""
+        },
+        {
+          "name": "Consolation No.3",
+          "url": "https://www.youtube.com/watch?v=6fD2n7YUN4k",
+          "duration": ""
+        },
+        {
+          "name": "Pavane Op.50",
+          "url": "https://www.youtube.com/watch?v=V-DhunIGgTc",
+          "duration": ""
+        }
+      ]
     },
     {
       "id": "instrument",
       "name": "Instrument",
       "icon": "🎹",
-      "tracks": []
+      "tracks": [
+        {
+          "name": "Chopin Nocturne Op.9 No.1",
+          "url": "https://www.youtube.com/watch?v=CVkQFl2NUG8",
+          "duration": ""
+        },
+        {
+          "name": "Chopin Barcarolle Op.60",
+          "url": "https://www.youtube.com/watch?v=WzqgKSZN9xM",
+          "duration": ""
+        },
+        {
+          "name": "Ave Verum — Mozart",
+          "url": "https://www.youtube.com/watch?v=xCnucTlRwZ8",
+          "duration": ""
+        },
+        {
+          "name": "Panis Angelicus — Franck",
+          "url": "https://www.youtube.com/watch?v=J3Zh54aQKm0",
+          "duration": ""
+        }
+      ]
     },
     {
       "id": "loop",
