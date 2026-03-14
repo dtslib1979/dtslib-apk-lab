@@ -1,12 +1,18 @@
 import 'package:flutter/services.dart';
 
+enum AudioMode { mic, unprocessed, daw }
+
 class RecordingService {
   static const _channel = MethodChannel('com.parksy.studio/recording');
 
-  static Future<String?> start({String format = 'shorts'}) async {
+  static Future<String?> start({
+    String format = 'shorts',
+    AudioMode audioMode = AudioMode.mic,
+  }) async {
     try {
       final path = await _channel.invokeMethod<String>('startRecording', {
         'format': format,
+        'audioMode': audioMode.name,
       });
       return path;
     } on PlatformException catch (e) {
@@ -16,8 +22,7 @@ class RecordingService {
   }
 
   static Future<String?> stop() async {
-    final path = await _channel.invokeMethod<String>('stopRecording');
-    return path;
+    return await _channel.invokeMethod<String>('stopRecording');
   }
 
   static Future<bool> isRecording() async {

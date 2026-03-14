@@ -19,6 +19,7 @@ class MainActivity : FlutterActivity() {
     private val PROJECTION_REQUEST = 100
     private var pendingResult: MethodChannel.Result? = null
     private var pendingFormat = "shorts"
+    private var pendingAudioMode = "mic"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,16 +33,16 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "startRecording" -> {
-                        pendingResult = result
-                        pendingFormat = call.argument<String>("format") ?: "shorts"
+                        pendingResult    = result
+                        pendingFormat    = call.argument<String>("format")    ?: "shorts"
+                        pendingAudioMode = call.argument<String>("audioMode") ?: "mic"
                         requestProjectionPermission()
                     }
                     "stopRecording" -> {
                         stopRecordingService()
-                        // 서비스 Intent 비동기 → 500ms 대기 후 path 리턴 (v2.0에서 콜백으로 교체 예정)
                         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                             result.success(RecordingService.outputPath.ifEmpty { null })
-                        }, 500)
+                        }, 800) // DAW 모드는 muxer stop에 시간이 더 필요
                     }
                     "isRecording" -> result.success(RecordingService.isRecording)
                     else -> result.notImplemented()
@@ -60,7 +61,6 @@ class MainActivity : FlutterActivity() {
             if (resultCode == Activity.RESULT_OK && data != null) {
                 val outputPath = buildOutputPath(pendingFormat)
                 val (width, height) = formatDimensions(pendingFormat)
-
                 val serviceIntent = Intent(this, RecordingService::class.java).apply {
                     action = RecordingService.ACTION_START
                     putExtra("resultCode", resultCode)
@@ -68,6 +68,7 @@ class MainActivity : FlutterActivity() {
                     putExtra("width", width)
                     putExtra("height", height)
                     putExtra("outputPath", outputPath)
+                    putExtra(RecordingService.EXTRA_AUDIO_MODE, pendingAudioMode)
                 }
                 startForegroundService(serviceIntent)
                 pendingResult?.success(outputPath)
@@ -79,10 +80,9 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun stopRecordingService() {
-        val intent = Intent(this, RecordingService::class.java).apply {
+        startService(Intent(this, RecordingService::class.java).apply {
             action = RecordingService.ACTION_STOP
-        }
-        startService(intent)
+        })
     }
 
     private fun buildOutputPath(format: String): String {
