@@ -287,7 +287,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? AppConstants.kAccent.withOpacity(0.2) : AppConstants.kSurface,
+          color: active ? AppConstants.kAccent.withValues(alpha: 0.2) : AppConstants.kSurface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: active ? AppConstants.kAccent : AppConstants.kDim),
         ),
@@ -306,9 +306,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppConstants.kAccent.withOpacity(0.1),
+          color: AppConstants.kAccent.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppConstants.kAccent.withOpacity(0.3)),
+          border: Border.all(color: AppConstants.kAccent.withValues(alpha: 0.3)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(s.desc,
@@ -359,7 +359,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
                 margin: EdgeInsets.only(right: f['id'] == 'shorts' ? 8 : 0),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: sel ? AppConstants.kAccent.withOpacity(0.2) : AppConstants.kSurface,
+                  color: sel ? AppConstants.kAccent.withValues(alpha: 0.2) : AppConstants.kSurface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: sel ? AppConstants.kAccent : AppConstants.kDim),
                 ),
@@ -388,7 +388,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: sel ? AppConstants.kAccent.withOpacity(0.12) : AppConstants.kSurface,
+              color: sel ? AppConstants.kAccent.withValues(alpha: 0.12) : AppConstants.kSurface,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: sel ? AppConstants.kAccent : AppConstants.kDim),
             ),
@@ -426,7 +426,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
                   margin: const EdgeInsets.only(right: 6),
                   padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                   decoration: BoxDecoration(
-                    color: sel ? AppConstants.kAccent.withOpacity(0.15) : AppConstants.kSurface,
+                    color: sel ? AppConstants.kAccent.withValues(alpha: 0.15) : AppConstants.kSurface,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: sel ? AppConstants.kAccent : AppConstants.kDim),
                   ),
@@ -454,7 +454,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
       decoration: BoxDecoration(
         color: AppConstants.kAccent.withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppConstants.kAccent.withOpacity(0.3)),
+        border: Border.all(color: AppConstants.kAccent.withValues(alpha: 0.3)),
       ),
       child: const Text(
         '💡 DAW 모드: FL Studio / BandLab 등에서 시스템 오디오 캡처\n녹화 전 DAW를 먼저 실행하세요.',
@@ -464,12 +464,3 @@ class _RecordingScreenState extends State<RecordingScreen> {
   }
 }
 
-extension _ProfileExt on AudioProfile {
-  String get effectsLabel {
-    final p = <String>[];
-    if (noiseSuppressor) p.add('NS');
-    if (autoGainControl) p.add('AGC');
-    if (echoCanceler)    p.add('AEC');
-    return p.isEmpty ? '원본' : p.join('+');
-  }
-}

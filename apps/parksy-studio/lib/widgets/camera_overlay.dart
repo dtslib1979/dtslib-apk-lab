@@ -26,22 +26,27 @@ class _CameraOverlayState extends State<CameraOverlay> {
   Widget build(BuildContext context) {
     if (!widget.controller.value.isInitialized) return const SizedBox.shrink();
 
-    // #6 fix: 드래그 바운드 — 화면 밖으로 못 나가게
-    final screen = MediaQuery.of(context).size;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 절대 좌표 clamp: 부모 크기 - 오버레이 크기
+        final maxDx = constraints.maxWidth.isFinite  ? constraints.maxWidth  / 2 : 200;
+        final maxDy = constraints.maxHeight.isFinite ? constraints.maxHeight / 2 : 400;
 
-    return GestureDetector(
-      onPanUpdate: (d) {
-        setState(() {
-          _offset = Offset(
-            (_offset.dx + d.delta.dx).clamp(-(screen.width * 0.3), screen.width * 0.3),
-            (_offset.dy + d.delta.dy).clamp(-(screen.height * 0.4), screen.height * 0.4),
-          );
-        });
+        return GestureDetector(
+          onPanUpdate: (d) {
+            setState(() {
+              _offset = Offset(
+                (_offset.dx + d.delta.dx).clamp(-maxDx, maxDx),
+                (_offset.dy + d.delta.dy).clamp(-maxDy, maxDy),
+              );
+            });
+          },
+          child: Transform.translate(
+            offset: _offset,
+            child: _buildFramed(),
+          ),
+        );
       },
-      child: Transform.translate(
-        offset: _offset,
-        child: _buildFramed(),
-      ),
     );
   }
 
@@ -55,15 +60,20 @@ class _CameraOverlayState extends State<CameraOverlay> {
   }
 
   // #3 fix: FittedBox.cover로 비율 왜곡 방지
-  Widget _coverCamera(double w, double h) => FittedBox(
-    fit: BoxFit.cover,
-    clipBehavior: Clip.hardEdge,
-    child: SizedBox(
-      width: widget.controller.value.previewSize?.height ?? w,
-      height: widget.controller.value.previewSize?.width ?? h,
-      child: CameraPreview(widget.controller),
-    ),
-  );
+  // #4 fix: 전면 카메라 좌우 반전 (셀카 미러링)
+  Widget _coverCamera(double w, double h) {
+    final isFront = widget.controller.description.lensDirection == CameraLensDirection.front;
+    final preview = FittedBox(
+      fit: BoxFit.cover,
+      clipBehavior: Clip.hardEdge,
+      child: SizedBox(
+        width: widget.controller.value.previewSize?.height ?? w,
+        height: widget.controller.value.previewSize?.width ?? h,
+        child: CameraPreview(widget.controller),
+      ),
+    );
+    return isFront ? Transform.flip(flipX: true, child: preview) : preview;
+  }
 
   // ── 기본 원형 ──────────────────────────────────────────────────
   Widget _plain(double s) {
@@ -123,7 +133,7 @@ class _PlainPainter extends CustomPainter {
       size.center(Offset.zero),
       size.width / 2 - 1.5,
       Paint()
-        ..color = Colors.white.withOpacity(0.85)
+        ..color = Colors.white.withValues(alpha: 0.85)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3,
     );
@@ -155,11 +165,11 @@ class _IPhonePainter extends CustomPainter {
     canvas.drawLine(Offset(-1, h * 0.45), Offset(-1, h * 0.57), btnPaint);
     canvas.drawLine(
       Offset(w / 2 - 22, h - 5), Offset(w / 2 + 22, h - 5),
-      Paint()..color = Colors.white.withOpacity(0.5)..strokeWidth = 3..strokeCap = StrokeCap.round..style = PaintingStyle.stroke,
+      Paint()..color = Colors.white.withValues(alpha: 0.5)..strokeWidth = 3..strokeCap = StrokeCap.round..style = PaintingStyle.stroke,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(Rect.fromLTWH(0.5, 0.5, w - 1, h - 1), r),
-      Paint()..color = Colors.white.withOpacity(0.12)..style = PaintingStyle.stroke..strokeWidth = 1,
+      Paint()..color = Colors.white.withValues(alpha: 0.12)..style = PaintingStyle.stroke..strokeWidth = 1,
     );
   }
   @override bool shouldRepaint(_) => false;
@@ -183,7 +193,7 @@ class _RetroTvPainter extends CustomPainter {
       RRect.fromRectAndRadius(Rect.fromLTWH(9, 9, w - 18, h - 18), const Radius.circular(8)),
       Paint()..color = _shadow..style = PaintingStyle.stroke..strokeWidth = 2.5,
     );
-    final scanPaint = Paint()..color = Colors.black.withOpacity(0.10)..strokeWidth = 1;
+    final scanPaint = Paint()..color = Colors.black.withValues(alpha: 0.10)..strokeWidth = 1;
     for (double y = 10; y < h - 18; y += 3.5) {
       canvas.drawLine(Offset(10, y), Offset(w - 10, y), scanPaint);
     }
@@ -195,11 +205,11 @@ class _RetroTvPainter extends CustomPainter {
     }
     canvas.drawCircle(Offset(w - 12, 12), 6, Paint()..color = _knob);
     canvas.drawCircle(Offset(w - 12, 12), 2.5, Paint()..color = _bezel);
-    canvas.drawCircle(Offset(13, 12), 3.5, Paint()..color = Colors.red.withOpacity(0.85));
+    canvas.drawCircle(Offset(13, 12), 3.5, Paint()..color = Colors.red.withValues(alpha: 0.85));
     canvas.drawCircle(Offset(13, 12), 1.5, Paint()..color = Colors.red.shade300);
     canvas.drawRRect(
       RRect.fromRectAndRadius(Rect.fromLTWH(w / 2 - 20, h - 14, 40, 8), const Radius.circular(2)),
-      Paint()..color = _shadow.withOpacity(0.4),
+      Paint()..color = _shadow.withValues(alpha: 0.4),
     );
   }
   @override bool shouldRepaint(_) => false;

@@ -33,6 +33,14 @@ class AudioProfile {
     this.echoCanceler = false,
   });
 
+  String get effectsLabel {
+    final p = <String>[];
+    if (noiseSuppressor) p.add('NS');
+    if (autoGainControl) p.add('AGC');
+    if (echoCanceler)    p.add('AEC');
+    return p.isEmpty ? '원본' : p.join('+');
+  }
+
   // 프리셋
   static const lecture = AudioProfile(noiseSuppressor: true, autoGainControl: true, echoCanceler: true);
   static const podcast = AudioProfile(noiseSuppressor: true, autoGainControl: true);

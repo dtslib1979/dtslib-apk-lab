@@ -200,7 +200,7 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: sel ? AppConstants.kAccent.withOpacity(0.2) : AppConstants.kSurface,
+                    color: sel ? AppConstants.kAccent.withValues(alpha: 0.2) : AppConstants.kSurface,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: sel ? AppConstants.kAccent : AppConstants.kDim),
                   ),

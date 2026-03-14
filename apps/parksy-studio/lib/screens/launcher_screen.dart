@@ -37,11 +37,11 @@ class _LauncherScreenState extends State<LauncherScreen> {
         builder: (_) => const RecordingScreen(),
       ));
     } else if (s.autoOpenTool == 'bgm') {
-      // BGM 먼저 설정 → 돌아오면 REC 패널에서 녹화 시작
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const BgmScreen()));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const BgmScreen()))
+        .then((_) { if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => RecordingScreen(scenario: s))); });
     } else if (s.autoOpenTool == 'interpreter') {
-      // 통역 먼저 설정 → 돌아오면 REC 패널에서 녹화 시작
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const InterpreterScreen()));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const InterpreterScreen()))
+        .then((_) { if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => RecordingScreen(scenario: s))); });
     } else {
       // 사이드 툴 없음 (shorts_lecture, long_lecture 등) → 원터치로 바로 녹화
       Navigator.push(context, MaterialPageRoute(
@@ -128,7 +128,7 @@ class _LauncherScreenState extends State<LauncherScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: sel ? AppConstants.kAccent.withOpacity(0.15) : AppConstants.kSurface,
+          color: sel ? AppConstants.kAccent.withValues(alpha: 0.15) : AppConstants.kSurface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: sel ? AppConstants.kAccent : AppConstants.kDim,
@@ -164,7 +164,7 @@ class _LauncherScreenState extends State<LauncherScreen> {
       decoration: BoxDecoration(
         color: AppConstants.kSurface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppConstants.kAccent.withOpacity(0.4)),
+        border: Border.all(color: AppConstants.kAccent.withValues(alpha: 0.4)),
       ),
       child: Column(children: [
         Row(children: [

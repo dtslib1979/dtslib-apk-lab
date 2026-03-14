@@ -141,7 +141,7 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
                 margin: EdgeInsets.only(right: e.key == 'shorts' ? 8 : 0),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: sel ? AppConstants.kAccent.withOpacity(0.15) : AppConstants.kSurface,
+                  color: sel ? AppConstants.kAccent.withValues(alpha: 0.15) : AppConstants.kSurface,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: sel ? AppConstants.kAccent : AppConstants.kDim),
                 ),
@@ -163,24 +163,35 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
           const SizedBox(height: 12),
           if (_progress > 0) ...[
             LinearProgressIndicator(
-              value: _progress > 0 ? _progress : null,
+              value: _progress,
               backgroundColor: AppConstants.kSurface,
               valueColor: AlwaysStoppedAnimation(AppConstants.kAccent),
             ),
             const SizedBox(height: 8),
           ],
-          ElevatedButton(
-            onPressed: _processing || !_playerReady ? null : _process,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.kAccent,
-              foregroundColor: Colors.black,
-              disabledBackgroundColor: AppConstants.kSurface,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          if (_processing)
+            ElevatedButton(
+              onPressed: () => FFmpegKit.cancel(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade800,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('⏹ 취소', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            )
+          else
+            ElevatedButton(
+              onPressed: !_playerReady ? null : _process,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.kAccent,
+                foregroundColor: Colors.black,
+                disabledBackgroundColor: AppConstants.kSurface,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('⚡ 변환 + 저장', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
-            child: Text(_processing ? '변환 중...' : '⚡ 변환 + 저장',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          ),
           if (_outputPath != null) ...[
             const SizedBox(height: 8),
             Text('📁 ${_outputPath!.split('/').last}', textAlign: TextAlign.center,
