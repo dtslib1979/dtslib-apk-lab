@@ -1,6 +1,9 @@
 // AudioMode는 여기서 정의 — recording_service.dart에서 re-export
 enum AudioMode { mic, unprocessed, daw }
 
+// CameraFrame은 camera_overlay.dart에서 정의 — 여기서 re-export
+export '../widgets/camera_overlay.dart' show CameraFrame;
+
 // 오디오 이펙트 프로파일
 class AudioProfile {
   final bool noiseSuppressor;
@@ -42,6 +45,8 @@ class StudioScenario {
   final bool interpreterEnabled;
   final String uploadPrivacy;    // 'private' | 'unlisted' | 'public'
   final bool isCustom;
+  final bool cameraEnabled;    // 카메라 오버레이 기본값
+  final CameraFrame cameraFrame; // 기본 프레임
 
   const StudioScenario({
     required this.id,
@@ -56,6 +61,8 @@ class StudioScenario {
     this.interpreterEnabled = false,
     this.uploadPrivacy = 'private',
     this.isCustom = false,
+    this.cameraEnabled = true,
+    this.cameraFrame = CameraFrame.plain,
   });
 
   String get audioSourceLabel => switch (audioSource) {
@@ -85,6 +92,8 @@ const kScenarios = [
     audioSource: AudioMode.mic,
     audioProfile: AudioProfile.lecture,
     uploadPrivacy: 'private',
+    cameraEnabled: true,
+    cameraFrame: CameraFrame.plain,
   ),
   StudioScenario(
     id: 'long_lecture',
@@ -95,6 +104,8 @@ const kScenarios = [
     audioSource: AudioMode.mic,
     audioProfile: AudioProfile.lecture,
     uploadPrivacy: 'private',
+    cameraEnabled: true,
+    cameraFrame: CameraFrame.iphone,
   ),
   StudioScenario(
     id: 'music_performance',
@@ -106,6 +117,8 @@ const kScenarios = [
     audioProfile: AudioProfile.music,
     autoOpenTool: 'bgm',
     uploadPrivacy: 'public',
+    cameraEnabled: true,
+    cameraFrame: CameraFrame.plain,
   ),
   StudioScenario(
     id: 'reaction_interpret',
@@ -118,6 +131,8 @@ const kScenarios = [
     autoOpenTool: 'interpreter',
     interpreterEnabled: true,
     uploadPrivacy: 'private',
+    cameraEnabled: true,
+    cameraFrame: CameraFrame.retroTv,
   ),
   StudioScenario(
     id: 'daw_mix',
@@ -129,6 +144,7 @@ const kScenarios = [
     audioProfile: AudioProfile.raw,
     autoOpenTool: 'bgm',
     uploadPrivacy: 'private',
+    cameraEnabled: false,
   ),
   StudioScenario(
     id: 'custom',
@@ -140,5 +156,6 @@ const kScenarios = [
     audioProfile: AudioProfile.raw,
     uploadPrivacy: 'private',
     isCustom: true,
+    cameraEnabled: false,
   ),
 ];

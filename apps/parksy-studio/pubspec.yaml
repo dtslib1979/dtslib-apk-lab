@@ -25,6 +25,8 @@ dependencies:
   speech_to_text: ^6.6.2
   # 동시통역 — 온디바이스 번역 (ML Kit)
   google_mlkit_translation: ^0.12.0
+  # 카메라 오버레이 — VirtualDisplay AUTO_MIRROR로 자동 합성
+  camera: ^0.10.5+9
   # OAuth 제거 — 업로드는 YouTube 앱 수동으로
 
 dev_dependencies:
