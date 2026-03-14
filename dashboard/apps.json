@@ -52,5 +52,14 @@
     "icon": "🎙️",
     "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-tts-factory/main/tts-factory-debug.zip",
     "lastUpdated": "2026-03-14"
+  },
+  {
+    "id": "parksy-studio",
+    "name": "Parksy Studio",
+    "version": "v1.0.0",
+    "description": "방송 제작 파이프라인 전체를 하나의 APK 안에. 동시통역 + 영상트리머 + BGM + YouTube 업로드.",
+    "icon": "🎬",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-studio-v1.0.0/app-debug.apk",
+    "lastUpdated": "2026-03-14"
   }
 ]
