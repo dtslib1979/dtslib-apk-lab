@@ -5,7 +5,6 @@ import 'studio_webview.dart';
 import 'recording_screen.dart';
 import 'interpreter_screen.dart';
 import 'bgm_screen.dart';
-import 'upload_screen.dart';
 
 class LauncherScreen extends StatefulWidget {
   const LauncherScreen({super.key});
@@ -290,7 +289,6 @@ class _LauncherScreenState extends State<LauncherScreen> {
           _tab(1, '🧰', '도구'),
           _navBtn('🎵', 'BGM',  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BgmScreen()))),
           _navBtn('🌐', '통역', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InterpreterScreen()))),
-          _navBtn('☁️', '업로드', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UploadScreen()))),
         ],
       ),
     );

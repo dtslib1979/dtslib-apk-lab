@@ -25,8 +25,7 @@ dependencies:
   speech_to_text: ^6.6.2
   # 동시통역 — 온디바이스 번역 (ML Kit)
   google_mlkit_translation: ^0.12.0
-  # OAuth — Chrome Custom Tab 방식
-  flutter_web_auth_2: ^3.1.2
+  # OAuth 제거 — 업로드는 YouTube 앱 수동으로
 
 dev_dependencies:
   flutter_test:
