@@ -1,0 +1,83 @@
+name: Build Parksy Studio
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/parksy-studio/**'
+      - '.github/workflows/build-parksy-studio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/parksy-studio
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secret leak guard
+        run: |
+          cd ../..
+          if grep -rE "CHANGE_ME|ghp_|gho_|github_pat_" --include="*.dart" --include="*.kt" apps/parksy-studio/; then
+            echo "::error::Secret-like string found!"
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter create (아이콘 등 보일러플레이트 생성)
+        run: flutter create . --org com.parksy --project-name parksy_studio
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: parksy-studio-debug
+          path: apps/parksy-studio/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Release APK to GitHub Releases
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: parksy-studio-v1.0.0
+          name: Parksy Studio v1.0.0
+          files: apps/parksy-studio/build/app/outputs/flutter-apk/app-debug.apk
+          body: |
+            ## Parksy Studio v1.0.0
+
+            방송 제작 파이프라인 전체를 하나의 APK 안에.
+
+            ### Phase 1-2 (이번 릴리즈)
+            - cloud-appstore 13개 도구 런처
+            - 풀스크린 WebView (브라우저 UI 없음)
+            - 카테고리 필터
+            - 탭하면 컨트롤 바 토글
+
+            ### 요구사항
+            - Android 10+ (minSdk 29)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

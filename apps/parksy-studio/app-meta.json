@@ -1,0 +1,22 @@
+{
+  "id": "parksy-studio",
+  "name": "Parksy Studio",
+  "description": "방송 제작 파이프라인 전체를 하나의 APK 안에. cloud-appstore 런처 + 영상트리머 + 동시통역 + 배경음악.",
+  "icon": "🎬",
+  "version": "v1.0.0",
+  "category": "studio",
+  "package": "com.parksy.studio",
+  "minSdk": 29,
+  "status": "prototype",
+  "features": [
+    "TTS 읽어주기",
+    "번역",
+    "백그라운드 재생",
+    "동시통역",
+    "영상트리머",
+    "배경음악 플레이어",
+    "실시간 자막"
+  ],
+  "upstream": ["cloud-appstore", "parksy-audio"],
+  "lastUpdated": "2026-03-14"
+}
