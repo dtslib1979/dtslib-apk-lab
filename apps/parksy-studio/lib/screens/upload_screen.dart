@@ -155,20 +155,11 @@ class _UploadScreenState extends State<UploadScreen> {
 
       // 2단계: 파일 업로드 (청크 업로드)
       const chunkSize = 5 * 1024 * 1024; // 5MB
-      final fileStream = file.openRead();
-      int uploaded = 0;
+      final chunkCount = (fileSize / chunkSize).ceil();
 
-      await for (final chunk in fileStream.expand((b) => [b]).toList().then(
-        (_) => Stream.fromIterable(
-          List.generate((fileSize / chunkSize).ceil(), (i) {
-            final start = i * chunkSize;
-            final end = (start + chunkSize).clamp(0, fileSize);
-            return [start, end];
-          }),
-        ),
-      )) {
-        final start = chunk[0];
-        final end = chunk[1];
+      for (int i = 0; i < chunkCount; i++) {
+        final start = i * chunkSize;
+        final end = (start + chunkSize).clamp(0, fileSize);
         final bytes = await file.openRead(start, end).fold<List<int>>(
           [], (a, b) => a..addAll(b));
 
@@ -182,8 +173,7 @@ class _UploadScreenState extends State<UploadScreen> {
           body: bytes,
         );
 
-        uploaded = end;
-        setState(() => _progress = uploaded / fileSize);
+        setState(() => _progress = end / fileSize);
 
         if (res.statusCode == 200 || res.statusCode == 201) {
           final data = jsonDecode(res.body);
