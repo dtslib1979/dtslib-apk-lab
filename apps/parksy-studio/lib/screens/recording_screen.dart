@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../core/constants.dart';
 import '../models/studio_scenario.dart';
 import '../services/recording_service.dart';
@@ -67,6 +68,13 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
   // ── 카메라 초기화 (#2 fix: 실패 시 유저에게 피드백) ──────────
   Future<void> _initCamera() async {
+    // 런타임 CAMERA 권한 요청
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      _showCameraError('카메라 권한이 필요합니다');
+      if (mounted) setState(() => _cameraEnabled = false);
+      return;
+    }
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
