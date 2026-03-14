@@ -50,11 +50,23 @@
             </intent-filter>
         </activity>
 
-        <!-- 화면녹화 서비스 (Phase 3) -->
+        <!-- 화면녹화 서비스 -->
         <service
             android:name=".RecordingService"
             android:foregroundServiceType="mediaProjection"
             android:exported="false"/>
+
+        <!-- OAuth2 콜백 수신 (flutter_web_auth_2) -->
+        <activity
+            android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+            android:exported="true">
+            <intent-filter android:label="flutter_web_auth_2">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.parksy.studio"/>
+            </intent-filter>
+        </activity>
 
         <meta-data
             android:name="flutterEmbedding"
