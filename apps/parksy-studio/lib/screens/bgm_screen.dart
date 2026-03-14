@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../core/constants.dart';
 
 class BgmScreen extends StatefulWidget {
@@ -46,8 +47,15 @@ class _BgmScreenState extends State<BgmScreen> {
     final videoId = _extractVideoId(youtubeUrl);
     if (videoId == null) return;
     setState(() => _playingTrack = youtubeUrl);
-    _playerController ??= WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+    if (_playerController == null) {
+      _playerController = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted);
+      // YouTube autoplay 허용
+      if (_playerController!.platform is AndroidWebViewController) {
+        (_playerController!.platform as AndroidWebViewController)
+            .setMediaPlaybackRequiresUserGesture(false);
+      }
+    }
     _playerController!.loadRequest(Uri.parse(
       'https://www.youtube.com/embed/$videoId?autoplay=1&loop=1&playlist=$videoId',
     ));

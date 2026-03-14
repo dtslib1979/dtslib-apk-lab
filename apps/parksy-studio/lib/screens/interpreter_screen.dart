@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../core/constants.dart';
 
 class InterpreterScreen extends StatefulWidget {
@@ -24,7 +25,6 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
         onMessageReceived: (msg) async {
           if (msg.message == 'ready') return;
           if (msg.message.startsWith('translate:')) {
-            // Gemini Nano 실패 시 Google Translate 웹 열기
             final text = Uri.decodeComponent(msg.message.substring(10));
             final uri = Uri.parse(
               'https://translate.google.com/?sl=auto&tl=ko&text=${Uri.encodeComponent(text)}&op=translate',
@@ -36,6 +36,12 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
         },
       )
       ..loadFlutterAsset('assets/interpreter/interpreter.html');
+
+    // WebView 마이크 권한 자동 허용 (webkitSpeechRecognition용)
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController)
+          .setOnPlatformPermissionRequest((request) => request.grant());
+    }
   }
 
   @override
@@ -49,7 +55,8 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white54),
-            onPressed: () => _controller.loadFlutterAsset('assets/interpreter/interpreter.html'),
+            onPressed: () =>
+                _controller.loadFlutterAsset('assets/interpreter/interpreter.html'),
           ),
         ],
       ),

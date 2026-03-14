@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../core/constants.dart';
 
 class TrimmerScreen extends StatefulWidget {
@@ -26,11 +30,8 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
         'TrimmerChannel',
         onMessageReceived: (msg) {
           if (msg.message == 'ready') {
-            // 영상 경로 전달 (file:// 프로토콜, 특수문자 인코딩)
             final encoded = Uri.encodeFull(widget.videoPath);
-            final filePath = 'file://$encoded';
-            _controller.runJavaScript("receiveVideoPath('$filePath')");
-            // 포맷 사전 설정
+            _controller.runJavaScript("receiveVideoPath('file://$encoded')");
             if (widget.format == 'long') {
               _controller.runJavaScript(
                 "document.querySelectorAll('.format-btn')[1].click()",
@@ -43,8 +44,24 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
       )
       ..setNavigationDelegate(NavigationDelegate(
         onPageFinished: (_) => setState(() => _status = '준비됨'),
-      ))
-      ..loadFlutterAsset('assets/trimmer/trimmer.html');
+      ));
+
+    // file:// → file:// fetch 허용
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController).setAllowFileAccess(true);
+    }
+
+    _loadHtml();
+  }
+
+  // asset을 temp 파일로 복사 → file:// 로드
+  // (flutter asset URL에서 fetch('file://...')는 cross-origin 차단됨)
+  Future<void> _loadHtml() async {
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/trimmer.html');
+    final content = await rootBundle.loadString('assets/trimmer/trimmer.html');
+    await file.writeAsString(content);
+    _controller.loadRequest(Uri.parse('file://${file.path}'));
   }
 
   @override
@@ -59,7 +76,8 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
-              child: Text(_status, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+              child: Text(_status,
+                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
             ),
           ),
         ],
