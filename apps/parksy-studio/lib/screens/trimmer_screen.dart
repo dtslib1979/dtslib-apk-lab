@@ -163,7 +163,7 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
           const SizedBox(height: 12),
           if (_progress > 0) ...[
             LinearProgressIndicator(
-              value: _processing ? null : _progress,
+              value: _progress > 0 ? _progress : null,
               backgroundColor: AppConstants.kSurface,
               valueColor: AlwaysStoppedAnimation(AppConstants.kAccent),
             ),
