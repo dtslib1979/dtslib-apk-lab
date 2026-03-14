@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>동시통역</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0A0A0A; color:#fff; font-family:sans-serif; padding:16px; height:100vh; display:flex; flex-direction:column; }
+  h2 { color:#E8D5B7; font-size:15px; letter-spacing:1px; margin-bottom:12px; }
+  .lang-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .lang-btn { padding:6px 12px; background:#1A1A1A; border:1px solid #333; color:#aaa;
+    border-radius:20px; cursor:pointer; font-size:12px; }
+  .lang-btn.active { border-color:#E8D5B7; color:#E8D5B7; }
+  .box { background:#111; border-radius:10px; padding:12px; margin-bottom:8px; flex:1; overflow-y:auto; }
+  .box-label { color:#555; font-size:11px; margin-bottom:6px; }
+  .text-original { font-size:15px; color:#ddd; line-height:1.6; }
+  .text-translated { font-size:16px; color:#E8D5B7; line-height:1.7; font-weight:500; }
+  .btn-row { display:flex; gap:8px; margin-top:10px; }
+  .btn { flex:1; padding:14px; border:none; border-radius:10px; cursor:pointer; font-size:14px; font-weight:bold; }
+  .btn-start { background:#E8D5B7; color:#000; }
+  .btn-stop { background:#c0392b; color:#fff; }
+  .status { color:#555; font-size:11px; text-align:center; margin:6px 0; }
+  .interim { color:#666; font-style:italic; }
+</style>
+</head>
+<body>
+<h2>🌐 동시통역</h2>
+
+<div class="lang-row">
+  <span class="box-label" style="align-self:center">입력언어:</span>
+  <div class="lang-btn active" onclick="setLang('auto',this)">🌍 자동감지</div>
+  <div class="lang-btn" onclick="setLang('en-US',this)">EN</div>
+  <div class="lang-btn" onclick="setLang('ja-JP',this)">JP</div>
+  <div class="lang-btn" onclick="setLang('zh-CN',this)">ZH</div>
+</div>
+
+<div class="box">
+  <div class="box-label">원문</div>
+  <div class="text-original" id="original">
+    <span class="interim" id="interim">마이크 버튼을 눌러 시작하세요...</span>
+  </div>
+</div>
+
+<div class="box">
+  <div class="box-label">한국어 번역</div>
+  <div class="text-translated" id="translated">번역 결과가 여기에 표시됩니다.</div>
+</div>
+
+<div class="status" id="status">대기 중</div>
+
+<div class="btn-row">
+  <button class="btn btn-start" id="btnStart" onclick="toggleRecognition()">🎙 시작</button>
+</div>
+
+<script>
+let recognition = null;
+let isListening = false;
+let sourceLang = 'auto';
+let translator = null;
+
+const originalEl = document.getElementById('original');
+const interimEl = document.getElementById('interim');
+const translatedEl = document.getElementById('translated');
+const statusEl = document.getElementById('status');
+const btnStart = document.getElementById('btnStart');
+
+function setLang(lang, el) {
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  sourceLang = lang;
+  if (isListening) { stopRecognition(); startRecognition(); }
+}
+
+async function initTranslator() {
+  // Gemini Nano (Chrome 127+)
+  if (window.ai && window.ai.translator) {
+    try {
+      translator = await window.ai.translator.create({
+        sourceLanguage: sourceLang === 'auto' ? 'en' : sourceLang.split('-')[0],
+        targetLanguage: 'ko'
+      });
+      statusEl.textContent = 'Gemini Nano 번역 준비됨';
+      return true;
+    } catch(e) {}
+  }
+  statusEl.textContent = 'Google Translate 모드';
+  return false;
+}
+
+async function translate(text) {
+  if (!text.trim()) return;
+  if (translator) {
+    try {
+      const result = await translator.translate(text);
+      translatedEl.textContent = result;
+      return;
+    } catch(e) {}
+  }
+  // fallback: postMessage to Flutter for Google Translate URL
+  if (window.InterpreterChannel) {
+    window.InterpreterChannel.postMessage('translate:' + encodeURIComponent(text));
+  }
+  translatedEl.textContent = '번역 중...';
+}
+
+function startRecognition() {
+  if (!('webkitSpeechRecognition' in window)) {
+    statusEl.textContent = '⚠️ 이 브라우저는 음성인식을 지원하지 않습니다';
+    return;
+  }
+  recognition = new webkitSpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = sourceLang === 'auto' ? '' : sourceLang;
+
+  recognition.onstart = () => {
+    isListening = true;
+    statusEl.textContent = '🔴 인식 중...';
+    btnStart.textContent = '⏹ 중지';
+    btnStart.className = 'btn btn-stop';
+  };
+
+  recognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        final += e.results[i][0].transcript;
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+    if (final) {
+      const p = document.createElement('p');
+      p.textContent = final;
+      originalEl.appendChild(p);
+      originalEl.scrollTop = originalEl.scrollHeight;
+      translate(final);
+    }
+    interimEl.textContent = interim;
+  };
+
+  recognition.onerror = (e) => {
+    statusEl.textContent = '오류: ' + e.error;
+    if (e.error === 'not-allowed') {
+      statusEl.textContent = '⚠️ 마이크 권한이 필요합니다';
+      stopRecognition();
+    }
+  };
+
+  recognition.onend = () => {
+    if (isListening) recognition.start(); // 자동 재시작
+  };
+
+  recognition.start();
+}
+
+function stopRecognition() {
+  isListening = false;
+  recognition?.stop();
+  recognition = null;
+  statusEl.textContent = '대기 중';
+  btnStart.textContent = '🎙 시작';
+  btnStart.className = 'btn btn-start';
+  interimEl.textContent = '';
+}
+
+function toggleRecognition() {
+  if (isListening) {
+    stopRecognition();
+  } else {
+    initTranslator().then(() => startRecognition());
+  }
+}
+
+// Flutter에서 번역 결과 수신
+function receiveTranslation(text) {
+  translatedEl.textContent = decodeURIComponent(text);
+}
+
+window.addEventListener('load', () => {
+  if (window.InterpreterChannel) {
+    window.InterpreterChannel.postMessage('ready');
+  }
+});
+</script>
+</body>
+</html>

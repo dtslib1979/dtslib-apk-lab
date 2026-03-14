@@ -1,20 +1,99 @@
 package com.parksy.studio
 
+import android.app.Activity
+import android.content.Intent
+import android.media.projection.MediaProjectionManager
+import android.os.Bundle
+import android.os.Environment
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import android.os.Bundle
-import android.view.WindowManager
+import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : FlutterActivity() {
 
+    private val RECORDING_CHANNEL = "com.parksy.studio/recording"
+    private val PROJECTION_REQUEST = 100
+    private var pendingResult: MethodChannel.Result? = null
+    private var pendingFormat = "shorts"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 화면 켜진 상태 유지 (방송 녹화 중 꺼지지 않도록)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        // Phase 3~4: 화면녹화, 동시통역 채널 추가 예정
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, RECORDING_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "startRecording" -> {
+                        pendingResult = result
+                        pendingFormat = call.argument<String>("format") ?: "shorts"
+                        requestProjectionPermission()
+                    }
+                    "stopRecording" -> {
+                        stopRecordingService()
+                        result.success(RecordingService.outputPath)
+                    }
+                    "isRecording" -> result.success(RecordingService.isRecording)
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun requestProjectionPermission() {
+        val mgr = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        startActivityForResult(mgr.createScreenCaptureIntent(), PROJECTION_REQUEST)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PROJECTION_REQUEST) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                val outputPath = buildOutputPath(pendingFormat)
+                val (width, height) = formatDimensions(pendingFormat)
+
+                val serviceIntent = Intent(this, RecordingService::class.java).apply {
+                    action = RecordingService.ACTION_START
+                    putExtra("resultCode", resultCode)
+                    putExtra("data", data)
+                    putExtra("width", width)
+                    putExtra("height", height)
+                    putExtra("outputPath", outputPath)
+                }
+                startForegroundService(serviceIntent)
+                pendingResult?.success(outputPath)
+            } else {
+                pendingResult?.error("PERMISSION_DENIED", "화면녹화 권한 거부", null)
+            }
+            pendingResult = null
+        }
+    }
+
+    private fun stopRecordingService() {
+        val intent = Intent(this, RecordingService::class.java).apply {
+            action = RecordingService.ACTION_STOP
+        }
+        startService(intent)
+    }
+
+    private fun buildOutputPath(format: String): String {
+        val dir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+            "ParksyStudio"
+        ).also { it.mkdirs() }
+        val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        return "${dir.absolutePath}/PS_${format.uppercase()}_$ts.mp4"
+    }
+
+    private fun formatDimensions(format: String): Pair<Int, Int> = when (format) {
+        "shorts" -> Pair(1080, 1920)
+        "long"   -> Pair(1920, 1080)
+        else     -> Pair(1080, 1920)
     }
 }

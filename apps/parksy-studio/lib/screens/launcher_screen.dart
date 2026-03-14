@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import 'studio_webview.dart';
+import 'recording_screen.dart';
+import 'interpreter_screen.dart';
+import 'bgm_screen.dart';
+import 'upload_screen.dart';
 
 class LauncherScreen extends StatefulWidget {
   const LauncherScreen({super.key});
@@ -170,10 +174,14 @@ class _LauncherScreenState extends State<LauncherScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _bottomBtn('🏠', '런처', () {}),
-          _bottomBtn('🎬', '녹화', () => _showComingSoon('영상트리머')),
-          _bottomBtn('🎵', 'BGM', () => _showComingSoon('배경음악')),
-          _bottomBtn('🌐', '통역', () => _showComingSoon('동시통역')),
-          _bottomBtn('⚙️', '설정', () => _showComingSoon('설정')),
+          _bottomBtn('🎬', '녹화', () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const RecordingScreen()))),
+          _bottomBtn('🌐', '통역', () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const InterpreterScreen()))),
+          _bottomBtn('🎵', 'BGM', () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const BgmScreen()))),
+          _bottomBtn('☁️', '업로드', () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const UploadScreen()))),
         ],
       ),
     );
