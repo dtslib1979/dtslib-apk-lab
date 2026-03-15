@@ -52,6 +52,21 @@ jobs:
           echo "✅ Kotlin version patched"
           grep "kotlin" android/settings.gradle
 
+      - name: Add ffmpeg-kit maven repository
+        run: |
+          python3 - << 'EOF'
+          with open('android/settings.gradle', 'r') as f:
+              content = f.read()
+          ffmpeg_repo = 'maven { url "https://raw.githubusercontent.com/arthenica/ffmpeg-kit/main/prebuilt/android/maven/repository" }'
+          if 'ffmpeg-kit' not in content:
+              content = content.replace('mavenCentral()', f'mavenCentral()\n        {ffmpeg_repo}')
+              if 'ffmpeg-kit' not in content:
+                  content += f'\nallprojects {{ repositories {{ {ffmpeg_repo} }} }}\n'
+          with open('android/settings.gradle', 'w') as f:
+              f.write(content)
+          print("✅ ffmpeg-kit maven repo added")
+          EOF
+
       - name: Get dependencies
         run: flutter pub get
 
