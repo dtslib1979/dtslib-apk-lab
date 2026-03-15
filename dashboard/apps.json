@@ -1,5 +1,14 @@
 [
   {
+    "id": "parksy-studio",
+    "name": "Parksy Studio",
+    "version": "v1.0.0",
+    "description": "방송 파이프라인 APK — 화면녹화 + 동시통역 + BGM + 트리머 + 카메라 오버레이",
+    "icon": "🎬",
+    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-studio/main/parksy-studio-debug.zip",
+    "lastUpdated": "2026-03-15"
+  },
+  {
     "id": "parksy-axis",
     "name": "Parksy Axis",
     "version": "v11.1.0",

@@ -1,22 +1,23 @@
 {
   "id": "parksy-studio",
   "name": "Parksy Studio",
-  "description": "방송 제작 파이프라인 전체를 하나의 APK 안에. cloud-appstore 런처 + 영상트리머 + 동시통역 + 배경음악.",
+  "description": "방송 제작 파이프라인 전체를 하나의 APK 안에. 화면녹화 + 동시통역 + BGM + 트리머 + 카메라 오버레이.",
   "icon": "🎬",
   "version": "v1.0.0",
   "category": "studio",
   "package": "com.parksy.studio",
   "minSdk": 29,
-  "status": "prototype",
+  "status": "production",
   "features": [
-    "TTS 읽어주기",
-    "번역",
-    "백그라운드 재생",
-    "동시통역",
-    "영상트리머",
-    "배경음악 플레이어",
-    "실시간 자막"
+    "화면녹화 (MIC / 외장마이크 / DAW 3모드)",
+    "시나리오 프리셋 6종 (강의/뮤직/통역/DAW/커스텀)",
+    "AudioEffect 내장 (NS + AGC + AEC)",
+    "카메라 오버레이 3종 프레임 (원형 / 아이폰 / 레트로TV)",
+    "동시통역 (STT + ML Kit 온디바이스 번역)",
+    "영상트리머 (FFmpeg HW인코딩)",
+    "배경음악 플레이어 (YouTube embed)",
+    "cloud-appstore 13개 도구 런처"
   ],
   "upstream": ["cloud-appstore", "parksy-audio"],
-  "lastUpdated": "2026-03-14"
+  "lastUpdated": "2026-03-15"
 }
