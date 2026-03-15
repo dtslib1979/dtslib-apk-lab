@@ -5,7 +5,7 @@
     "version": "v1.0.0",
     "description": "방송 파이프라인 APK — 화면녹화 + 동시통역 + BGM + 트리머 + 카메라 오버레이",
     "icon": "🎬",
-    "downloadUrl": "https://nightly.link/dtslib1979/dtslib-apk-lab/workflows/build-parksy-studio/main/parksy-studio-debug.zip",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-studio-v1.0.0/app-debug.apk",
     "lastUpdated": "2026-03-15"
   },
   {
