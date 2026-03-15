@@ -39,21 +39,51 @@
     "warningText": "Debug builds — Internal & partner use only"
   },
   "stats": {
-    "total_apps": 10,
-    "store_apps": 9,
-    "total_dart_lines": 18646,
-    "total_kotlin_lines": 4949,
-    "total_code_lines": 23595,
+    "total_apps": 11,
+    "store_apps": 10,
+    "total_dart_lines": 19946,
+    "total_kotlin_lines": 5399,
+    "total_code_lines": 25345,
     "automation_rate": 72,
-    "total_workflows": 10
+    "total_workflows": 11
   },
   "pipeline": {
     "stages": [
-      { "num": 1, "name": "Ingestion", "icon": "📥", "tool": "source-pool-clone.sh", "pct": 60 },
-      { "num": 2, "name": "Analysis", "icon": "🔍", "tool": "source-pool-analyze.sh", "pct": 70 },
-      { "num": 3, "name": "Transform", "icon": "⚙️", "tool": "Claude + propagate.sh", "pct": 60 },
-      { "num": 4, "name": "Build", "icon": "🔨", "tool": "GitHub Actions (21)", "pct": 90 },
-      { "num": 5, "name": "Distrib", "icon": "🚀", "tool": "Vercel + Releases", "pct": 80 }
+      {
+        "num": 1,
+        "name": "Ingestion",
+        "icon": "📥",
+        "tool": "source-pool-clone.sh",
+        "pct": 60
+      },
+      {
+        "num": 2,
+        "name": "Analysis",
+        "icon": "🔍",
+        "tool": "source-pool-analyze.sh",
+        "pct": 70
+      },
+      {
+        "num": 3,
+        "name": "Transform",
+        "icon": "⚙️",
+        "tool": "Claude + propagate.sh",
+        "pct": 60
+      },
+      {
+        "num": 4,
+        "name": "Build",
+        "icon": "🔨",
+        "tool": "GitHub Actions (21)",
+        "pct": 90
+      },
+      {
+        "num": 5,
+        "name": "Distrib",
+        "icon": "🚀",
+        "tool": "Vercel + Releases",
+        "pct": 80
+      }
     ],
     "total_pct": 72
   },
