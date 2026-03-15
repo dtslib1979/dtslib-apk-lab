@@ -20,7 +20,7 @@
     "category": "utility",
     "description": "통화 녹음 STT 변환기 (Whisper)",
     "icon": "📞",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/chrono-call-latest/app-debug.apk",
+    "downloadUrl": null,
     "workflow": "build-chrono-call.yml",
     "releaseTag": "chrono-call-latest",
     "lastUpdated": "2026-03-15"
@@ -59,7 +59,7 @@
     "category": "audio",
     "description": "Screen Audio Capture + MIDI Converter for AIVA",
     "icon": "🎧",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-audio-tools-latest/app-debug.apk",
+    "downloadUrl": null,
     "workflow": "build-parksy-audio-tools.yml",
     "releaseTag": "parksy-audio-tools-latest",
     "lastUpdated": "2026-03-15"
@@ -85,7 +85,7 @@
     "category": "subtitle",
     "description": "Real-time multilingual subtitle overlay (OpenAI Whisper + GPT-4o)",
     "icon": "🌐",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-glot-latest/app-debug.apk",
+    "downloadUrl": null,
     "workflow": "build-parksy-glot.yml",
     "releaseTag": "parksy-glot-latest",
     "lastUpdated": "2026-03-15"
@@ -98,7 +98,7 @@
     "category": "broadcast",
     "description": "방송 파이프라인 APK — 화면녹화 + 동시통역 + BGM + 트리머 + 카메라 오버레이",
     "icon": "🎬",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-studio-v1.0.0/app-debug.apk",
+    "downloadUrl": null,
     "workflow": "build-parksy-studio.yml",
     "releaseTag": "parksy-studio-v1.0.0",
     "lastUpdated": "2026-03-15"
@@ -111,7 +111,7 @@
     "category": "creative",
     "description": "Photo to sketch pipeline - XDoG line art for Samsung Notes",
     "icon": "🖌️",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-liner-latest/app-debug.apk",
+    "downloadUrl": null,
     "workflow": "build-parksy-liner.yml",
     "releaseTag": "parksy-liner-latest",
     "lastUpdated": "2026-03-15"
@@ -124,7 +124,7 @@
     "category": "audio",
     "description": "음원 편집 가위 - MP3/MIDI 트리밍 + MIDI 편집",
     "icon": "🌊",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-wavesy-latest/app-debug.apk",
+    "downloadUrl": null,
     "workflow": "build-parksy-wavesy.yml",
     "releaseTag": "parksy-wavesy-latest",
     "lastUpdated": "2026-03-15"
@@ -137,7 +137,7 @@
     "category": "utility",
     "description": "배치 TTS 변환 클라이언트",
     "icon": "🎙️",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/tts-factory-latest/app-debug.apk",
+    "downloadUrl": null,
     "workflow": "build-tts-factory.yml",
     "releaseTag": "tts-factory-latest",
     "lastUpdated": "2026-03-15"
