@@ -25,12 +25,19 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
   String _status = '초기화 중...';
   String _srcLang = 'auto'; // STT locale
 
-  // mlkit: 0.13.x API는 String 언어코드 사용 ('en', 'ja', 'zh', 'ko')
+  // mlkit 코드 (모델 매니저용 String) + enum 매핑 (OnDeviceTranslator용)
   static const _langMap = {
     'auto':  {'label': '🌍 자동', 'mlkit': null,  'stt': ''},
     'en_US': {'label': 'EN',     'mlkit': 'en',   'stt': 'en_US'},
     'ja_JP': {'label': 'JP',     'mlkit': 'ja',   'stt': 'ja_JP'},
     'zh_CN': {'label': 'ZH',     'mlkit': 'zh',   'stt': 'zh_CN'},
+  };
+
+  // String 코드 → TranslateLanguage enum (OnDeviceTranslator 생성자용)
+  static TranslateLanguage _toEnum(String code) => switch (code) {
+    'ja' => TranslateLanguage.japanese,
+    'zh' => TranslateLanguage.chinese,
+    _    => TranslateLanguage.english,
   };
 
   @override
@@ -60,8 +67,8 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
         await mgr.downloadModel('ko');
       }
       _translator = OnDeviceTranslator(
-        sourceLanguage: 'en',
-        targetLanguage: 'ko',
+        sourceLanguage: TranslateLanguage.english,
+        targetLanguage: TranslateLanguage.korean,
       );
       _translatorReady = true;
     } catch (e) {
@@ -138,7 +145,10 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
         await mgr.downloadModel('en');
       }
       if (!mounted) return;
-      _translator = OnDeviceTranslator(sourceLanguage: 'en', targetLanguage: 'ko');
+      _translator = OnDeviceTranslator(
+        sourceLanguage: TranslateLanguage.english,
+        targetLanguage: TranslateLanguage.korean,
+      );
       setState(() { _translatorReady = true; _status = '대기 중 (자동 — EN→KO 폴백)'; });
       return;
     }
@@ -151,7 +161,10 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
         await mgr.downloadModel(mlkitCode);
       }
       if (!mounted) return;
-      _translator = OnDeviceTranslator(sourceLanguage: mlkitCode, targetLanguage: 'ko');
+      _translator = OnDeviceTranslator(
+        sourceLanguage: _toEnum(mlkitCode),
+        targetLanguage: TranslateLanguage.korean,
+      );
       setState(() { _translatorReady = true; _status = '대기 중'; });
     } catch (e) {
       debugPrint('[Interpreter] 모델 로드 실패: $e');
