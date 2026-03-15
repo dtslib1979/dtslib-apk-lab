@@ -25,11 +25,12 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
   String _status = '초기화 중...';
   String _srcLang = 'auto'; // STT locale
 
+  // mlkit: 0.13.x API는 String 언어코드 사용 ('en', 'ja', 'zh', 'ko')
   static const _langMap = {
-    'auto':  {'label': '🌍 자동', 'mlkit': null,                           'stt': ''},
-    'en_US': {'label': 'EN',     'mlkit': TranslateLanguage.english,       'stt': 'en_US'},
-    'ja_JP': {'label': 'JP',     'mlkit': TranslateLanguage.japanese,      'stt': 'ja_JP'},
-    'zh_CN': {'label': 'ZH',     'mlkit': TranslateLanguage.chinese,       'stt': 'zh_CN'},
+    'auto':  {'label': '🌍 자동', 'mlkit': null,  'stt': ''},
+    'en_US': {'label': 'EN',     'mlkit': 'en',   'stt': 'en_US'},
+    'ja_JP': {'label': 'JP',     'mlkit': 'ja',   'stt': 'ja_JP'},
+    'zh_CN': {'label': 'ZH',     'mlkit': 'zh',   'stt': 'zh_CN'},
   };
 
   @override
@@ -48,19 +49,19 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
     // ML Kit 번역기 초기화 (EN→KO 기본)
     try {
       final mgr = OnDeviceTranslatorModelManager();
-      final enOk = await mgr.isModelDownloaded(TranslateLanguage.english);
-      final koOk = await mgr.isModelDownloaded(TranslateLanguage.korean);
+      final enOk = await mgr.isModelDownloaded('en');
+      final koOk = await mgr.isModelDownloaded('ko');
       if (!enOk) {
         if (mounted) setState(() => _status = 'EN 모델 다운로드 중...');
-        await mgr.downloadModel(TranslateLanguage.english);
+        await mgr.downloadModel('en');
       }
       if (!koOk) {
         if (mounted) setState(() => _status = 'KO 모델 다운로드 중...');
-        await mgr.downloadModel(TranslateLanguage.korean);
+        await mgr.downloadModel('ko');
       }
       _translator = OnDeviceTranslator(
-        sourceLanguage: TranslateLanguage.english,
-        targetLanguage: TranslateLanguage.korean,
+        sourceLanguage: 'en',
+        targetLanguage: 'ko',
       );
       _translatorReady = true;
     } catch (e) {
@@ -125,23 +126,19 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
     if (_listening) await _stop();
     setState(() { _srcLang = newLang; _translated = ''; });
 
-    final mlkitLang = _langMap[newLang]!['mlkit'] as TranslateLanguage?;
+    final mlkitCode = _langMap[newLang]!['mlkit'] as String?;
     _translator?.close();
     _translator = null;
 
-    if (mlkitLang == null) {
-      // auto 모드 — STT 자동 감지 + EN→KO 폴백 번역 유지 (#5 fix)
-      final fallback = TranslateLanguage.english;
+    if (mlkitCode == null) {
+      // auto 모드 — STT 자동 감지 + EN→KO 폴백 번역 유지
       final mgr = OnDeviceTranslatorModelManager();
-      if (!await mgr.isModelDownloaded(fallback)) {
+      if (!await mgr.isModelDownloaded('en')) {
         setState(() => _status = 'EN 모델 다운로드 중...');
-        await mgr.downloadModel(fallback);
+        await mgr.downloadModel('en');
       }
       if (!mounted) return;
-      _translator = OnDeviceTranslator(
-        sourceLanguage: fallback,
-        targetLanguage: TranslateLanguage.korean,
-      );
+      _translator = OnDeviceTranslator(sourceLanguage: 'en', targetLanguage: 'ko');
       setState(() { _translatorReady = true; _status = '대기 중 (자동 — EN→KO 폴백)'; });
       return;
     }
@@ -149,15 +146,12 @@ class _InterpreterScreenState extends State<InterpreterScreen> {
     setState(() => _status = '모델 확인 중...');
     try {
       final mgr = OnDeviceTranslatorModelManager();
-      if (!await mgr.isModelDownloaded(mlkitLang)) {
+      if (!await mgr.isModelDownloaded(mlkitCode)) {
         setState(() => _status = '$newLang 모델 다운로드 중...');
-        await mgr.downloadModel(mlkitLang);
+        await mgr.downloadModel(mlkitCode);
       }
       if (!mounted) return;
-      _translator = OnDeviceTranslator(
-        sourceLanguage: mlkitLang,
-        targetLanguage: TranslateLanguage.korean,
-      );
+      _translator = OnDeviceTranslator(sourceLanguage: mlkitCode, targetLanguage: 'ko');
       setState(() { _translatorReady = true; _status = '대기 중'; });
     } catch (e) {
       debugPrint('[Interpreter] 모델 로드 실패: $e');

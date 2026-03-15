@@ -29,15 +29,15 @@ class _CameraOverlayState extends State<CameraOverlay> {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 절대 좌표 clamp: 부모 크기 - 오버레이 크기
-        final maxDx = constraints.maxWidth.isFinite  ? constraints.maxWidth  / 2 : 200;
-        final maxDy = constraints.maxHeight.isFinite ? constraints.maxHeight / 2 : 400;
+        final maxDx = constraints.maxWidth.isFinite  ? constraints.maxWidth  / 2 : 200.0;
+        final maxDy = constraints.maxHeight.isFinite ? constraints.maxHeight / 2 : 400.0;
 
         return GestureDetector(
           onPanUpdate: (d) {
             setState(() {
               _offset = Offset(
-                (_offset.dx + d.delta.dx).clamp(-maxDx, maxDx),
-                (_offset.dy + d.delta.dy).clamp(-maxDy, maxDy),
+                (_offset.dx + d.delta.dx).clamp(-maxDx, maxDx).toDouble(),
+                (_offset.dy + d.delta.dy).clamp(-maxDy, maxDy).toDouble(),
               );
             });
           },
