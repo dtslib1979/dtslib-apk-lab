@@ -52,29 +52,23 @@ jobs:
           echo "✅ Kotlin version patched"
           grep "kotlin" android/settings.gradle
 
-      - name: Add ffmpeg-kit maven repository
+      - name: Add ffmpeg-kit maven repository to build.gradle
         run: |
-          echo "=== settings.gradle before patch ==="
-          cat android/settings.gradle
+          echo "=== android/build.gradle before patch ==="
+          cat android/build.gradle
           python3 - << 'PYEOF'
-          import re
-          with open('android/settings.gradle', 'r') as f:
-              content = f.read()
           ffmpeg_maven = '        maven { url "https://raw.githubusercontent.com/arthenica/ffmpeg-kit/main/prebuilt/android/maven/repository" }'
-          # FAIL_ON_PROJECT_REPOS → PREFER_PROJECT (모듈별 repo 허용)
-          content = content.replace('FAIL_ON_PROJECT_REPOS', 'PREFER_PROJECT')
-          # mavenCentral() 뒤에 삽입
+          with open('android/build.gradle', 'r') as f:
+              content = f.read()
+          # allprojects.repositories의 mavenCentral() 뒤에 삽입
           if 'ffmpeg-kit' not in content:
-              if 'mavenCentral()' in content:
-                  content = content.replace('mavenCentral()', f'mavenCentral()\n{ffmpeg_maven}', 1)
-              elif 'google()' in content:
-                  content = content.replace('google()', f'google()\n{ffmpeg_maven}', 1)
-          with open('android/settings.gradle', 'w') as f:
+              content = content.replace('mavenCentral()', f'mavenCentral()\n{ffmpeg_maven}', 1)
+          with open('android/build.gradle', 'w') as f:
               f.write(content)
-          print("✅ ffmpeg-kit maven repo added")
+          print("✅ ffmpeg-kit maven repo added to build.gradle")
           PYEOF
-          echo "=== settings.gradle after patch ==="
-          cat android/settings.gradle
+          echo "=== android/build.gradle after patch ==="
+          cat android/build.gradle
 
       - name: Get dependencies
         run: flutter pub get
