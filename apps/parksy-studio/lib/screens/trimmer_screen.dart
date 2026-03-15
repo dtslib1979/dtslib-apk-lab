@@ -1,9 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:ffmpeg_kit_flutter_min_gpl/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_min_gpl/ffmpeg_kit_config.dart';
-import 'package:ffmpeg_kit_flutter_min_gpl/return_code.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import '../core/constants.dart';
 
@@ -19,14 +15,8 @@ class TrimmerScreen extends StatefulWidget {
 class _TrimmerScreenState extends State<TrimmerScreen> {
   VideoPlayerController? _player;
   bool _playerReady = false;
-  bool _processing = false;
-  double _progress = 0;
   String _status = '로드 중...';
-  String? _outputPath;
   late String _fmt;
-
-  final _cropTopCtrl = TextEditingController(text: '80');
-  final _cropBotCtrl = TextEditingController(text: '80');
 
   static const _fmts = {
     'shorts': {'w': 1080, 'h': 1920, 'label': '📱 Shorts', 'desc': '1080×1920'},
@@ -49,63 +39,13 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
     setState(() {
       _player = ctrl;
       _playerReady = true;
-      _status = '로드됨 — ${ctrl.value.duration.inSeconds}초';
+      _status = '${ctrl.value.duration.inSeconds}초 · ${_fmts[_fmt]!['desc']}';
     });
-  }
-
-  Future<void> _process() async {
-    if (_processing) return;
-    setState(() { _processing = true; _progress = 0; _status = '변환 중...'; });
-    try {
-      final extDir = await getExternalStorageDirectory();
-      final outDir = Directory('${extDir!.path}/ParksyStudio');
-      await outDir.create(recursive: true);
-      final ts = DateTime.now().toString().replaceAll(RegExp(r'[: .]'), '-').substring(0, 19);
-      final outPath = '${outDir.path}/PS_${_fmt.toUpperCase()}_$ts.mp4';
-
-      final w = _fmts[_fmt]!['w']!;
-      final h = _fmts[_fmt]!['h']!;
-      final cropTop = int.tryParse(_cropTopCtrl.text) ?? 0;
-      final cropBot = int.tryParse(_cropBotCtrl.text) ?? 0;
-      final durationMs = (_player?.value.duration.inMilliseconds ?? 1).toDouble();
-
-      final filter = cropTop + cropBot > 0
-          ? 'crop=iw:ih-${cropTop + cropBot}:0:$cropTop,scale=$w:$h:force_original_aspect_ratio=decrease,pad=$w:$h:(ow-iw)/2:(oh-ih)/2'
-          : 'scale=$w:$h:force_original_aspect_ratio=decrease,pad=$w:$h:(ow-iw)/2:(oh-ih)/2';
-
-      FFmpegKitConfig.enableStatisticsCallback((stats) {
-        if (!mounted) return;
-        setState(() => _progress = (stats.getTime() / durationMs).clamp(0.0, 0.99));
-      });
-
-      final session = await FFmpegKit.execute(
-        '-i "${widget.videoPath}" -vf "$filter" '
-        '-c:v libx264 -preset fast -crf 23 '
-        '-c:a aac -b:a 128k -movflags +faststart "$outPath"',
-      );
-
-      FFmpegKitConfig.disableStatistics();
-      final rc = await session.getReturnCode();
-      if (!mounted) return;
-
-      if (ReturnCode.isSuccess(rc)) {
-        setState(() { _outputPath = outPath; _status = '✅ ${outPath.split('/').last}'; _progress = 1.0; });
-      } else {
-        setState(() => _status = '❌ 변환 실패');
-      }
-    } catch (e) {
-      if (mounted) setState(() => _status = '❌ $e');
-    } finally {
-      if (mounted) setState(() => _processing = false);
-    }
   }
 
   @override
   void dispose() {
     _player?.dispose();
-    _cropTopCtrl.dispose();
-    _cropBotCtrl.dispose();
-    FFmpegKitConfig.disableStatistics();
     super.dispose();
   }
 
@@ -154,68 +94,27 @@ class _TrimmerScreenState extends State<TrimmerScreen> {
               ),
             ));
           }).toList()),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _numField('위 제거 (px)', _cropTopCtrl)),
-            const SizedBox(width: 8),
-            Expanded(child: _numField('아래 제거 (px)', _cropBotCtrl)),
-          ]),
-          const SizedBox(height: 12),
-          if (_progress > 0) ...[
-            LinearProgressIndicator(
-              value: _progress,
-              backgroundColor: AppConstants.kSurface,
-              valueColor: AlwaysStoppedAnimation(AppConstants.kAccent),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppConstants.kSurface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppConstants.kDim),
             ),
-            const SizedBox(height: 8),
-          ],
-          if (_processing)
-            ElevatedButton(
-              onPressed: () => FFmpegKit.cancel(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade800,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('⏹ 취소', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            )
-          else
-            ElevatedButton(
-              onPressed: !_playerReady ? null : _process,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.kAccent,
-                foregroundColor: Colors.black,
-                disabledBackgroundColor: AppConstants.kSurface,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('⚡ 변환 + 저장', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            ),
-          if (_outputPath != null) ...[
-            const SizedBox(height: 8),
-            Text('📁 ${_outputPath!.split('/').last}', textAlign: TextAlign.center,
-                style: TextStyle(color: AppConstants.kAccent, fontSize: 12)),
-          ],
+            child: Column(children: [
+              Icon(Icons.cut, color: AppConstants.kAccent.withValues(alpha: 0.4), size: 32),
+              const SizedBox(height: 8),
+              Text('변환 기능 v2.0 예정',
+                  style: TextStyle(color: AppConstants.kAccent, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              const Text('네이티브 H.264 인코더 + 크롭 필터\n(현재 버전: 미리보기 전용)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.5)),
+            ]),
+          ),
         ]),
       ),
     );
-  }
-
-  Widget _numField(String label, TextEditingController ctrl) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-      const SizedBox(height: 4),
-      TextField(
-        controller: ctrl,
-        keyboardType: TextInputType.number,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          filled: true, fillColor: AppConstants.kSurface,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        ),
-      ),
-    ]);
   }
 }

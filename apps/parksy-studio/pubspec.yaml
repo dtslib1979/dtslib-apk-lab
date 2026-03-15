@@ -17,8 +17,6 @@ dependencies:
   url_launcher: ^6.2.1
   permission_handler: ^11.3.0
   http: ^1.1.0
-  # 트리머 — 네이티브 FFmpeg (H.264 인코딩 포함)
-  ffmpeg_kit_flutter_min_gpl: ^6.0.3
   # 트리머 — 영상 미리보기
   video_player: ^2.8.1
   # 동시통역 — Android 네이티브 SpeechRecognizer

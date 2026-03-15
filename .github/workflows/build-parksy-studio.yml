@@ -55,17 +55,6 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Patch ffmpeg-kit native artifact to LTS (Maven Central)
-        run: |
-          # 6.0.3 plugin은 non-LTS '6.0-2' 사용 → Maven Central 없음
-          # pub-cache에서 plugin build.gradle 찾아 '6.0.2.LTS'로 교체 → Maven Central 있음
-          find ~/.pub-cache -name "build.gradle" -path "*ffmpeg_kit_flutter_min_gpl*" | while read f; do
-            sed -i "s/'com.arthenica:ffmpeg-kit-min-gpl:6.0-2'/'com.arthenica:ffmpeg-kit-min-gpl:6.0.2.LTS'/g" "$f"
-            sed -i 's/"com.arthenica:ffmpeg-kit-min-gpl:6.0-2"/"com.arthenica:ffmpeg-kit-min-gpl:6.0.2.LTS"/g' "$f"
-            echo "✅ Patched: $f"
-            grep "ffmpeg-kit-min-gpl" "$f"
-          done
-
       - name: Build Debug APK
         run: flutter build apk --debug
 
