@@ -86,7 +86,7 @@
     "directory": "apps/midi-converter",
     "version": "1.0.0",
     "version_code": 1,
-    "status": "development",
+    "status": "discontinued",
     "category": "audio",
     "overlay": false,
     "description": "MIDI 변환기 스텁",
@@ -103,7 +103,8 @@
     "target_sdk": 34,
     "java_version": "17",
     "dart_lines": 0,
-    "kotlin_lines": 5
+    "kotlin_lines": 5,
+    "discontinue_reason": "PC WSL2 Basic Pitch 파이프라인으로 흡수. APK 레벨 MIDI 변환 불필요."
   },
   {
     "id": "parksy-audio-tools",
@@ -112,7 +113,7 @@
     "directory": "apps/parksy-audio-tools",
     "version": "2.1.0",
     "version_code": 7,
-    "status": "store-registered",
+    "status": "discontinued",
     "category": "audio",
     "overlay": false,
     "description": "Screen Audio Capture + MIDI Converter for AIVA",
@@ -129,7 +130,8 @@
     "target_sdk": 34,
     "java_version": "17",
     "dart_lines": 3359,
-    "kotlin_lines": 699
+    "kotlin_lines": 699,
+    "discontinue_reason": "PC WSL2 Basic Pitch 파이프라인으로 흡수. Wavesy + Telegram 봇으로 대체. APK 레벨 오디오 캡처/변환 불필요."
   },
   {
     "id": "parksy-axis",
@@ -269,7 +271,7 @@
     "directory": "apps/tts-factory",
     "version": "1.0.2",
     "version_code": 3,
-    "status": "store-registered",
+    "status": "discontinued",
     "category": "utility",
     "overlay": false,
     "description": "배치 TTS 변환 클라이언트",
@@ -286,6 +288,7 @@
     "target_sdk": 34,
     "java_version": "17",
     "dart_lines": 783,
-    "kotlin_lines": 5
+    "kotlin_lines": 5,
+    "discontinue_reason": "Edge TTS/Grok 품질로 대체됨. Google Cloud 과금 이슈. APK 불필요."
   }
 ]

@@ -40,7 +40,7 @@
   },
   "stats": {
     "total_apps": 11,
-    "store_apps": 10,
+    "store_apps": 8,
     "total_dart_lines": 19946,
     "total_kotlin_lines": 5399,
     "total_code_lines": 25345,
