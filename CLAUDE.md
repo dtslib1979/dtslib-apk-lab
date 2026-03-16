@@ -631,3 +631,53 @@ D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md  ← 이 레포 상세
 | **이유** | APK 실험실 — Store+Factory IT 튜토리얼 |
 | **URL** | https://dtslib-apk-lab.vercel.app |
 
+
+---
+
+## ⚡ 전역 컨텍스트 — 반드시 읽어라 (2026-03-16 갱신)
+
+> **세션 시작 시 이 블록을 먼저 읽는다. 모든 하위 조항보다 우선한다.**
+
+### 패러다임 전환 (특별법 제0조)
+
+| | Before | After (지금) |
+|---|---|---|
+| 메인 기기 | 핸드폰 (Termux) | 집 PC (WSL2) |
+| 보조 기기 | PC (원격 서버) | 핸드폰 (SSH 클라이언트) |
+| 브라우저 자동화 | headless 우회, ADB 체인 | PC Chrome 직접 (Playwright headless=False) |
+| 배치 작업 | 핸드폰 한 세션 | tmux 던져놓고 퇴근 |
+
+### 죽은 패턴 (절대 부활 금지)
+```
+❌ headless Chromium 우회
+❌ ADB 체인
+❌ 핸드폰에서 CDP 흉내
+❌ 세션 1개 제약 설계
+```
+
+### 현재 작업 표준
+```
+핸드폰 → Tailscale SSH → 집 PC WSL2 → Claude Code
+텔레그램 봇 → tmux 배치 세션 (tg-image, tg-audio)
+브라우저 자동화 → Windows Chrome Playwright headless=False
+```
+
+### SCM 자동화 개발 시퀀스 (진행 중)
+```
+1. 텔레그램 봇        ✅ 완료 (2026-03-16)
+2. 티스토리 자동화    🔄 진행 중 — Playwright headless=False
+3. 네이버 자동화      ⏳ 대기 — login.cjs PC-native 교체
+4. YouTube 자동화     ⏳ 대기 — Draft injection, OAuth 정상화
+5. Google 자동화      ⏳ 대기
+   ↓
+6. APK 업데이트       ⏳ 대기
+7. 워크센터 레포 정비 ⏳ 대기 (28개)
+8. 양산               ⏳ 대기
+```
+
+### 지금 당장 막힌 것
+- 티스토리 19개 블로그 스킨 삽입 미완료 (player.html)
+- 티스토리 25슬롯 서브도메인 미확보
+- 관련 스크립트: `C:\Temp\tistory_auto_v2.py`
+
+---
