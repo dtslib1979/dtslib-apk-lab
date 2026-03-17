@@ -19,6 +19,34 @@ class MainActivity : FlutterActivity() {
                         result.success(sharedUrl)
                         sharedUrl = null
                     }
+                    "runYtDlp" -> {
+                        val url = call.argument<String>("url")
+                        val output = call.argument<String>("output")
+                        if (url == null || output == null) {
+                            result.error("ARGS", "url/output required", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val i = Intent()
+                            i.setClassName("com.termux", "com.termux.app.RunCommandService")
+                            i.action = "com.termux.RUN_COMMAND"
+                            i.putExtra("com.termux.RUN_COMMAND_PATH",
+                                "/data/data/com.termux/files/usr/bin/yt-dlp")
+                            i.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(
+                                "-x", "--audio-format", "mp3",
+                                "--audio-quality", "5",
+                                "--no-playlist",
+                                "-o", output,
+                                url
+                            ))
+                            i.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/sdcard/Music")
+                            i.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
+                            startService(i)
+                            result.success(null)
+                        } catch (e: Exception) {
+                            result.error("TERMUX", e.message, null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }

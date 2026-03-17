@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -86,6 +85,9 @@ class _MelodyScreenState extends State<MelodyScreen> {
     super.dispose();
   }
 
+  // yt-dlp via Termux RUN_COMMAND — output always /sdcard/Music/melody_dl.mp3
+  static const _dlPath = '/sdcard/Music/melody_dl.mp3';
+
   Future<void> _download() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) return;
@@ -93,68 +95,51 @@ class _MelodyScreenState extends State<MelodyScreen> {
     setState(() {
       _state = AppState.downloading;
       _downloadProgress = 0.0;
-      _statusMsg = 'Requesting audio link...';
+      _statusMsg = 'Starting yt-dlp...';
     });
 
     try {
-      // Step 1: cobalt API → get direct audio stream URL
-      final cobaltResp = await http.post(
-        Uri.parse('https://api.cobalt.tools/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({'url': url, 'downloadMode': 'audio'}),
-      );
-
-      if (cobaltResp.statusCode != 200) {
-        throw Exception('cobalt error ${cobaltResp.statusCode}: ${cobaltResp.body}');
-      }
-
-      final cobaltData = jsonDecode(cobaltResp.body) as Map<String, dynamic>;
-      final status = cobaltData['status'] as String? ?? '';
-      final downloadUrl = cobaltData['url'] as String?;
-
-      if (status == 'error') {
-        final errCode = (cobaltData['error'] as Map?)?['code'] ?? cobaltData['text'] ?? 'unknown';
-        throw Exception('cobalt: $errCode');
-      }
-      if (downloadUrl == null) {
-        throw Exception('No URL in cobalt response (status: $status)');
-      }
-
-      // Step 2: stream download
-      setState(() => _statusMsg = 'Downloading audio...');
-
-      final dir = await getTemporaryDirectory();
-      final outPath = '${dir.path}/melody_dl.m4a';
-      final outFile = File(outPath);
+      // Delete stale file
+      final outFile = File(_dlPath);
       if (await outFile.exists()) await outFile.delete();
 
-      final req = http.Request('GET', Uri.parse(downloadUrl));
-      final streamedResp = await req.send();
+      // Kick off yt-dlp in Termux background
+      await _intentChannel.invokeMethod('runYtDlp', {
+        'url': url,
+        'output': _dlPath,
+      });
 
-      if (streamedResp.statusCode != 200) {
-        throw Exception('Stream error ${streamedResp.statusCode}');
-      }
+      setState(() => _statusMsg = 'Downloading via yt-dlp...');
 
-      final totalBytes = streamedResp.contentLength ?? 0;
-      int received = 0;
-      final sink = outFile.openWrite();
-      await for (final chunk in streamedResp.stream) {
-        sink.add(chunk);
-        received += chunk.length;
-        if (totalBytes > 0 && mounted) {
-          setState(() => _downloadProgress = received / totalBytes);
+      // Poll until file is stable (size unchanged for 2s) — max 3 min
+      int lastSize = -1;
+      int stableCount = 0;
+      bool done = false;
+
+      for (int i = 0; i < 180; i++) {
+        await Future.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+
+        if (await outFile.exists()) {
+          final size = await outFile.length();
+          if (size > 50000 && size == lastSize) {
+            stableCount++;
+            if (stableCount >= 2) { done = true; break; }
+          } else {
+            stableCount = 0;
+          }
+          lastSize = size;
         }
+        setState(() => _downloadProgress = (i / 60).clamp(0.0, 0.95));
       }
-      await sink.close();
 
-      await _player.setFilePath(outPath);
+      if (!done) throw Exception('Timeout. Check Termux notification.');
+
+      await _player.setFilePath(_dlPath);
       final dur = _player.duration;
 
       setState(() {
-        _downloadedPath = outPath;
+        _downloadedPath = _dlPath;
         _totalDuration = dur ?? Duration.zero;
         _state = AppState.ready;
         _statusMsg = 'Ready — ${_fmt(dur ?? Duration.zero)}';
@@ -163,7 +148,7 @@ class _MelodyScreenState extends State<MelodyScreen> {
     } catch (e) {
       setState(() {
         _state = AppState.idle;
-        _statusMsg = 'Download failed: $e';
+        _statusMsg = 'Error: $e';
       });
     }
   }
