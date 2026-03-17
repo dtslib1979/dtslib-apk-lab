@@ -94,7 +94,7 @@ class _MelodyScreenState extends State<MelodyScreen>
       _st == _State.sending;
 
   // ── Download ─────────────────────────────────────────────────
-  static const _outPath = '/sdcard/Music/melody_dl.mp3';
+  static const _outPath = '/sdcard/Download/melody_dl.mp3';
 
   Future<void> _download() async {
     final url = _urlCtrl.text.trim();
