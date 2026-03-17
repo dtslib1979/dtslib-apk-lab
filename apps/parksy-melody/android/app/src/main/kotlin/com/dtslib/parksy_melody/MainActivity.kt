@@ -2,6 +2,8 @@ package com.dtslib.parksy_melody
 
 import android.content.Intent
 import android.os.Bundle
+import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLRequest
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -9,6 +11,16 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.parksy.melody/intent"
     private var sharedUrl: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        try {
+            YoutubeDL.getInstance().init(application)
+        } catch (e: Exception) {
+            // 초기화 실패 시 runYtDlp 호출 때 에러 처리
+        }
+        extractSharedUrl(intent)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -26,32 +38,21 @@ class MainActivity : FlutterActivity() {
                             result.error("ARGS", "url/output required", null)
                             return@setMethodCallHandler
                         }
-                        try {
-                            val logPath = "/sdcard/Music/melody_debug.log"
-                            // bash -c "cmd" _ $1=output $2=url
-                            // $1/$2/$? are literal in Kotlin (not valid identifiers)
-                            val cmd = "echo 'RUN_COMMAND fired' > \"$logPath\" 2>&1; " +
-                                "/data/data/com.termux/files/usr/bin/python3.12 " +
-                                "/data/data/com.termux/files/usr/bin/yt-dlp " +
-                                "-x --audio-format mp3 --audio-quality 5 " +
-                                "--no-playlist --force-overwrites " +
-                                "-o \"$1\" \"$2\" >> \"$logPath\" 2>&1; " +
-                                "echo \"EXIT=$?\" >> \"$logPath\""
-                            val i = Intent()
-                            i.setClassName("com.termux", "com.termux.app.RunCommandService")
-                            i.action = "com.termux.RUN_COMMAND"
-                            i.putExtra("com.termux.RUN_COMMAND_PATH",
-                                "/data/data/com.termux/files/usr/bin/bash")
-                            i.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(
-                                "-c", cmd, "_", output, url
-                            ))
-                            i.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/sdcard/Music")
-                            i.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
-                            startService(i)
-                            result.success(null)
-                        } catch (e: Exception) {
-                            result.error("TERMUX", e.message, null)
-                        }
+                        Thread {
+                            try {
+                                val request = YoutubeDLRequest(url)
+                                request.addOption("-x")
+                                request.addOption("--audio-format", "mp3")
+                                request.addOption("--audio-quality", "5")
+                                request.addOption("--no-playlist")
+                                request.addOption("--force-overwrites")
+                                request.addOption("-o", output)
+                                YoutubeDL.getInstance().execute(request, null, null)
+                                runOnUiThread { result.success(null) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("YTDLP", e.message, null) }
+                            }
+                        }.start()
                     }
                     else -> result.notImplemented()
                 }

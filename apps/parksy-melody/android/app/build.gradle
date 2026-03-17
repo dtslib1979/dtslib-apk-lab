@@ -66,4 +66,6 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    implementation 'com.github.yausername.youtubedl-android:library:0.17.+'
+}

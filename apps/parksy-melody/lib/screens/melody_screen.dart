@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -101,69 +100,16 @@ class _MelodyScreenState extends State<MelodyScreen>
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) return;
 
-    setState(() { _st = _State.downloading; _prog = 0; _msg = 'Connecting to cobalt...'; });
+    setState(() { _st = _State.downloading; _prog = 0.1; _msg = 'Downloading via yt-dlp...'; });
 
     await Permission.audio.request();
     await Permission.storage.request();
 
     try {
-      // 1. cobalt API → 다운로드 URL 획득
-      final apiRes = await http.post(
-        Uri.parse('https://api.cobalt.tools/'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'url': url,
-          'downloadMode': 'audio',
-          'audioFormat': 'mp3',
-          'audioBitrate': '128',
-        }),
-      ).timeout(const Duration(seconds: 30));
+      // youtubedl-android가 완료될 때까지 block (백그라운드 스레드에서 실행)
+      await _ch.invokeMethod('runYtDlp', {'url': url, 'output': _outPath});
 
-      if (apiRes.statusCode != 200) {
-        throw Exception('Cobalt API ${apiRes.statusCode}\n${apiRes.body}');
-      }
-
-      final data = jsonDecode(apiRes.body) as Map<String, dynamic>;
-      final status = data['status'] as String? ?? '';
-
-      if (status != 'tunnel' && status != 'redirect') {
-        throw Exception('Cobalt status: $status\n${apiRes.body}');
-      }
-
-      final dlUrl = data['url'] as String;
-      setState(() { _prog = 0.05; _msg = 'Downloading...'; });
-
-      // 2. 실제 파일 스트림 다운로드
-      final req = http.Request('GET', Uri.parse(dlUrl));
-      final streamedRes = await http.Client()
-          .send(req)
-          .timeout(const Duration(seconds: 30));
-
-      final totalBytes = streamedRes.contentLength ?? 0;
-      final outFile = File(_outPath);
-      final sink = outFile.openWrite();
-      int downloaded = 0;
-
-      await for (final chunk in streamedRes.stream) {
-        if (!mounted) { await sink.close(); return; }
-        sink.add(chunk);
-        downloaded += chunk.length;
-        setState(() {
-          _prog = totalBytes > 0
-              ? (0.05 + downloaded / totalBytes * 0.90).clamp(0.0, 0.95)
-              : 0.5;
-          _msg = 'Stealing... ${(downloaded / 1024 / 1024).toStringAsFixed(1)} MB';
-        });
-      }
-      await sink.flush();
-      await sink.close();
-
-      if (downloaded < 10000) {
-        throw Exception('File too small (${downloaded}B) — download failed');
-      }
+      setState(() { _prog = 0.95; _msg = 'Loading...'; });
 
       await _player.setFilePath(_outPath);
       setState(() {
