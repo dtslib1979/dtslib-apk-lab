@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  yt_explode_dart: ^2.3.0
+  youtube_explode_dart: ^2.3.0
   just_audio: ^0.9.36
   ffmpeg_kit_flutter_new_audio: ^2.0.0
   path_provider: ^2.1.1
