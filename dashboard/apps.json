@@ -132,7 +132,7 @@
   {
     "id": "parksy-melody",
     "name": "Parksy Melody",
-    "version": "v1.0.8",
+    "version": "v1.0.9",
     "registryStatus": "store-registered",
     "category": "audio",
     "description": "YouTube audio cutter — preset clips (10s/20s/30s/1min/3min) + Telegram bridge",
