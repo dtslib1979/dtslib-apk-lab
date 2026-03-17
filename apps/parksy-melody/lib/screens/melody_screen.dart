@@ -7,6 +7,7 @@ import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 const _botToken = '8669426963:AAGvsn8ZnWgkTccw2G2AqgxHbq9RVtmBZMA';
 const _chatId = '6858098283';
@@ -94,78 +95,43 @@ class _MelodyScreenState extends State<MelodyScreen>
       _st == _State.sending;
 
   // ── Download ─────────────────────────────────────────────────
-  static const _outPath = '/sdcard/Music/melody_dl.mp3';
-
-  static const _logPath = '/sdcard/Music/melody_debug.log';
+  static const _outPath = '/sdcard/Music/melody_dl.m4a';
 
   Future<void> _download() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) return;
 
-    setState(() { _st = _State.downloading; _prog = 0; _msg = 'Checking permissions...'; });
+    setState(() { _st = _State.downloading; _prog = 0; _msg = 'Analyzing...'; });
 
     await Permission.audio.request();
     await Permission.storage.request();
 
-    // Clear old log so we can detect if RunCommandService fired
-    try { await File(_logPath).delete(); } catch (_) {}
-
-    setState(() => _msg = 'Launching yt-dlp via Termux...');
-
+    final yt = YoutubeExplode();
     try {
-      final startTime = DateTime.now().subtract(const Duration(seconds: 3));
-      await _ch.invokeMethod('runYtDlp', {'url': url, 'output': _outPath});
+      final video = await yt.videos.get(url);
+      final manifest = await yt.videos.streamsClient.getManifest(video.id);
+      final audioInfo = manifest.audioOnly.withHighestBitrate();
+      final totalBytes = audioInfo.size.totalBytes;
 
-      final f = File(_outPath);
-      final logFile = File(_logPath);
-      int lastSz = -1, stable = 0;
-      bool done = false;
+      setState(() => _msg = '🎵 ${video.title}');
 
-      for (int i = 0; i < 90; i++) {
-        await Future.delayed(const Duration(seconds: 1));
-        if (!mounted) return;
+      final outFile = File(_outPath);
+      final sink = outFile.openWrite();
+      final stream = yt.videos.streamsClient.get(audioInfo);
+      int downloaded = 0;
 
-        // Show last 3 lines of log every 5s for real-time yt-dlp progress
-        if (i % 5 == 4 && await logFile.exists()) {
-          try {
-            final log = await logFile.readAsString();
-            final lines = log.trim().split('\n').where((l) => l.isNotEmpty).toList();
-            final recent = lines.length > 2 ? lines.sublist(lines.length - 2).join('\n') : lines.join('\n');
-            if (recent.isNotEmpty && mounted) setState(() => _msg = recent);
-          } catch (_) {}
-        }
-
-        if (await f.exists()) {
-          final stat = await f.stat();
-          if (stat.modified.isAfter(startTime)) {
-            final sz = await f.length();
-            if (sz > 50000 && sz == lastSz) {
-              if (++stable >= 2) { done = true; break; }
-            } else {
-              stable = 0;
-            }
-            lastSz = sz;
-          }
-        }
-        setState(() => _prog = (i / 60).clamp(0.0, 0.95));
+      await for (final chunk in stream) {
+        if (!mounted) { await sink.close(); return; }
+        sink.add(chunk);
+        downloaded += chunk.length;
+        setState(() {
+          _prog = (downloaded / totalBytes * 0.95).clamp(0.0, 0.95);
+          _msg = 'Stealing... ${(downloaded / 1024 / 1024).toStringAsFixed(1)} / '
+              '${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB';
+        });
       }
-
-      if (!done) {
-        String errDetail = '';
-        try {
-          if (await logFile.exists()) {
-            final log = await logFile.readAsString();
-            errDetail = log.trim().isEmpty
-                ? '[log empty — RunCommandService fired but command produced no output]'
-                : (log.length > 700 ? '...' + log.substring(log.length - 700) : log);
-          } else {
-            errDetail = '[no log file]\nRunCommandService did not fire.\n'
-                'Fix: echo "allow-external-apps=true" >> ~/.termux/termux.properties\n'
-                'Then kill & restart Termux.';
-          }
-        } catch (_) {}
-        throw Exception('Timeout (90s)\n\n$errDetail');
-      }
+      await sink.flush();
+      await sink.close();
 
       await _player.setFilePath(_outPath);
       setState(() {
@@ -177,6 +143,8 @@ class _MelodyScreenState extends State<MelodyScreen>
       });
     } catch (e) {
       setState(() { _st = _State.idle; _msg = 'ERR: $e'; });
+    } finally {
+      yt.close();
     }
   }
 
