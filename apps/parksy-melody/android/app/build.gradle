@@ -67,5 +67,6 @@ flutter {
 }
 
 dependencies {
-    implementation 'com.github.yausername.youtubedl-android:library:0.14.0'
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:v0.24.2'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }

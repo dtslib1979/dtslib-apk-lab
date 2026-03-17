@@ -2,23 +2,46 @@ package com.dtslib.parksy_melody
 
 import android.content.Intent
 import android.os.Bundle
-import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.YoutubeDLRequest
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import okhttp3.OkHttpClient
+import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.downloader.Downloader
+import org.schabi.newpipe.extractor.downloader.Request
+import org.schabi.newpipe.extractor.downloader.Response
+import java.util.concurrent.TimeUnit
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.parksy.melody/intent"
     private var sharedUrl: String? = null
 
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    private val npeDownloader = object : Downloader() {
+        override fun execute(request: Request): Response {
+            val reqBuilder = okhttp3.Request.Builder().url(request.url())
+            request.headers().forEach { (key, values) ->
+                values.forEach { reqBuilder.addHeader(key, it) }
+            }
+            val response = okHttpClient.newCall(reqBuilder.build()).execute()
+            return Response(
+                response.code,
+                response.message,
+                response.headers.toMultimap(),
+                response.body?.string(),
+                response.request.url.toString()
+            )
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try {
-            YoutubeDL.getInstance().init(application)
-        } catch (e: Exception) {
-            // 초기화 실패 시 runYtDlp 호출 때 에러 처리
-        }
+        try { NewPipe.init(npeDownloader) } catch (e: Exception) {}
         extractSharedUrl(intent)
     }
 
@@ -31,27 +54,23 @@ class MainActivity : FlutterActivity() {
                         result.success(sharedUrl)
                         sharedUrl = null
                     }
-                    "runYtDlp" -> {
+                    "getAudioUrl" -> {
                         val url = call.argument<String>("url")
-                        val output = call.argument<String>("output")
-                        if (url == null || output == null) {
-                            result.error("ARGS", "url/output required", null)
+                        if (url == null) {
+                            result.error("ARGS", "url required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
                             try {
-                                YoutubeDL.getInstance().init(application)
-                                val request = YoutubeDLRequest(url)
-                                request.addOption("-x")
-                                request.addOption("--audio-format", "mp3")
-                                request.addOption("--audio-quality", "5")
-                                request.addOption("--no-playlist")
-                                request.addOption("--force-overwrites")
-                                request.addOption("-o", output)
-                                YoutubeDL.getInstance().execute(request, null, null)
-                                runOnUiThread { result.success(null) }
+                                NewPipe.init(npeDownloader)
+                                val extractor = ServiceList.YouTube.getStreamExtractor(url)
+                                extractor.fetchPage()
+                                val audioStream = extractor.audioStreams
+                                    .maxByOrNull { it.bitrate }
+                                    ?: throw Exception("No audio stream found")
+                                runOnUiThread { result.success(audioStream.content) }
                             } catch (e: Exception) {
-                                runOnUiThread { result.error("YTDLP", e.message, null) }
+                                runOnUiThread { result.error("NPE", e.message, null) }
                             }
                         }.start()
                     }

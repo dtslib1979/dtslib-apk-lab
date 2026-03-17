@@ -7,6 +7,7 @@ import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:async';
 
 const _botToken = '8669426963:AAGvsn8ZnWgkTccw2G2AqgxHbq9RVtmBZMA';
 const _chatId = '6858098283';
@@ -94,23 +95,60 @@ class _MelodyScreenState extends State<MelodyScreen>
       _st == _State.sending;
 
   // ── Download ─────────────────────────────────────────────────
+  static const _rawPath = '/sdcard/Download/melody_raw.tmp';
   static const _outPath = '/sdcard/Download/melody_dl.mp3';
 
   Future<void> _download() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) return;
 
-    setState(() { _st = _State.downloading; _prog = 0.1; _msg = 'Downloading via yt-dlp...'; });
+    setState(() { _st = _State.downloading; _prog = 0.05; _msg = 'Getting stream URL...'; });
 
     await Permission.audio.request();
     await Permission.storage.request();
 
     try {
-      // youtubedl-android가 완료될 때까지 block (백그라운드 스레드에서 실행)
-      await _ch.invokeMethod('runYtDlp', {'url': url, 'output': _outPath});
+      // Step 1: NewPipeExtractor로 오디오 스트림 URL 추출
+      final streamUrl = await _ch.invokeMethod<String>('getAudioUrl', {'url': url});
+      if (streamUrl == null) throw Exception('No stream URL returned');
 
-      setState(() { _prog = 0.95; _msg = 'Loading...'; });
+      setState(() { _prog = 0.1; _msg = 'Downloading audio...'; });
 
+      // Step 2: 스트리밍 다운로드
+      final client = http.Client();
+      try {
+        final request = http.Request('GET', Uri.parse(streamUrl));
+        request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 10)';
+        final response = await client.send(request);
+        final contentLength = response.contentLength ?? 0;
+
+        final rawFile = File(_rawPath);
+        final sink = rawFile.openWrite();
+        int downloaded = 0;
+
+        await for (final chunk in response.stream) {
+          sink.add(chunk);
+          downloaded += chunk.length;
+          if (contentLength > 0 && mounted) {
+            setState(() { _prog = 0.1 + 0.8 * (downloaded / contentLength); _msg = 'Downloading... ${(downloaded / 1024 / 1024).toStringAsFixed(1)}MB'; });
+          }
+        }
+        await sink.close();
+      } finally {
+        client.close();
+      }
+
+      setState(() { _prog = 0.92; _msg = 'Converting to MP3...'; });
+
+      // Step 3: MP3 변환 (m4a/webm → mp3)
+      final session = await FFmpegKit.execute(
+          '-y -i "$_rawPath" -acodec libmp3lame -ab 192k "$_outPath"');
+      if (!ReturnCode.isSuccess(await session.getReturnCode())) {
+        // 변환 실패 시 raw 파일 그대로 사용
+        await File(_rawPath).copy(_outPath);
+      }
+
+      setState(() { _prog = 0.97; _msg = 'Loading...'; });
       await _player.setFilePath(_outPath);
       setState(() {
         _dlPath = _outPath;
