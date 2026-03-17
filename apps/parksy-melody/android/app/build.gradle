@@ -67,5 +67,5 @@ flutter {
 }
 
 dependencies {
-    implementation 'com.github.yausername.youtubedl-android:library:0.17.+'
+    implementation 'com.github.yausername.youtubedl-android:library:0.14.0'
 }
