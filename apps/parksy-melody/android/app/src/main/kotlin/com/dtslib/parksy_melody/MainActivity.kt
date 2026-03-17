@@ -59,11 +59,6 @@ class MainActivity : FlutterActivity() {
             }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        extractSharedUrl(intent)
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         extractSharedUrl(intent)
