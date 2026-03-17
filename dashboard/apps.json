@@ -10,7 +10,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-capture-latest/app-debug.apk",
     "workflow": "build-capture-pipeline.yml",
     "releaseTag": "parksy-capture-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "chrono-call",
@@ -23,7 +23,7 @@
     "downloadUrl": null,
     "workflow": "build-chrono-call.yml",
     "releaseTag": "chrono-call-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "parksy-pen",
@@ -36,33 +36,33 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-pen-latest/app-debug.apk",
     "workflow": "build-laser-pen.yml",
     "releaseTag": "parksy-pen-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "midi-converter",
     "name": "Parksy MIDI",
     "version": "v1.0.0",
-    "registryStatus": "development",
+    "registryStatus": "discontinued",
     "category": "audio",
     "description": "MIDI 변환기 스텁",
     "icon": "🎵",
     "downloadUrl": null,
     "workflow": "build-midi-converter.yml",
     "releaseTag": "midi-converter-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "parksy-audio-tools",
     "name": "Parksy Audio Tools",
     "version": "v2.1.0",
-    "registryStatus": "store-registered",
+    "registryStatus": "discontinued",
     "category": "audio",
     "description": "Screen Audio Capture + MIDI Converter for AIVA",
     "icon": "🎧",
     "downloadUrl": null,
     "workflow": "build-parksy-audio-tools.yml",
     "releaseTag": "parksy-audio-tools-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "parksy-axis",
@@ -75,7 +75,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-axis-latest/app-debug.apk",
     "workflow": "build-parksy-axis.yml",
     "releaseTag": "parksy-axis-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "parksy-glot",
@@ -88,7 +88,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-glot.yml",
     "releaseTag": "parksy-glot-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "parksy-studio",
@@ -101,7 +101,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-studio.yml",
     "releaseTag": "parksy-studio-v1.0.0",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "parksy-liner",
@@ -114,32 +114,58 @@
     "downloadUrl": null,
     "workflow": "build-parksy-liner.yml",
     "releaseTag": "parksy-liner-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "parksy-wavesy",
     "name": "Parksy Wavesy",
     "version": "v4.0.0",
-    "registryStatus": "store-registered",
+    "registryStatus": "discontinued",
     "category": "audio",
     "description": "음원 편집 가위 - MP3/MIDI 트리밍 + MIDI 편집",
     "icon": "🌊",
     "downloadUrl": null,
     "workflow": "build-parksy-wavesy.yml",
     "releaseTag": "parksy-wavesy-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
+  },
+  {
+    "id": "parksy-melody",
+    "name": "Parksy Melody",
+    "version": "v1.0.0",
+    "registryStatus": "store-registered",
+    "category": "audio",
+    "description": "YouTube audio cutter — preset clips (10s/20s/30s/1min/3min) + Telegram bridge",
+    "icon": "🎵",
+    "downloadUrl": null,
+    "workflow": "build-parksy-melody.yml",
+    "releaseTag": "parksy-melody-v1.0.0",
+    "lastUpdated": "2026-03-17"
+  },
+  {
+    "id": "parksy-printer",
+    "name": "Parksy Printer",
+    "version": "v0.0.0",
+    "registryStatus": "in-development",
+    "category": "hardware",
+    "description": "ESP32 + 열지 전표 프린터 — 음성→ESC/POS 파이프라인 (Reverse Orality)",
+    "icon": "🖨️",
+    "downloadUrl": null,
+    "workflow": "build-parksy-printer.yml",
+    "releaseTag": "parksy-printer-latest",
+    "lastUpdated": "2026-03-17"
   },
   {
     "id": "parksy-tts",
     "name": "Parksy TTS",
     "version": "v1.0.2",
-    "registryStatus": "store-registered",
+    "registryStatus": "discontinued",
     "category": "utility",
     "description": "배치 TTS 변환 클라이언트",
     "icon": "🎙️",
     "downloadUrl": null,
     "workflow": "build-tts-factory.yml",
     "releaseTag": "tts-factory-latest",
-    "lastUpdated": "2026-03-15"
+    "lastUpdated": "2026-03-17"
   }
 ]

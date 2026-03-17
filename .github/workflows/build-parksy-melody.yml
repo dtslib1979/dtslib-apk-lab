@@ -1,0 +1,89 @@
+name: Build Parksy Melody
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/parksy-melody/**'
+      - '.github/workflows/build-parksy-melody.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/parksy-melody
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secret leak guard
+        run: |
+          cd ../..
+          if grep -rE "CHANGE_ME|ghp_|gho_|github_pat_" --include="*.dart" --include="*.kt" apps/parksy-melody/; then
+            echo "::error::Secret-like string found!"
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter create (boilerplate icons etc)
+        run: flutter create . --org com.dtslib --project-name parksy_melody
+
+      - name: Patch Kotlin version in settings.gradle
+        run: |
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "1.9.10"/' android/settings.gradle
+          echo "✅ Kotlin version patched"
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parksy-melody-debug
+          path: apps/parksy-melody/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Release APK to GitHub Releases
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: parksy-melody-v1.0.0
+          name: Parksy Melody v1.0.0
+          files: apps/parksy-melody/build/app/outputs/flutter-apk/app-debug.apk
+          body: |
+            ## Parksy Melody v1.0.0
+
+            YouTube audio cutter with preset clips & Telegram bridge.
+
+            ### Features
+            - Share from YouTube app → auto-fills URL
+            - Download audio via yt_explode_dart
+            - Preset cuts: 10s / 20s / 30s / 1min / 3min
+            - Playback with seek
+            - Cut & send to @parksy_bridges_bot
+
+            ### Requirements
+            - Android 7.0+ (minSdk 24)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
