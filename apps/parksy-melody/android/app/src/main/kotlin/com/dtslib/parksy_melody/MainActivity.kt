@@ -27,19 +27,23 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
                         try {
+                            val logPath = "/sdcard/Music/melody_debug.log"
+                            // bash -c "cmd" _ $1=output $2=url
+                            // $1/$2/$? are literal in Kotlin (not valid identifiers)
+                            val cmd = "echo 'RUN_COMMAND fired' > \"$logPath\" 2>&1; " +
+                                "/data/data/com.termux/files/usr/bin/python3.12 " +
+                                "/data/data/com.termux/files/usr/bin/yt-dlp " +
+                                "-x --audio-format mp3 --audio-quality 5 " +
+                                "--no-playlist --force-overwrites " +
+                                "-o \"$1\" \"$2\" >> \"$logPath\" 2>&1; " +
+                                "echo \"EXIT=$?\" >> \"$logPath\""
                             val i = Intent()
                             i.setClassName("com.termux", "com.termux.app.RunCommandService")
                             i.action = "com.termux.RUN_COMMAND"
                             i.putExtra("com.termux.RUN_COMMAND_PATH",
-                                "/data/data/com.termux/files/usr/bin/python3.12")
+                                "/data/data/com.termux/files/usr/bin/bash")
                             i.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(
-                                "/data/data/com.termux/files/usr/bin/yt-dlp",
-                                "-x", "--audio-format", "mp3",
-                                "--audio-quality", "5",
-                                "--no-playlist",
-                                "--force-overwrites",
-                                "-o", output,
-                                url
+                                "-c", cmd, "_", output, url
                             ))
                             i.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/sdcard/Music")
                             i.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)

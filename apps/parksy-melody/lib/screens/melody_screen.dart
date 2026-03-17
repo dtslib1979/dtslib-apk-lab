@@ -96,6 +96,8 @@ class _MelodyScreenState extends State<MelodyScreen>
   // ── Download ─────────────────────────────────────────────────
   static const _outPath = '/sdcard/Music/melody_dl.mp3';
 
+  static const _logPath = '/sdcard/Music/melody_debug.log';
+
   Future<void> _download() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) return;
@@ -105,20 +107,34 @@ class _MelodyScreenState extends State<MelodyScreen>
     await Permission.audio.request();
     await Permission.storage.request();
 
-    setState(() => _msg = 'Launching yt-dlp...');
+    // Clear old log so we can detect if RunCommandService fired
+    try { await File(_logPath).delete(); } catch (_) {}
+
+    setState(() => _msg = 'Launching yt-dlp via Termux...');
 
     try {
       final startTime = DateTime.now().subtract(const Duration(seconds: 3));
       await _ch.invokeMethod('runYtDlp', {'url': url, 'output': _outPath});
-      setState(() => _msg = 'Stealing audio... 🥷');
 
       final f = File(_outPath);
+      final logFile = File(_logPath);
       int lastSz = -1, stable = 0;
       bool done = false;
 
       for (int i = 0; i < 90; i++) {
         await Future.delayed(const Duration(seconds: 1));
         if (!mounted) return;
+
+        // Show last 3 lines of log every 5s for real-time yt-dlp progress
+        if (i % 5 == 4 && await logFile.exists()) {
+          try {
+            final log = await logFile.readAsString();
+            final lines = log.trim().split('\n').where((l) => l.isNotEmpty).toList();
+            final recent = lines.length > 2 ? lines.sublist(lines.length - 2).join('\n') : lines.join('\n');
+            if (recent.isNotEmpty && mounted) setState(() => _msg = recent);
+          } catch (_) {}
+        }
+
         if (await f.exists()) {
           final stat = await f.stat();
           if (stat.modified.isAfter(startTime)) {
@@ -134,7 +150,22 @@ class _MelodyScreenState extends State<MelodyScreen>
         setState(() => _prog = (i / 60).clamp(0.0, 0.95));
       }
 
-      if (!done) throw Exception('Timeout — check Termux');
+      if (!done) {
+        String errDetail = '';
+        try {
+          if (await logFile.exists()) {
+            final log = await logFile.readAsString();
+            errDetail = log.trim().isEmpty
+                ? '[log empty — RunCommandService fired but command produced no output]'
+                : (log.length > 700 ? '...' + log.substring(log.length - 700) : log);
+          } else {
+            errDetail = '[no log file]\nRunCommandService did not fire.\n'
+                'Fix: echo "allow-external-apps=true" >> ~/.termux/termux.properties\n'
+                'Then kill & restart Termux.';
+          }
+        } catch (_) {}
+        throw Exception('Timeout (90s)\n\n$errDetail');
+      }
 
       await _player.setFilePath(_outPath);
       setState(() {
@@ -145,7 +176,7 @@ class _MelodyScreenState extends State<MelodyScreen>
         _prog = 1.0;
       });
     } catch (e) {
-      setState(() { _st = _State.idle; _msg = 'Error: $e'; });
+      setState(() { _st = _State.idle; _msg = 'ERR: $e'; });
     }
   }
 
@@ -203,7 +234,7 @@ class _MelodyScreenState extends State<MelodyScreen>
                 children: [
                   _buildUrlCard(),
                   const SizedBox(height: 12),
-                  if (_st != _State.idle) _buildStatusRow(),
+                  if (_msg.isNotEmpty) _buildStatusRow(),
                   if (_busy) ...[
                     const SizedBox(height: 8),
                     _buildProgressBar(),
@@ -378,29 +409,43 @@ class _MelodyScreenState extends State<MelodyScreen>
 
   Widget _buildStatusRow() {
     final isOk = _st == _State.done && _msg.startsWith('✅');
+    final isErr = _st == _State.idle && _msg.startsWith('ERR:');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: _kCard,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color: isOk ? Colors.green.withOpacity(0.4) : _kBorder),
+            color: isOk
+                ? Colors.green.withOpacity(0.4)
+                : isErr
+                    ? Colors.red.withOpacity(0.5)
+                    : _kBorder),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_busy)
-            const SizedBox(
-              width: 12, height: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 2, color: _kRed,
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: const SizedBox(
+                width: 12, height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2, color: _kRed,
+                ),
               ),
             ),
           if (_busy) const SizedBox(width: 10),
           Expanded(
             child: Text(_msg,
                 style: TextStyle(
-                  color: isOk ? Colors.greenAccent : _kText,
-                  fontSize: 12,
+                  color: isOk
+                      ? Colors.greenAccent
+                      : isErr
+                          ? Colors.red[300]
+                          : _kText,
+                  fontSize: isErr ? 10 : 12,
+                  fontFamily: isErr ? 'monospace' : null,
                 )),
           ),
         ],
