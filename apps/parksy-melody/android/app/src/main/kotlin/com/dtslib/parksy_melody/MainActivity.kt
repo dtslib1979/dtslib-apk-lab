@@ -40,6 +40,7 @@ class MainActivity : FlutterActivity() {
                         }
                         Thread {
                             try {
+                                YoutubeDL.getInstance().init(application)
                                 val request = YoutubeDLRequest(url)
                                 request.addOption("-x")
                                 request.addOption("--audio-format", "mp3")
