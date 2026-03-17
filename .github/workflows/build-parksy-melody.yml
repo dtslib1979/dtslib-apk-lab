@@ -68,8 +68,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: parksy-melody-v1.0.7
-          name: Parksy Melody v1.0.7
+          tag_name: parksy-melody-v1.0.8
+          name: Parksy Melody v1.0.8
           files: apps/parksy-melody/build/app/outputs/flutter-apk/app-debug.apk
           body: |
             ## Parksy Melody v1.0.0

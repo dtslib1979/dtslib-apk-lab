@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +8,6 @@ import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 const _botToken = '8669426963:AAGvsn8ZnWgkTccw2G2AqgxHbq9RVtmBZMA';
 const _chatId = '6858098283';
@@ -95,53 +95,75 @@ class _MelodyScreenState extends State<MelodyScreen>
       _st == _State.sending;
 
   // ── Download ─────────────────────────────────────────────────
-  static const _outPath = '/sdcard/Music/melody_dl.m4a';
+  static const _outPath = '/sdcard/Music/melody_dl.mp3';
 
   Future<void> _download() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) return;
 
-    setState(() { _st = _State.downloading; _prog = 0; _msg = 'Analyzing...'; });
+    setState(() { _st = _State.downloading; _prog = 0; _msg = 'Connecting to cobalt...'; });
 
     await Permission.audio.request();
     await Permission.storage.request();
 
-    final yt = YoutubeExplode();
     try {
-      final video = await yt.videos.get(url);
-      final manifest = await yt.videos.streamsClient.getManifest(video.id);
-      final audioInfo = manifest.audioOnly.withHighestBitrate();
-      final totalBytes = audioInfo.size.totalBytes;
+      // 1. cobalt API → 다운로드 URL 획득
+      final apiRes = await http.post(
+        Uri.parse('https://api.cobalt.tools/'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'url': url,
+          'downloadMode': 'audio',
+          'audioFormat': 'mp3',
+          'audioBitrate': '128',
+        }),
+      ).timeout(const Duration(seconds: 30));
 
-      setState(() => _msg = '🎵 ${video.title}');
+      if (apiRes.statusCode != 200) {
+        throw Exception('Cobalt API ${apiRes.statusCode}\n${apiRes.body}');
+      }
 
+      final data = jsonDecode(apiRes.body) as Map<String, dynamic>;
+      final status = data['status'] as String? ?? '';
+
+      if (status != 'tunnel' && status != 'redirect') {
+        throw Exception('Cobalt status: $status\n${apiRes.body}');
+      }
+
+      final dlUrl = data['url'] as String;
+      setState(() { _prog = 0.05; _msg = 'Downloading...'; });
+
+      // 2. 실제 파일 스트림 다운로드
+      final req = http.Request('GET', Uri.parse(dlUrl));
+      final streamedRes = await http.Client()
+          .send(req)
+          .timeout(const Duration(seconds: 30));
+
+      final totalBytes = streamedRes.contentLength ?? 0;
       final outFile = File(_outPath);
       final sink = outFile.openWrite();
       int downloaded = 0;
 
-      await Future.any([
-        () async {
-          final stream = yt.videos.streamsClient.get(audioInfo);
-          await for (final chunk in stream) {
-            if (!mounted) { await sink.close(); return; }
-            sink.add(chunk);
-            downloaded += chunk.length;
-            setState(() {
-              _prog = (downloaded / totalBytes * 0.95).clamp(0.0, 0.95);
-              _msg = 'Stealing... ${(downloaded / 1024 / 1024).toStringAsFixed(1)} / '
-                  '${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB';
-            });
-          }
-          await sink.flush();
-          await sink.close();
-        }(),
-        Future.delayed(const Duration(seconds: 60), () async {
-          await sink.close();
-          throw Exception('Stream timeout — youtube_explode_dart stream hung.\n'
-              'Size: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)}MB\n'
-              'Downloaded: ${(downloaded / 1024 / 1024).toStringAsFixed(1)}MB');
-        }),
-      ]);
+      await for (final chunk in streamedRes.stream) {
+        if (!mounted) { await sink.close(); return; }
+        sink.add(chunk);
+        downloaded += chunk.length;
+        setState(() {
+          _prog = totalBytes > 0
+              ? (0.05 + downloaded / totalBytes * 0.90).clamp(0.0, 0.95)
+              : 0.5;
+          _msg = 'Stealing... ${(downloaded / 1024 / 1024).toStringAsFixed(1)} MB';
+        });
+      }
+      await sink.flush();
+      await sink.close();
+
+      if (downloaded < 10000) {
+        throw Exception('File too small (${downloaded}B) — download failed');
+      }
 
       await _player.setFilePath(_outPath);
       setState(() {
@@ -153,8 +175,6 @@ class _MelodyScreenState extends State<MelodyScreen>
       });
     } catch (e) {
       setState(() { _st = _State.idle; _msg = 'ERR: $e'; });
-    } finally {
-      yt.close();
     }
   }
 

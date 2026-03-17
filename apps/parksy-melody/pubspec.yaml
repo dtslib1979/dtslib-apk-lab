@@ -1,7 +1,7 @@
 name: parksy_melody
 description: Parksy Melody — YouTube audio cutter with preset clips & Telegram bridge
 publish_to: 'none'
-version: 1.0.7+8
+version: 1.0.8+9
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  youtube_explode_dart: ^3.0.0
   just_audio: ^0.9.36
   ffmpeg_kit_flutter_new_audio: ^2.0.0
   path_provider: ^2.1.1
