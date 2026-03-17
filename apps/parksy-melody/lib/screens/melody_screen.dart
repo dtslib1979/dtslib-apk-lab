@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,9 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
-import 'package:permission_handler/permission_handler.dart';
 
 // Telegram bot config (personal use)
 const _botToken = '8669426963:AAGvsn8ZnWgkTccw2G2AqgxHbq9RVtmBZMA';
@@ -91,51 +90,65 @@ class _MelodyScreenState extends State<MelodyScreen> {
     final url = _urlController.text.trim();
     if (url.isEmpty) return;
 
-    await Permission.storage.request();
-
     setState(() {
       _state = AppState.downloading;
       _downloadProgress = 0.0;
-      _statusMsg = 'Fetching stream info...';
+      _statusMsg = 'Requesting audio link...';
     });
 
     try {
-      final yt = YoutubeExplode();
-      VideoId videoId;
-      try {
-        videoId = VideoId(url);
-      } catch (_) {
-        yt.close();
-        setState(() {
-          _state = AppState.idle;
-          _statusMsg = 'Invalid YouTube URL';
-        });
-        return;
+      // Step 1: cobalt API → get direct audio stream URL
+      final cobaltResp = await http.post(
+        Uri.parse('https://api.cobalt.tools/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'url': url, 'downloadMode': 'audio'}),
+      );
+
+      if (cobaltResp.statusCode != 200) {
+        throw Exception('cobalt error ${cobaltResp.statusCode}: ${cobaltResp.body}');
       }
 
-      final manifest = await yt.videos.streamsClient.getManifest(videoId);
-      final audioStream = manifest.audioOnly.withHighestBitrate();
+      final cobaltData = jsonDecode(cobaltResp.body) as Map<String, dynamic>;
+      final status = cobaltData['status'] as String? ?? '';
+      final downloadUrl = cobaltData['url'] as String?;
+
+      if (status == 'error') {
+        final errCode = (cobaltData['error'] as Map?)?['code'] ?? cobaltData['text'] ?? 'unknown';
+        throw Exception('cobalt: $errCode');
+      }
+      if (downloadUrl == null) {
+        throw Exception('No URL in cobalt response (status: $status)');
+      }
+
+      // Step 2: stream download
+      setState(() => _statusMsg = 'Downloading audio...');
 
       final dir = await getTemporaryDirectory();
       final outPath = '${dir.path}/melody_dl.m4a';
       final outFile = File(outPath);
       if (await outFile.exists()) await outFile.delete();
 
-      setState(() => _statusMsg = 'Downloading audio...');
+      final req = http.Request('GET', Uri.parse(downloadUrl));
+      final streamedResp = await req.send();
 
-      final stream = yt.videos.streamsClient.get(audioStream);
-      final totalBytes = audioStream.size.totalBytes;
+      if (streamedResp.statusCode != 200) {
+        throw Exception('Stream error ${streamedResp.statusCode}');
+      }
+
+      final totalBytes = streamedResp.contentLength ?? 0;
       int received = 0;
       final sink = outFile.openWrite();
-      await for (final chunk in stream) {
+      await for (final chunk in streamedResp.stream) {
         sink.add(chunk);
         received += chunk.length;
-        if (mounted) {
+        if (totalBytes > 0 && mounted) {
           setState(() => _downloadProgress = received / totalBytes);
         }
       }
       await sink.close();
-      yt.close();
 
       await _player.setFilePath(outPath);
       final dur = _player.duration;
@@ -145,6 +158,7 @@ class _MelodyScreenState extends State<MelodyScreen> {
         _totalDuration = dur ?? Duration.zero;
         _state = AppState.ready;
         _statusMsg = 'Ready — ${_fmt(dur ?? Duration.zero)}';
+        _downloadProgress = 1.0;
       });
     } catch (e) {
       setState(() {
