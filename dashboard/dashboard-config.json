@@ -39,7 +39,7 @@
     "warningText": "Debug builds — Internal & partner use only"
   },
   "stats": {
-    "total_apps": 11,
+    "total_apps": 12,
     "store_apps": 8,
     "total_dart_lines": 19946,
     "total_kotlin_lines": 5399,
@@ -115,6 +115,10 @@
     "creative": {
       "label": "Creative",
       "color": "#DDA0DD"
+    },
+    "hardware": {
+      "label": "Hardware",
+      "color": "#E8C547"
     }
   }
 }
