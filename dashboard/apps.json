@@ -132,14 +132,14 @@
   {
     "id": "parksy-melody",
     "name": "Parksy Melody",
-    "version": "v1.0.2",
+    "version": "v1.0.3",
     "registryStatus": "store-registered",
     "category": "audio",
     "description": "YouTube audio cutter — preset clips (10s/20s/30s/1min/3min) + Telegram bridge",
     "icon": "🎵",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-melody-v1.0.2/app-debug.apk",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-melody-v1.0.3/app-debug.apk",
     "workflow": "build-parksy-melody.yml",
-    "releaseTag": "parksy-melody-v1.0.2",
+    "releaseTag": "parksy-melody-v1.0.3",
     "lastUpdated": "2026-03-17"
   },
   {
@@ -158,7 +158,7 @@
   {
     "id": "parksy-tts",
     "name": "Parksy TTS",
-    "version": "v1.0.2",
+    "version": "v1.0.3",
     "registryStatus": "discontinued",
     "category": "utility",
     "description": "배치 TTS 변환 클라이언트",

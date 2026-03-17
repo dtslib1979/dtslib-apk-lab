@@ -36,6 +36,7 @@ class MainActivity : FlutterActivity() {
                                 "-x", "--audio-format", "mp3",
                                 "--audio-quality", "5",
                                 "--no-playlist",
+                                "--force-overwrites",
                                 "-o", output,
                                 url
                             ))

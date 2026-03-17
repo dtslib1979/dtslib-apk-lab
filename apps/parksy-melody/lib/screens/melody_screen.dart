@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 
 // Telegram bot config (personal use)
 const _botToken = '8669426963:AAGvsn8ZnWgkTccw2G2AqgxHbq9RVtmBZMA';
@@ -95,15 +96,20 @@ class _MelodyScreenState extends State<MelodyScreen> {
     setState(() {
       _state = AppState.downloading;
       _downloadProgress = 0.0;
-      _statusMsg = 'Starting yt-dlp...';
+      _statusMsg = 'Requesting permissions...';
     });
 
-    try {
-      // Delete stale file
-      final outFile = File(_dlPath);
-      if (await outFile.exists()) await outFile.delete();
+    // Request storage permissions (READ_MEDIA_AUDIO on Android 13+, storage on older)
+    await Permission.audio.request();
+    await Permission.storage.request();
 
-      // Kick off yt-dlp in Termux background
+    setState(() => _statusMsg = 'Starting yt-dlp...');
+
+    try {
+      // Record start time to reject stale files
+      final startTime = DateTime.now().subtract(const Duration(seconds: 3));
+
+      // Kick off yt-dlp in Termux background (--force-overwrites handles stale file)
       await _intentChannel.invokeMethod('runYtDlp', {
         'url': url,
         'output': _dlPath,
@@ -111,29 +117,34 @@ class _MelodyScreenState extends State<MelodyScreen> {
 
       setState(() => _statusMsg = 'Downloading via yt-dlp...');
 
-      // Poll until file is stable (size unchanged for 2s) — max 3 min
+      final outFile = File(_dlPath);
       int lastSize = -1;
       int stableCount = 0;
       bool done = false;
 
-      for (int i = 0; i < 180; i++) {
+      // Poll max 90s: file must be newer than startTime AND size stable for 2s
+      for (int i = 0; i < 90; i++) {
         await Future.delayed(const Duration(seconds: 1));
         if (!mounted) return;
 
         if (await outFile.exists()) {
-          final size = await outFile.length();
-          if (size > 50000 && size == lastSize) {
-            stableCount++;
-            if (stableCount >= 2) { done = true; break; }
-          } else {
-            stableCount = 0;
+          final stat = await outFile.stat();
+          // Ignore stale files from previous runs
+          if (stat.modified.isAfter(startTime)) {
+            final size = await outFile.length();
+            if (size > 50000 && size == lastSize) {
+              stableCount++;
+              if (stableCount >= 2) { done = true; break; }
+            } else {
+              stableCount = 0;
+            }
+            lastSize = size;
           }
-          lastSize = size;
         }
         setState(() => _downloadProgress = (i / 60).clamp(0.0, 0.95));
       }
 
-      if (!done) throw Exception('Timeout. Check Termux notification.');
+      if (!done) throw Exception('Timeout. Check Termux for errors.');
 
       await _player.setFilePath(_dlPath);
       final dur = _player.duration;
