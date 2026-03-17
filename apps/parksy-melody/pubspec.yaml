@@ -1,7 +1,7 @@
 name: parksy_melody
 description: Parksy Melody — YouTube audio cutter with preset clips & Telegram bridge
 publish_to: 'none'
-version: 1.0.6+7
+version: 1.0.7+8
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

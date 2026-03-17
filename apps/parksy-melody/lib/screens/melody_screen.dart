@@ -117,21 +117,31 @@ class _MelodyScreenState extends State<MelodyScreen>
 
       final outFile = File(_outPath);
       final sink = outFile.openWrite();
-      final stream = yt.videos.streamsClient.get(audioInfo);
       int downloaded = 0;
 
-      await for (final chunk in stream) {
-        if (!mounted) { await sink.close(); return; }
-        sink.add(chunk);
-        downloaded += chunk.length;
-        setState(() {
-          _prog = (downloaded / totalBytes * 0.95).clamp(0.0, 0.95);
-          _msg = 'Stealing... ${(downloaded / 1024 / 1024).toStringAsFixed(1)} / '
-              '${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB';
-        });
-      }
-      await sink.flush();
-      await sink.close();
+      await Future.any([
+        () async {
+          final stream = yt.videos.streamsClient.get(audioInfo);
+          await for (final chunk in stream) {
+            if (!mounted) { await sink.close(); return; }
+            sink.add(chunk);
+            downloaded += chunk.length;
+            setState(() {
+              _prog = (downloaded / totalBytes * 0.95).clamp(0.0, 0.95);
+              _msg = 'Stealing... ${(downloaded / 1024 / 1024).toStringAsFixed(1)} / '
+                  '${(totalBytes / 1024 / 1024).toStringAsFixed(1)} MB';
+            });
+          }
+          await sink.flush();
+          await sink.close();
+        }(),
+        Future.delayed(const Duration(seconds: 60), () async {
+          await sink.close();
+          throw Exception('Stream timeout — youtube_explode_dart stream hung.\n'
+              'Size: ${(totalBytes / 1024 / 1024).toStringAsFixed(1)}MB\n'
+              'Downloaded: ${(downloaded / 1024 / 1024).toStringAsFixed(1)}MB');
+        }),
+      ]);
 
       await _player.setFilePath(_outPath);
       setState(() {
