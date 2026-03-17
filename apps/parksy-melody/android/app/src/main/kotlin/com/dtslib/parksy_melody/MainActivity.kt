@@ -31,8 +31,9 @@ class MainActivity : FlutterActivity() {
                             i.setClassName("com.termux", "com.termux.app.RunCommandService")
                             i.action = "com.termux.RUN_COMMAND"
                             i.putExtra("com.termux.RUN_COMMAND_PATH",
-                                "/data/data/com.termux/files/usr/bin/yt-dlp")
+                                "/data/data/com.termux/files/usr/bin/python3.12")
                             i.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(
+                                "/data/data/com.termux/files/usr/bin/yt-dlp",
                                 "-x", "--audio-format", "mp3",
                                 "--audio-quality", "5",
                                 "--no-playlist",

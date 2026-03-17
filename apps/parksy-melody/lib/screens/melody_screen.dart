@@ -8,267 +8,279 @@ import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
-// Telegram bot config (personal use)
 const _botToken = '8669426963:AAGvsn8ZnWgkTccw2G2AqgxHbq9RVtmBZMA';
 const _chatId = '6858098283';
 
-const _kBg = Color(0xFF0D0D0D);
-const _kSurface = Color(0xFF1A1A1A);
-const _kGold = Color(0xFFE8D5B7);
-const _kDim = Color(0xFF2A2A2A);
-const _kAccent = Color(0xFFD4AF37);
+// ── Thief palette ──────────────────────────────────────────────
+const _kBg      = Color(0xFF0A0A0A);
+const _kSurface = Color(0xFF141414);
+const _kCard    = Color(0xFF1C1C1C);
+const _kRed     = Color(0xFFE53935);
+const _kRedDim  = Color(0xFF4A1010);
+const _kText    = Color(0xFFF5F5F5);
+const _kMuted   = Color(0xFF666666);
+const _kBorder  = Color(0xFF2A2A2A);
 
-enum AppState { idle, downloading, ready, trimming, sending, done }
-
-class _Preset {
-  final String label;
-  final int seconds;
-  const _Preset(this.label, this.seconds);
-}
-
-const _presets = [
-  _Preset('10s', 10),
-  _Preset('20s', 20),
-  _Preset('30s', 30),
-  _Preset('1 min', 60),
-  _Preset('3 min', 180),
-];
+enum _State { idle, downloading, ready, trimming, sending, done }
 
 class MelodyScreen extends StatefulWidget {
   const MelodyScreen({super.key});
-
   @override
   State<MelodyScreen> createState() => _MelodyScreenState();
 }
 
-class _MelodyScreenState extends State<MelodyScreen> {
-  static const _intentChannel = MethodChannel('com.parksy.melody/intent');
+class _MelodyScreenState extends State<MelodyScreen>
+    with SingleTickerProviderStateMixin {
+  static const _ch = MethodChannel('com.parksy.melody/intent');
 
-  final _urlController = TextEditingController();
-  final _player = AudioPlayer();
+  final _urlCtrl = TextEditingController();
+  final _player  = AudioPlayer();
+  late final AnimationController _pulseCtrl;
 
-  AppState _state = AppState.idle;
-  String _statusMsg = '';
-  double _downloadProgress = 0.0;
+  _State _st = _State.idle;
+  String _msg = '';
+  double _prog = 0.0;
+  String? _dlPath;
+  Duration _dur = Duration.zero;
+  Duration _pos = Duration.zero;
+  int _preset = 30;
+  bool _playing = false;
 
-  String? _downloadedPath;
-  Duration _totalDuration = Duration.zero;
-  Duration _position = Duration.zero;
-  int _selectedPreset = 30; // default 30s
-  bool _isPlaying = false;
+  static const _presets = [
+    (label: '10s',   sec: 10),
+    (label: '20s',   sec: 20),
+    (label: '30s',   sec: 30),
+    (label: '1 min', sec: 60),
+    (label: '3 min', sec: 180),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _player.positionStream.listen((pos) {
-      if (mounted) setState(() => _position = pos);
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _player.positionStream.listen((p) {
+      if (mounted) setState(() => _pos = p);
     });
     _player.playerStateStream.listen((s) {
-      if (mounted) setState(() => _isPlaying = s.playing);
+      if (mounted) setState(() => _playing = s.playing);
     });
-    _checkSharedUrl();
-  }
-
-  Future<void> _checkSharedUrl() async {
-    try {
-      final url = await _intentChannel.invokeMethod<String>('getSharedUrl');
-      if (url != null && url.isNotEmpty && mounted) {
-        _urlController.text = url;
-        setState(() => _statusMsg = 'YouTube URL received from share');
-      }
-    } catch (_) {}
+    _loadSharedUrl();
   }
 
   @override
   void dispose() {
+    _pulseCtrl.dispose();
     _player.dispose();
-    _urlController.dispose();
+    _urlCtrl.dispose();
     super.dispose();
   }
 
-  // yt-dlp via Termux RUN_COMMAND — output always /sdcard/Music/melody_dl.mp3
-  static const _dlPath = '/sdcard/Music/melody_dl.mp3';
-
-  Future<void> _download() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty) return;
-
-    setState(() {
-      _state = AppState.downloading;
-      _downloadProgress = 0.0;
-      _statusMsg = 'Requesting permissions...';
-    });
-
-    // Request storage permissions (READ_MEDIA_AUDIO on Android 13+, storage on older)
-    await Permission.audio.request();
-    await Permission.storage.request();
-
-    setState(() => _statusMsg = 'Starting yt-dlp...');
-
+  Future<void> _loadSharedUrl() async {
     try {
-      // Record start time to reject stale files
-      final startTime = DateTime.now().subtract(const Duration(seconds: 3));
-
-      // Kick off yt-dlp in Termux background (--force-overwrites handles stale file)
-      await _intentChannel.invokeMethod('runYtDlp', {
-        'url': url,
-        'output': _dlPath,
-      });
-
-      setState(() => _statusMsg = 'Downloading via yt-dlp...');
-
-      final outFile = File(_dlPath);
-      int lastSize = -1;
-      int stableCount = 0;
-      bool done = false;
-
-      // Poll max 90s: file must be newer than startTime AND size stable for 2s
-      for (int i = 0; i < 90; i++) {
-        await Future.delayed(const Duration(seconds: 1));
-        if (!mounted) return;
-
-        if (await outFile.exists()) {
-          final stat = await outFile.stat();
-          // Ignore stale files from previous runs
-          if (stat.modified.isAfter(startTime)) {
-            final size = await outFile.length();
-            if (size > 50000 && size == lastSize) {
-              stableCount++;
-              if (stableCount >= 2) { done = true; break; }
-            } else {
-              stableCount = 0;
-            }
-            lastSize = size;
-          }
-        }
-        setState(() => _downloadProgress = (i / 60).clamp(0.0, 0.95));
+      final url = await _ch.invokeMethod<String>('getSharedUrl');
+      if (url != null && url.isNotEmpty && mounted) {
+        _urlCtrl.text = url;
+        setState(() => _msg = '📎 YouTube URL received');
       }
-
-      if (!done) throw Exception('Timeout. Check Termux for errors.');
-
-      await _player.setFilePath(_dlPath);
-      final dur = _player.duration;
-
-      setState(() {
-        _downloadedPath = _dlPath;
-        _totalDuration = dur ?? Duration.zero;
-        _state = AppState.ready;
-        _statusMsg = 'Ready — ${_fmt(dur ?? Duration.zero)}';
-        _downloadProgress = 1.0;
-      });
-    } catch (e) {
-      setState(() {
-        _state = AppState.idle;
-        _statusMsg = 'Error: $e';
-      });
-    }
-  }
-
-  Future<void> _cutAndSend() async {
-    if (_downloadedPath == null) return;
-
-    final endSec = _selectedPreset;
-    final actualEnd = _totalDuration.inSeconds > 0
-        ? endSec.clamp(1, _totalDuration.inSeconds)
-        : endSec;
-
-    setState(() {
-      _state = AppState.trimming;
-      _statusMsg = 'Trimming 0~${endSec}s...';
-    });
-    await _player.stop();
-
-    final dir = await getTemporaryDirectory();
-    final outPath = '${dir.path}/melody_cut_${endSec}s.mp3';
-
-    final cmd = '-y -i "$_downloadedPath" -t $actualEnd -acodec libmp3lame -ab 192k "$outPath"';
-    final session = await FFmpegKit.execute(cmd);
-    final rc = await session.getReturnCode();
-
-    if (!ReturnCode.isSuccess(rc)) {
-      setState(() {
-        _state = AppState.ready;
-        _statusMsg = 'Trim failed';
-      });
-      return;
-    }
-
-    setState(() {
-      _state = AppState.sending;
-      _statusMsg = 'Sending to Telegram...';
-    });
-
-    try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://api.telegram.org/bot$_botToken/sendDocument'),
-      );
-      request.fields['chat_id'] = _chatId;
-      request.files.add(await http.MultipartFile.fromPath('document', outPath,
-          filename: 'melody_${endSec}s.mp3'));
-
-      final response = await request.send();
-      final statusCode = response.statusCode;
-
-      setState(() {
-        _state = AppState.done;
-        _statusMsg = statusCode == 200
-            ? '✅ Sent! Check @parksy_bridges_bot'
-            : '❌ Telegram error $statusCode';
-      });
-    } catch (e) {
-      setState(() {
-        _state = AppState.ready;
-        _statusMsg = 'Send failed: $e';
-      });
-    }
-  }
-
-  String _fmt(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+    } catch (_) {}
   }
 
   bool get _busy =>
-      _state == AppState.downloading ||
-      _state == AppState.trimming ||
-      _state == AppState.sending;
+      _st == _State.downloading ||
+      _st == _State.trimming ||
+      _st == _State.sending;
 
+  // ── Download ─────────────────────────────────────────────────
+  static const _outPath = '/sdcard/Music/melody_dl.mp3';
+
+  Future<void> _download() async {
+    final url = _urlCtrl.text.trim();
+    if (url.isEmpty) return;
+
+    setState(() { _st = _State.downloading; _prog = 0; _msg = 'Checking permissions...'; });
+
+    await Permission.audio.request();
+    await Permission.storage.request();
+
+    setState(() => _msg = 'Launching yt-dlp...');
+
+    try {
+      final startTime = DateTime.now().subtract(const Duration(seconds: 3));
+      await _ch.invokeMethod('runYtDlp', {'url': url, 'output': _outPath});
+      setState(() => _msg = 'Stealing audio... 🥷');
+
+      final f = File(_outPath);
+      int lastSz = -1, stable = 0;
+      bool done = false;
+
+      for (int i = 0; i < 90; i++) {
+        await Future.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        if (await f.exists()) {
+          final stat = await f.stat();
+          if (stat.modified.isAfter(startTime)) {
+            final sz = await f.length();
+            if (sz > 50000 && sz == lastSz) {
+              if (++stable >= 2) { done = true; break; }
+            } else {
+              stable = 0;
+            }
+            lastSz = sz;
+          }
+        }
+        setState(() => _prog = (i / 60).clamp(0.0, 0.95));
+      }
+
+      if (!done) throw Exception('Timeout — check Termux');
+
+      await _player.setFilePath(_outPath);
+      setState(() {
+        _dlPath = _outPath;
+        _dur = _player.duration ?? Duration.zero;
+        _st = _State.ready;
+        _msg = 'Stolen ✓  ${_fmt(_dur)}';
+        _prog = 1.0;
+      });
+    } catch (e) {
+      setState(() { _st = _State.idle; _msg = 'Error: $e'; });
+    }
+  }
+
+  // ── Cut & Send ────────────────────────────────────────────────
+  Future<void> _cutAndSend() async {
+    if (_dlPath == null) return;
+    final end = _preset.clamp(1, _dur.inSeconds > 0 ? _dur.inSeconds : _preset);
+
+    setState(() { _st = _State.trimming; _msg = 'Cutting 0–${end}s...'; });
+    await _player.stop();
+
+    final tmp = await getTemporaryDirectory();
+    final out = '${tmp.path}/cut_${end}s.mp3';
+
+    final session = await FFmpegKit.execute(
+        '-y -i "$_dlPath" -t $end -acodec libmp3lame -ab 192k "$out"');
+    if (!ReturnCode.isSuccess(await session.getReturnCode())) {
+      setState(() { _st = _State.ready; _msg = 'Trim failed'; });
+      return;
+    }
+
+    setState(() { _st = _State.sending; _msg = 'Sending to Telegram...'; });
+    try {
+      final req = http.MultipartRequest(
+          'POST', Uri.parse('https://api.telegram.org/bot$_botToken/sendDocument'));
+      req.fields['chat_id'] = _chatId;
+      req.files.add(await http.MultipartFile.fromPath(
+          'document', out, filename: 'melody_${end}s.mp3'));
+      final res = await req.send();
+      setState(() {
+        _st = _State.done;
+        _msg = res.statusCode == 200 ? '✅ Sent to @parksy_bridges_bot' : '❌ Telegram ${res.statusCode}';
+      });
+    } catch (e) {
+      setState(() { _st = _State.ready; _msg = 'Send error: $e'; });
+    }
+  }
+
+  String _fmt(Duration d) =>
+      '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}:'
+      '${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
+
+  // ── Build ─────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _kBg,
-      appBar: AppBar(
-        backgroundColor: _kBg,
-        title: const Text('🎵 Parksy Melody',
-            style: TextStyle(color: _kGold, fontWeight: FontWeight.bold)),
-        elevation: 0,
-      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
-            _buildUrlCard(),
-            const SizedBox(height: 12),
-            if (_state != AppState.idle) _buildStatusCard(),
-            if (_state == AppState.downloading) ...[
-              const SizedBox(height: 8),
-              _buildProgressBar(),
-            ],
-            if (_state == AppState.ready ||
-                _state == AppState.trimming ||
-                _state == AppState.sending ||
-                _state == AppState.done) ...[
-              const SizedBox(height: 12),
-              _buildPlayerCard(),
-              const SizedBox(height: 12),
-              _buildPresetCard(),
-              const SizedBox(height: 16),
-              _buildSendButton(),
-            ],
+            _buildHeader(),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _buildUrlCard(),
+                  const SizedBox(height: 12),
+                  if (_st != _State.idle) _buildStatusRow(),
+                  if (_busy) ...[
+                    const SizedBox(height: 8),
+                    _buildProgressBar(),
+                  ],
+                  if (_st == _State.ready ||
+                      _st == _State.trimming ||
+                      _st == _State.sending ||
+                      _st == _State.done) ...[
+                    const SizedBox(height: 12),
+                    _buildPlayer(),
+                    const SizedBox(height: 12),
+                    _buildPresets(),
+                    const SizedBox(height: 16),
+                    _buildSendBtn(),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      color: _kSurface,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: _kRedDim,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _kRed.withOpacity(0.6), width: 1.5),
+            ),
+            child: const Center(
+              child: Text('🥷', style: TextStyle(fontSize: 20)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('MELODY',
+                  style: TextStyle(
+                    color: _kText,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  )),
+              Text('YouTube Audio Stealer',
+                  style: TextStyle(
+                    color: _kRed,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 1.5,
+                  )),
+            ],
+          ),
+          const Spacer(),
+          if (_busy)
+            AnimatedBuilder(
+              animation: _pulseCtrl,
+              builder: (_, __) => Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kRed.withOpacity(0.4 + 0.6 * _pulseCtrl.value),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -276,60 +288,86 @@ class _MelodyScreenState extends State<MelodyScreen> {
   Widget _buildUrlCard() {
     return Container(
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: _kCard,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('YouTube URL',
-              style: TextStyle(color: _kGold, fontSize: 12,
-                  fontWeight: FontWeight.w600, letterSpacing: 1)),
-          const SizedBox(height: 8),
+          Row(children: [
+            Container(
+              width: 4, height: 14,
+              decoration: BoxDecoration(
+                color: _kRed,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('TARGET URL',
+                style: TextStyle(
+                  color: _kMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                )),
+          ]),
+          const SizedBox(height: 10),
           TextField(
-            controller: _urlController,
+            controller: _urlCtrl,
             enabled: !_busy,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+            style: const TextStyle(color: _kText, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Paste URL or share from YouTube app',
-              hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+              hintText: 'youtube.com/watch?v=... or share from YouTube',
+              hintStyle: const TextStyle(color: _kMuted, fontSize: 12),
               filled: true,
-              fillColor: _kDim,
+              fillColor: _kBg,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
+                borderSide: const BorderSide(color: _kBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _kBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _kRed),
               ),
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              suffixIcon: _urlController.text.isNotEmpty
+              suffixIcon: _urlCtrl.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.white38, size: 18),
-                      onPressed: () => setState(() => _urlController.clear()),
+                      icon: const Icon(Icons.close, color: _kMuted, size: 16),
+                      onPressed: () => setState(() => _urlCtrl.clear()),
                     )
                   : null,
             ),
             onChanged: (_) => setState(() {}),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
+            height: 46,
             child: ElevatedButton(
               onPressed: (_busy ||
-                      _urlController.text.trim().isEmpty ||
-                      _state == AppState.done)
+                      _urlCtrl.text.trim().isEmpty ||
+                      _st == _State.done)
                   ? null
                   : _download,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _kAccent,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                backgroundColor: _kRed,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: _kRedDim,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
               ),
               child: Text(
-                _state == AppState.downloading ? 'Downloading...' : 'DOWNLOAD',
-                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                _st == _State.downloading ? 'STEALING...' : 'STEAL AUDIO',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800, letterSpacing: 1.5, fontSize: 13),
               ),
             ),
           ),
@@ -338,33 +376,32 @@ class _MelodyScreenState extends State<MelodyScreen> {
     );
   }
 
-  Widget _buildStatusCard() {
+  Widget _buildStatusRow() {
+    final isOk = _st == _State.done && _msg.startsWith('✅');
     return Container(
-      decoration: BoxDecoration(
-        color: _kSurface,
-        borderRadius: BorderRadius.circular(8),
-      ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: isOk ? Colors.green.withOpacity(0.4) : _kBorder),
+      ),
       child: Row(
         children: [
           if (_busy)
             const SizedBox(
-              width: 14,
-              height: 14,
+              width: 12, height: 12,
               child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: _kGold,
+                strokeWidth: 2, color: _kRed,
               ),
             ),
           if (_busy) const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              _statusMsg,
-              style: TextStyle(
-                color: _state == AppState.done ? const Color(0xFF4CAF50) : _kGold,
-                fontSize: 13,
-              ),
-            ),
+            child: Text(_msg,
+                style: TextStyle(
+                  color: isOk ? Colors.greenAccent : _kText,
+                  fontSize: 12,
+                )),
           ),
         ],
       ),
@@ -375,112 +412,106 @@ class _MelodyScreenState extends State<MelodyScreen> {
     return Column(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(3),
           child: LinearProgressIndicator(
-            value: _downloadProgress,
-            backgroundColor: _kDim,
-            valueColor: const AlwaysStoppedAnimation<Color>(_kAccent),
-            minHeight: 6,
+            value: _prog,
+            backgroundColor: _kBorder,
+            valueColor: const AlwaysStoppedAnimation<Color>(_kRed),
+            minHeight: 3,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          '${(_downloadProgress * 100).toStringAsFixed(0)}%',
-          style: const TextStyle(color: Colors.white38, fontSize: 11),
+        const SizedBox(height: 3),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text('${(_prog * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(color: _kMuted, fontSize: 10)),
         ),
       ],
     );
   }
 
-  Widget _buildPlayerCard() {
-    final progress = _totalDuration.inMilliseconds > 0
-        ? _position.inMilliseconds / _totalDuration.inMilliseconds
+  Widget _buildPlayer() {
+    final pct = _dur.inMilliseconds > 0
+        ? (_pos.inMilliseconds / _dur.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
-
     return Container(
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: _kCard,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_fmt(_position),
-                  style: const TextStyle(color: _kGold, fontSize: 13)),
-              Text(_fmt(_totalDuration),
-                  style: const TextStyle(color: Colors.white38, fontSize: 13)),
+              Text(_fmt(_pos),
+                  style: const TextStyle(color: _kText, fontSize: 12,
+                      fontFamily: 'monospace')),
+              Text(_fmt(_dur),
+                  style: const TextStyle(color: _kMuted, fontSize: 12,
+                      fontFamily: 'monospace')),
             ],
           ),
-          const SizedBox(height: 6),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              activeTrackColor: _kAccent,
-              inactiveTrackColor: _kDim,
-              thumbColor: _kGold,
-              overlayColor: _kGold.withOpacity(0.2),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              trackHeight: 3,
+              activeTrackColor: _kRed,
+              inactiveTrackColor: _kBorder,
+              thumbColor: _kRed,
+              overlayColor: _kRed.withOpacity(0.2),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+              trackHeight: 2,
             ),
             child: Slider(
-              value: progress.clamp(0.0, 1.0),
+              value: pct,
               onChanged: _busy
                   ? null
-                  : (val) {
-                      final pos = Duration(
-                          milliseconds:
-                              (val * _totalDuration.inMilliseconds).round());
-                      _player.seek(pos);
-                    },
+                  : (v) => _player.seek(Duration(
+                      milliseconds: (v * _dur.inMilliseconds).round())),
             ),
           ),
-          const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                icon: const Icon(Icons.replay_10, color: _kGold),
+                icon: const Icon(Icons.replay_10, color: _kMuted, size: 22),
                 onPressed: _busy
                     ? null
                     : () => _player.seek(Duration(
-                        seconds: (_position.inSeconds - 10).clamp(0,
-                            _totalDuration.inSeconds))),
+                        seconds: (_pos.inSeconds - 10)
+                            .clamp(0, _dur.inSeconds))),
               ),
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: _busy
                     ? null
-                    : () {
-                        if (_isPlaying) {
-                          _player.pause();
-                        } else {
-                          _player.play();
-                        }
-                      },
+                    : () => _playing ? _player.pause() : _player.play(),
                 child: Container(
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _busy ? _kDim : _kAccent,
+                    color: _busy ? _kRedDim : _kRed,
+                    boxShadow: _busy
+                        ? null
+                        : [BoxShadow(color: _kRed.withOpacity(0.4), blurRadius: 12)],
                   ),
                   child: Icon(
-                    _isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.black,
-                    size: 28,
+                    _playing ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white,
+                    size: 24,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.forward_10, color: _kGold),
+                icon: const Icon(Icons.forward_10, color: _kMuted, size: 22),
                 onPressed: _busy
                     ? null
                     : () => _player.seek(Duration(
-                        seconds: (_position.inSeconds + 10).clamp(0,
-                            _totalDuration.inSeconds))),
+                        seconds: (_pos.inSeconds + 10)
+                            .clamp(0, _dur.inSeconds))),
               ),
             ],
           ),
@@ -489,80 +520,101 @@ class _MelodyScreenState extends State<MelodyScreen> {
     );
   }
 
-  Widget _buildPresetCard() {
+  Widget _buildPresets() {
     return Container(
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: _kCard,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('CUT PRESET',
-              style: TextStyle(
-                  color: _kGold, fontSize: 12,
-                  fontWeight: FontWeight.w600, letterSpacing: 1)),
+          Row(children: [
+            Container(
+              width: 4, height: 14,
+              decoration: BoxDecoration(
+                color: _kRed,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('CUT LENGTH',
+                style: TextStyle(
+                  color: _kMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                )),
+          ]),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: _presets.map((p) {
-              final selected = _selectedPreset == p.seconds;
+              final sel = _preset == p.sec;
               return GestureDetector(
-                onTap: _busy ? null : () => setState(() => _selectedPreset = p.seconds),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                onTap: _busy ? null : () => setState(() => _preset = p.sec),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   decoration: BoxDecoration(
-                    color: selected ? _kAccent : _kDim,
-                    borderRadius: BorderRadius.circular(8),
-                    border: selected
-                        ? null
-                        : Border.all(color: Colors.white12),
+                    color: sel ? _kRed : _kBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: sel ? _kRed : _kBorder, width: 1),
                   ),
-                  child: Text(
-                    p.label,
-                    style: TextStyle(
-                      color: selected ? Colors.black : Colors.white70,
-                      fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 14,
-                    ),
-                  ),
+                  child: Text(p.label,
+                      style: TextStyle(
+                        color: sel ? Colors.white : _kMuted,
+                        fontWeight:
+                            sel ? FontWeight.w700 : FontWeight.normal,
+                        fontSize: 13,
+                      )),
                 ),
               );
             }).toList(),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Will cut from 0:00 to ${_fmt(Duration(seconds: _selectedPreset))}',
-            style: const TextStyle(color: Colors.white38, fontSize: 12),
-          ),
+          Text('Cut: 0:00 → ${_fmt(Duration(seconds: _preset))}',
+              style: const TextStyle(color: _kMuted, fontSize: 11)),
         ],
       ),
     );
   }
 
-  Widget _buildSendButton() {
-    final canSend = _state == AppState.ready || _state == AppState.done;
+  Widget _buildSendBtn() {
+    final can = _st == _State.ready || _st == _State.done;
     return SizedBox(
       width: double.infinity,
-      height: 52,
-      child: ElevatedButton.icon(
-        onPressed: canSend ? _cutAndSend : null,
-        icon: const Icon(Icons.send, size: 18),
-        label: Text(
-          _state == AppState.trimming
-              ? 'Trimming...'
-              : _state == AppState.sending
-                  ? 'Sending...'
-                  : 'CUT & SEND TO TELEGRAM',
-          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
-        ),
+      height: 50,
+      child: ElevatedButton(
+        onPressed: can ? _cutAndSend : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: canSend ? const Color(0xFF0088CC) : _kDim,
+          backgroundColor: can ? const Color(0xFF0088CC) : _kCard,
           foregroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          disabledForegroundColor: _kMuted,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+          elevation: 0,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.send, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              _st == _State.trimming
+                  ? 'CUTTING...'
+                  : _st == _State.sending
+                      ? 'SENDING...'
+                      : 'CUT & SEND TO TELEGRAM',
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, letterSpacing: 1, fontSize: 13),
+            ),
+          ],
         ),
       ),
     );

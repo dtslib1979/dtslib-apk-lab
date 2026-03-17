@@ -1,9 +1,9 @@
 {
   "id": "parksy-melody",
   "name": "Parksy Melody",
-  "desc": "YouTube audio cutter — preset clips (10s/20s/30s/1min/3min) + Telegram bridge",
-  "version": "v1.0.3",
-  "icon": "🎵",
+  "desc": "YouTube audio cutter \u2014 preset clips (10s/20s/30s/1min/3min) + Telegram bridge",
+  "version": "v1.0.4",
+  "icon": "\ud83c\udfb5",
   "cardClass": "melody",
   "workflow": "build-parksy-melody"
 }
