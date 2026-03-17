@@ -158,7 +158,7 @@
   {
     "id": "parksy-tts",
     "name": "Parksy TTS",
-    "version": "v1.0.3",
+    "version": "v1.0.2",
     "registryStatus": "discontinued",
     "category": "utility",
     "description": "배치 TTS 변환 클라이언트",
