@@ -135,12 +135,12 @@
     "version": "v2.0.0",
     "registryStatus": "store-registered",
     "category": "audio",
-    "description": "YouTube audio cutter — preset clips (10s/20s/30s/1min/3min) + Telegram bridge",
+    "description": "YouTube audio cutter — start-point trim + fade + launcher dashboard",
     "icon": "🎵",
-    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-melody-v1.1.0/app-debug.apk",
+    "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-melody-v2.0.0/app-debug.apk",
     "workflow": "build-parksy-melody.yml",
-    "releaseTag": "parksy-melody-v1.1.0",
-    "lastUpdated": "2026-03-18"
+    "releaseTag": "parksy-melody-v2.0.0",
+    "lastUpdated": "2026-03-19"
   },
   {
     "id": "parksy-printer",
