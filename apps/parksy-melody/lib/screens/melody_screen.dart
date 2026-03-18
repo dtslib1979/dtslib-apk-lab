@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10,9 +11,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 
 const _botToken = '8669426963:AAGvsn8ZnWgkTccw2G2AqgxHbq9RVtmBZMA';
-const _chatId = '6858098283';
+const _chatId   = '6858098283';
 
-// ── Thief palette ──────────────────────────────────────────────
+// ── Thief palette ───────────────────────────────────────────────
 const _kBg      = Color(0xFF0A0A0A);
 const _kSurface = Color(0xFF141414);
 const _kCard    = Color(0xFF1C1C1C);
@@ -21,6 +22,7 @@ const _kRedDim  = Color(0xFF4A1010);
 const _kText    = Color(0xFFF5F5F5);
 const _kMuted   = Color(0xFF666666);
 const _kBorder  = Color(0xFF2A2A2A);
+const _kGold    = Color(0xFFFFB300);
 
 enum _State { idle, downloading, ready, trimming, sending, done }
 
@@ -33,25 +35,33 @@ class MelodyScreen extends StatefulWidget {
 class _MelodyScreenState extends State<MelodyScreen>
     with SingleTickerProviderStateMixin {
   static const _ch = MethodChannel('com.parksy.melody/intent');
+  final _rng = Random();
 
   final _urlCtrl = TextEditingController();
   final _player  = AudioPlayer();
   late final AnimationController _pulseCtrl;
 
-  _State _st = _State.idle;
-  String _msg = '';
+  _State _st   = _State.idle;
+  String _msg  = '';
   double _prog = 0.0;
   String? _dlPath;
   Duration _dur = Duration.zero;
   Duration _pos = Duration.zero;
-  int _preset = 30;
-  bool _playing = false;
+  int  _preset   = 30;
+  bool _playing  = false;
+
+  // ── 스타트 포인트 (초 단위) ─────────────────────────────────────
+  double _startSec = 0.0;
+
+  static const _rawPath = '/sdcard/Download/melody_raw.tmp';
+  static const _outPath = '/sdcard/Download/melody_dl.mp3';
 
   static const _presets = [
     (label: '10s',   sec: 10),
     (label: '20s',   sec: 20),
     (label: '30s',   sec: 30),
     (label: '1 min', sec: 60),
+    (label: '2 min', sec: 120),
     (label: '3 min', sec: 180),
   ];
 
@@ -91,30 +101,39 @@ class _MelodyScreenState extends State<MelodyScreen>
 
   bool get _busy =>
       _st == _State.downloading ||
-      _st == _State.trimming ||
+      _st == _State.trimming    ||
       _st == _State.sending;
 
-  // ── Download ─────────────────────────────────────────────────
-  static const _rawPath = '/sdcard/Download/melody_raw.tmp';
-  static const _outPath = '/sdcard/Download/melody_dl.mp3';
+  // ── 스타트 포인트 확정 ──────────────────────────────────────────
+  void _setStart() {
+    setState(() {
+      _startSec = _pos.inMilliseconds / 1000.0;
+      _msg = '📍 Start set → ${_fmtSec(_startSec)}';
+    });
+  }
 
+  // ── Download ──────────────────────────────────────────────────
   Future<void> _download() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) return;
 
-    setState(() { _st = _State.downloading; _prog = 0.05; _msg = 'Getting stream URL...'; });
+    setState(() {
+      _st       = _State.downloading;
+      _prog     = 0.05;
+      _msg      = 'Getting stream URL...';
+      _startSec = 0.0;
+    });
 
     await Permission.audio.request();
     await Permission.storage.request();
 
     try {
-      // Step 1: NewPipeExtractor로 오디오 스트림 URL 추출
-      final streamUrl = await _ch.invokeMethod<String>('getAudioUrl', {'url': url});
+      final streamUrl =
+          await _ch.invokeMethod<String>('getAudioUrl', {'url': url});
       if (streamUrl == null) throw Exception('No stream URL returned');
 
       setState(() { _prog = 0.1; _msg = 'Downloading audio...'; });
 
-      // Step 2: 스트리밍 다운로드
       final client = http.Client();
       try {
         final request = http.Request('GET', Uri.parse(streamUrl));
@@ -122,15 +141,16 @@ class _MelodyScreenState extends State<MelodyScreen>
         final response = await client.send(request);
         final contentLength = response.contentLength ?? 0;
 
-        final rawFile = File(_rawPath);
-        final sink = rawFile.openWrite();
+        final sink = File(_rawPath).openWrite();
         int downloaded = 0;
-
         await for (final chunk in response.stream) {
           sink.add(chunk);
           downloaded += chunk.length;
           if (contentLength > 0 && mounted) {
-            setState(() { _prog = 0.1 + 0.8 * (downloaded / contentLength); _msg = 'Downloading... ${(downloaded / 1024 / 1024).toStringAsFixed(1)}MB'; });
+            setState(() {
+              _prog = 0.1 + 0.8 * (downloaded / contentLength);
+              _msg  = 'Downloading... ${(downloaded / 1024 / 1024).toStringAsFixed(1)} MB';
+            });
           }
         }
         await sink.close();
@@ -140,22 +160,20 @@ class _MelodyScreenState extends State<MelodyScreen>
 
       setState(() { _prog = 0.92; _msg = 'Converting to MP3...'; });
 
-      // Step 3: MP3 변환 (m4a/webm → mp3)
       final session = await FFmpegKit.execute(
           '-y -i "$_rawPath" -acodec libmp3lame -ab 192k "$_outPath"');
       if (!ReturnCode.isSuccess(await session.getReturnCode())) {
-        // 변환 실패 시 raw 파일 그대로 사용
         await File(_rawPath).copy(_outPath);
       }
 
-      setState(() { _prog = 0.97; _msg = 'Loading...'; });
+      setState(() { _prog = 0.97; _msg = 'Loading player...'; });
       await _player.setFilePath(_outPath);
       setState(() {
         _dlPath = _outPath;
-        _dur = _player.duration ?? Duration.zero;
-        _st = _State.ready;
-        _msg = 'Stolen ✓  ${_fmt(_dur)}';
-        _prog = 1.0;
+        _dur    = _player.duration ?? Duration.zero;
+        _st     = _State.ready;
+        _msg    = 'Stolen ✓  ${_fmt(_dur)}  |  seek → SET START → CUT';
+        _prog   = 1.0;
       });
     } catch (e) {
       setState(() { _st = _State.idle; _msg = 'ERR: $e'; });
@@ -163,18 +181,38 @@ class _MelodyScreenState extends State<MelodyScreen>
   }
 
   // ── Cut & Send ────────────────────────────────────────────────
+  // 페이드아웃: 1.2 ~ 1.8s 랜덤 (자연스러운 루프/믹스 위해)
+  double get _fadeOut => 1.2 + _rng.nextDouble() * 0.6;  // [1.2, 1.8)
+  static const _fadeIn = 0.5;
+
   Future<void> _cutAndSend() async {
     if (_dlPath == null) return;
-    final end = _preset.clamp(1, _dur.inSeconds > 0 ? _dur.inSeconds : _preset);
 
-    setState(() { _st = _State.trimming; _msg = 'Cutting 0–${end}s...'; });
+    final totalDur = _dur.inSeconds > 0 ? _dur.inSeconds : _preset;
+    final maxStart = (totalDur - 1).clamp(0, totalDur).toDouble();
+    final start    = _startSec.clamp(0.0, maxStart);
+    final dur      = _preset.clamp(1, (totalDur - start.toInt()).clamp(1, _preset));
+    final fo       = _fadeOut;
+    final foStart  = (dur - fo).clamp(0.0, dur.toDouble());
+
+    setState(() {
+      _st  = _State.trimming;
+      _msg = 'Cutting ${_fmtSec(start)} → ${_fmtSec(start + dur)}  (fade out: ${fo.toStringAsFixed(1)}s)...';
+    });
     await _player.stop();
 
     final tmp = await getTemporaryDirectory();
-    final out = '${tmp.path}/cut_${end}s.mp3';
+    final out = '${tmp.path}/cut_${_preset}s_${start.toInt()}s.mp3';
 
-    final session = await FFmpegKit.execute(
-        '-y -i "$_dlPath" -t $end -acodec libmp3lame -ab 192k "$out"');
+    // -ss 앞에 위치 = 빠른 seek, 오디오는 정확도 충분
+    // afade=in 0.5s + afade=out 랜덤 1.2~1.8s
+    final cmd = '-y -ss ${start.toStringAsFixed(3)} -t $dur '
+        '-i "$_dlPath" '
+        '-af "afade=t=in:st=0:d=$_fadeIn,'
+        'afade=t=out:st=${foStart.toStringAsFixed(3)}:d=${fo.toStringAsFixed(3)}" '
+        '-acodec libmp3lame -ab 192k "$out"';
+
+    final session = await FFmpegKit.execute(cmd);
     if (!ReturnCode.isSuccess(await session.getReturnCode())) {
       setState(() { _st = _State.ready; _msg = 'Trim failed'; });
       return;
@@ -183,14 +221,18 @@ class _MelodyScreenState extends State<MelodyScreen>
     setState(() { _st = _State.sending; _msg = 'Sending to Telegram...'; });
     try {
       final req = http.MultipartRequest(
-          'POST', Uri.parse('https://api.telegram.org/bot$_botToken/sendDocument'));
+          'POST',
+          Uri.parse('https://api.telegram.org/bot$_botToken/sendDocument'));
       req.fields['chat_id'] = _chatId;
       req.files.add(await http.MultipartFile.fromPath(
-          'document', out, filename: 'melody_${end}s.mp3'));
+          'document', out,
+          filename: 'melody_${_preset}s_from${start.toInt()}s.mp3'));
       final res = await req.send();
       setState(() {
-        _st = _State.done;
-        _msg = res.statusCode == 200 ? '✅ Sent to @parksy_bridges_bot' : '❌ Telegram ${res.statusCode}';
+        _st  = _State.done;
+        _msg = res.statusCode == 200
+            ? '✅ Sent → @parksy_bridges_bot'
+            : '❌ Telegram ${res.statusCode}';
       });
     } catch (e) {
       setState(() { _st = _State.ready; _msg = 'Send error: $e'; });
@@ -201,6 +243,12 @@ class _MelodyScreenState extends State<MelodyScreen>
       '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}:'
       '${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
 
+  String _fmtSec(double s) {
+    final m = (s ~/ 60).toString().padLeft(2, '0');
+    final sec = (s % 60).toStringAsFixed(0).padLeft(2, '0');
+    return '$m:$sec';
+  }
+
   // ── Build ─────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -209,7 +257,7 @@ class _MelodyScreenState extends State<MelodyScreen>
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
+            _buildHeader(context),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -228,7 +276,7 @@ class _MelodyScreenState extends State<MelodyScreen>
                     const SizedBox(height: 12),
                     _buildPlayer(),
                     const SizedBox(height: 12),
-                    _buildPresets(),
+                    _buildCutCard(),
                     const SizedBox(height: 16),
                     _buildSendBtn(),
                   ],
@@ -241,42 +289,46 @@ class _MelodyScreenState extends State<MelodyScreen>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
       color: _kSurface,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: _kMuted, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => Navigator.pop(context),
+          ),
+          const SizedBox(width: 10),
           Container(
-            width: 38,
-            height: 38,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: _kRedDim,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(9),
               border: Border.all(color: _kRed.withOpacity(0.6), width: 1.5),
             ),
-            child: const Center(
-              child: Text('🥷', style: TextStyle(fontSize: 20)),
-            ),
+            child: const Center(child: Text('🥷', style: TextStyle(fontSize: 18))),
           ),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('MELODY',
+              const Text('YOUTUBE 채집',
                   style: TextStyle(
                     color: _kText,
-                    fontSize: 18,
+                    fontSize: 15,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
+                    letterSpacing: 2.5,
                   )),
-              Text('YouTube Audio Stealer',
+              Text('steal → trim → send',
                   style: TextStyle(
-                    color: _kRed,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 1.5,
+                    color: _kRed.withOpacity(0.7),
+                    fontSize: 9,
+                    letterSpacing: 1.2,
                   )),
             ],
           ),
@@ -309,30 +361,14 @@ class _MelodyScreenState extends State<MelodyScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(
-              width: 4, height: 14,
-              decoration: BoxDecoration(
-                color: _kRed,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text('TARGET URL',
-                style: TextStyle(
-                  color: _kMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                )),
-          ]),
+          _sectionLabel('TARGET URL'),
           const SizedBox(height: 10),
           TextField(
             controller: _urlCtrl,
             enabled: !_busy,
             style: const TextStyle(color: _kText, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'youtube.com/watch?v=... or share from YouTube',
+              hintText: 'youtube.com/watch?v=...  또는 YouTube 공유',
               hintStyle: const TextStyle(color: _kMuted, fontSize: 12),
               filled: true,
               fillColor: _kBg,
@@ -390,7 +426,7 @@ class _MelodyScreenState extends State<MelodyScreen>
   }
 
   Widget _buildStatusRow() {
-    final isOk = _st == _State.done && _msg.startsWith('✅');
+    final isOk  = _st == _State.done && _msg.startsWith('✅');
     final isErr = _st == _State.idle && _msg.startsWith('ERR:');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -398,11 +434,12 @@ class _MelodyScreenState extends State<MelodyScreen>
         color: _kCard,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color: isOk
-                ? Colors.green.withOpacity(0.4)
-                : isErr
-                    ? Colors.red.withOpacity(0.5)
-                    : _kBorder),
+          color: isOk
+              ? Colors.green.withOpacity(0.4)
+              : isErr
+                  ? Colors.red.withOpacity(0.5)
+                  : _kBorder,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,9 +449,7 @@ class _MelodyScreenState extends State<MelodyScreen>
               padding: const EdgeInsets.only(top: 2),
               child: const SizedBox(
                 width: 12, height: 12,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2, color: _kRed,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2, color: _kRed),
               ),
             ),
           if (_busy) const SizedBox(width: 10),
@@ -461,6 +496,10 @@ class _MelodyScreenState extends State<MelodyScreen>
     final pct = _dur.inMilliseconds > 0
         ? (_pos.inMilliseconds / _dur.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
+    final startPct = _dur.inMilliseconds > 0
+        ? (_startSec * 1000 / _dur.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
     return Container(
       decoration: BoxDecoration(
         color: _kCard,
@@ -470,34 +509,93 @@ class _MelodyScreenState extends State<MelodyScreen>
       padding: const EdgeInsets.all(14),
       child: Column(
         children: [
+          // 시간 표시 + SET START 버튼
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(_fmt(_pos),
-                  style: const TextStyle(color: _kText, fontSize: 12,
-                      fontFamily: 'monospace')),
+                  style: const TextStyle(
+                      color: _kText, fontSize: 12, fontFamily: 'monospace')),
+              GestureDetector(
+                onTap: _busy ? null : _setStart,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _startSec > 0
+                        ? _kGold.withOpacity(0.15)
+                        : _kRedDim,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _startSec > 0
+                          ? _kGold.withOpacity(0.6)
+                          : _kRed.withOpacity(0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.flag,
+                          size: 12,
+                          color: _startSec > 0 ? _kGold : _kRed),
+                      const SizedBox(width: 4),
+                      Text(
+                        _startSec > 0
+                            ? 'START: ${_fmtSec(_startSec)}'
+                            : 'SET START',
+                        style: TextStyle(
+                          color: _startSec > 0 ? _kGold : _kRed,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               Text(_fmt(_dur),
-                  style: const TextStyle(color: _kMuted, fontSize: 12,
-                      fontFamily: 'monospace')),
+                  style: const TextStyle(
+                      color: _kMuted, fontSize: 12, fontFamily: 'monospace')),
             ],
           ),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: _kRed,
-              inactiveTrackColor: _kBorder,
-              thumbColor: _kRed,
-              overlayColor: _kRed.withOpacity(0.2),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-              trackHeight: 2,
-            ),
-            child: Slider(
-              value: pct,
-              onChanged: _busy
-                  ? null
-                  : (v) => _player.seek(Duration(
-                      milliseconds: (v * _dur.inMilliseconds).round())),
-            ),
+          const SizedBox(height: 4),
+          // 슬라이더 + 스타트 마커
+          Stack(
+            children: [
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: _kRed,
+                  inactiveTrackColor: _kBorder,
+                  thumbColor: _kRed,
+                  overlayColor: _kRed.withOpacity(0.2),
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  trackHeight: 3,
+                ),
+                child: Slider(
+                  value: pct,
+                  onChanged: _busy
+                      ? null
+                      : (v) => _player.seek(Duration(
+                          milliseconds:
+                              (v * _dur.inMilliseconds).round())),
+                ),
+              ),
+              // 스타트 포인트 마커 (골드 삼각형)
+              if (_startSec > 0 && _dur.inMilliseconds > 0)
+                Positioned(
+                  left: 12 + startPct * (MediaQuery.of(context).size.width - 32 - 24),
+                  top: 14,
+                  child: Container(
+                    width: 2,
+                    height: 20,
+                    color: _kGold.withOpacity(0.8),
+                  ),
+                ),
+            ],
           ),
+          // 컨트롤
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -506,8 +604,8 @@ class _MelodyScreenState extends State<MelodyScreen>
                 onPressed: _busy
                     ? null
                     : () => _player.seek(Duration(
-                        seconds: (_pos.inSeconds - 10)
-                            .clamp(0, _dur.inSeconds))),
+                        seconds:
+                            (_pos.inSeconds - 10).clamp(0, _dur.inSeconds))),
               ),
               const SizedBox(width: 8),
               GestureDetector(
@@ -524,11 +622,8 @@ class _MelodyScreenState extends State<MelodyScreen>
                         ? null
                         : [BoxShadow(color: _kRed.withOpacity(0.4), blurRadius: 12)],
                   ),
-                  child: Icon(
-                    _playing ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
-                    size: 24,
-                  ),
+                  child: Icon(_playing ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white, size: 24),
                 ),
               ),
               const SizedBox(width: 8),
@@ -537,8 +632,8 @@ class _MelodyScreenState extends State<MelodyScreen>
                 onPressed: _busy
                     ? null
                     : () => _player.seek(Duration(
-                        seconds: (_pos.inSeconds + 10)
-                            .clamp(0, _dur.inSeconds))),
+                        seconds:
+                            (_pos.inSeconds + 10).clamp(0, _dur.inSeconds))),
               ),
             ],
           ),
@@ -547,7 +642,8 @@ class _MelodyScreenState extends State<MelodyScreen>
     );
   }
 
-  Widget _buildPresets() {
+  Widget _buildCutCard() {
+    final endSec = _startSec + _preset;
     return Container(
       decoration: BoxDecoration(
         color: _kCard,
@@ -558,23 +654,7 @@ class _MelodyScreenState extends State<MelodyScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(
-              width: 4, height: 14,
-              decoration: BoxDecoration(
-                color: _kRed,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text('CUT LENGTH',
-                style: TextStyle(
-                  color: _kMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                )),
-          ]),
+          _sectionLabel('CUT LENGTH'),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
@@ -604,11 +684,61 @@ class _MelodyScreenState extends State<MelodyScreen>
               );
             }).toList(),
           ),
-          const SizedBox(height: 8),
-          Text('Cut: 0:00 → ${_fmt(Duration(seconds: _preset))}',
-              style: const TextStyle(color: _kMuted, fontSize: 11)),
+          const SizedBox(height: 12),
+          // 컷 범위 + 페이드 정보
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _kBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _kBorder),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _infoChip('START', _fmtSec(_startSec),
+                        _startSec > 0 ? _kGold : _kMuted),
+                    const Icon(Icons.arrow_forward, color: _kMuted, size: 14),
+                    _infoChip('END', _fmtSec(endSec), _kText),
+                    const Icon(Icons.arrow_forward, color: _kMuted, size: 14),
+                    _infoChip('DUR', '${_preset}s', _kRed),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.graphic_eq, color: _kMuted, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      'fade in: ${_fadeIn}s  |  fade out: 1.2~1.8s (random)',
+                      style: const TextStyle(color: _kMuted, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _infoChip(String label, String value, Color valueColor) {
+    return Column(
+      children: [
+        Text(label,
+            style: const TextStyle(color: _kMuted, fontSize: 9, letterSpacing: 1)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: TextStyle(
+                color: valueColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'monospace')),
+      ],
     );
   }
 
@@ -644,6 +774,27 @@ class _MelodyScreenState extends State<MelodyScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _sectionLabel(String label) {
+    return Row(
+      children: [
+        Container(
+          width: 4, height: 14,
+          decoration: BoxDecoration(
+            color: _kRed, borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(label,
+            style: const TextStyle(
+              color: _kMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.5,
+            )),
+      ],
     );
   }
 }
