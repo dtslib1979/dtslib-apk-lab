@@ -5,10 +5,45 @@ import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import okhttp3.OkHttpClient
+import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.downloader.Downloader
+import org.schabi.newpipe.extractor.downloader.Request
+import org.schabi.newpipe.extractor.downloader.Response
+import java.util.concurrent.TimeUnit
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.parksy.melody/intent"
     private var sharedUrl: String? = null
+
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    private val npeDownloader = object : Downloader() {
+        override fun execute(request: Request): Response {
+            val reqBuilder = okhttp3.Request.Builder().url(request.url())
+            request.headers().forEach { (key, values) ->
+                values.forEach { reqBuilder.addHeader(key, it) }
+            }
+            val response = okHttpClient.newCall(reqBuilder.build()).execute()
+            return Response(
+                response.code,
+                response.message,
+                response.headers.toMultimap(),
+                response.body?.string(),
+                response.request.url.toString()
+            )
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        try { NewPipe.init(npeDownloader) } catch (e: Exception) {}
+        extractSharedUrl(intent)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -19,14 +54,29 @@ class MainActivity : FlutterActivity() {
                         result.success(sharedUrl)
                         sharedUrl = null
                     }
+                    "getAudioUrl" -> {
+                        val url = call.argument<String>("url")
+                        if (url == null) {
+                            result.error("ARGS", "url required", null)
+                            return@setMethodCallHandler
+                        }
+                        Thread {
+                            try {
+                                NewPipe.init(npeDownloader)
+                                val extractor = ServiceList.YouTube.getStreamExtractor(url)
+                                extractor.fetchPage()
+                                val audioStream = extractor.audioStreams
+                                    .maxByOrNull { it.bitrate }
+                                    ?: throw Exception("No audio stream found")
+                                runOnUiThread { result.success(audioStream.content) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("NPE", e.message, null) }
+                            }
+                        }.start()
+                    }
                     else -> result.notImplemented()
                 }
             }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        extractSharedUrl(intent)
     }
 
     override fun onNewIntent(intent: Intent) {

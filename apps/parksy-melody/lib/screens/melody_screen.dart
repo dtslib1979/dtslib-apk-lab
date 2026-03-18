@@ -1,264 +1,351 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_audio/return_code.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:async';
 
-// Telegram bot config (personal use)
 const _botToken = '8669426963:AAGvsn8ZnWgkTccw2G2AqgxHbq9RVtmBZMA';
-const _chatId = '6858098283';
+const _chatId   = '6858098283';
 
-const _kBg = Color(0xFF0D0D0D);
-const _kSurface = Color(0xFF1A1A1A);
-const _kGold = Color(0xFFE8D5B7);
-const _kDim = Color(0xFF2A2A2A);
-const _kAccent = Color(0xFFD4AF37);
+// ── Thief palette ───────────────────────────────────────────────
+const _kBg      = Color(0xFF0A0A0A);
+const _kSurface = Color(0xFF141414);
+const _kCard    = Color(0xFF1C1C1C);
+const _kRed     = Color(0xFFE53935);
+const _kRedDim  = Color(0xFF4A1010);
+const _kText    = Color(0xFFF5F5F5);
+const _kMuted   = Color(0xFF666666);
+const _kBorder  = Color(0xFF2A2A2A);
+const _kGold    = Color(0xFFFFB300);
 
-enum AppState { idle, downloading, ready, trimming, sending, done }
-
-class _Preset {
-  final String label;
-  final int seconds;
-  const _Preset(this.label, this.seconds);
-}
-
-const _presets = [
-  _Preset('10s', 10),
-  _Preset('20s', 20),
-  _Preset('30s', 30),
-  _Preset('1 min', 60),
-  _Preset('3 min', 180),
-];
+enum _State { idle, downloading, ready, trimming, sending, done }
 
 class MelodyScreen extends StatefulWidget {
   const MelodyScreen({super.key});
-
   @override
   State<MelodyScreen> createState() => _MelodyScreenState();
 }
 
-class _MelodyScreenState extends State<MelodyScreen> {
-  static const _intentChannel = MethodChannel('com.parksy.melody/intent');
+class _MelodyScreenState extends State<MelodyScreen>
+    with SingleTickerProviderStateMixin {
+  static const _ch = MethodChannel('com.parksy.melody/intent');
+  final _rng = Random();
 
-  final _urlController = TextEditingController();
-  final _player = AudioPlayer();
+  final _urlCtrl = TextEditingController();
+  final _player  = AudioPlayer();
+  late final AnimationController _pulseCtrl;
 
-  AppState _state = AppState.idle;
-  String _statusMsg = '';
-  double _downloadProgress = 0.0;
+  _State _st   = _State.idle;
+  String _msg  = '';
+  double _prog = 0.0;
+  String? _dlPath;
+  Duration _dur = Duration.zero;
+  Duration _pos = Duration.zero;
+  int  _preset   = 30;
+  bool _playing  = false;
 
-  String? _downloadedPath;
-  Duration _totalDuration = Duration.zero;
-  Duration _position = Duration.zero;
-  int _selectedPreset = 30; // default 30s
-  bool _isPlaying = false;
+  // ── 스타트 포인트 (초 단위) ─────────────────────────────────────
+  double _startSec = 0.0;
+
+  static const _rawPath = '/sdcard/Download/melody_raw.tmp';
+  static const _outPath = '/sdcard/Download/melody_dl.mp3';
+
+  static const _presets = [
+    (label: '10s',   sec: 10),
+    (label: '20s',   sec: 20),
+    (label: '30s',   sec: 30),
+    (label: '1 min', sec: 60),
+    (label: '2 min', sec: 120),
+    (label: '3 min', sec: 180),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _player.positionStream.listen((pos) {
-      if (mounted) setState(() => _position = pos);
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _player.positionStream.listen((p) {
+      if (mounted) setState(() => _pos = p);
     });
     _player.playerStateStream.listen((s) {
-      if (mounted) setState(() => _isPlaying = s.playing);
+      if (mounted) setState(() => _playing = s.playing);
     });
-    _checkSharedUrl();
-  }
-
-  Future<void> _checkSharedUrl() async {
-    try {
-      final url = await _intentChannel.invokeMethod<String>('getSharedUrl');
-      if (url != null && url.isNotEmpty && mounted) {
-        _urlController.text = url;
-        setState(() => _statusMsg = 'YouTube URL received from share');
-      }
-    } catch (_) {}
+    _loadSharedUrl();
   }
 
   @override
   void dispose() {
+    _pulseCtrl.dispose();
     _player.dispose();
-    _urlController.dispose();
+    _urlCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _download() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty) return;
-
-    await Permission.storage.request();
-
-    setState(() {
-      _state = AppState.downloading;
-      _downloadProgress = 0.0;
-      _statusMsg = 'Fetching stream info...';
-    });
-
+  Future<void> _loadSharedUrl() async {
     try {
-      final yt = YoutubeExplode();
-      VideoId videoId;
-      try {
-        videoId = VideoId(url);
-      } catch (_) {
-        yt.close();
-        setState(() {
-          _state = AppState.idle;
-          _statusMsg = 'Invalid YouTube URL';
-        });
-        return;
+      final url = await _ch.invokeMethod<String>('getSharedUrl');
+      if (url != null && url.isNotEmpty && mounted) {
+        _urlCtrl.text = url;
+        setState(() => _msg = '📎 YouTube URL received');
       }
-
-      final manifest = await yt.videos.streamsClient.getManifest(videoId);
-      final audioStream = manifest.audioOnly.withHighestBitrate();
-
-      final dir = await getTemporaryDirectory();
-      final outPath = '${dir.path}/melody_dl.m4a';
-      final outFile = File(outPath);
-      if (await outFile.exists()) await outFile.delete();
-
-      setState(() => _statusMsg = 'Downloading audio...');
-
-      final stream = yt.videos.streamsClient.get(audioStream);
-      final totalBytes = audioStream.size.totalBytes;
-      int received = 0;
-      final sink = outFile.openWrite();
-      await for (final chunk in stream) {
-        sink.add(chunk);
-        received += chunk.length;
-        if (mounted) {
-          setState(() => _downloadProgress = received / totalBytes);
-        }
-      }
-      await sink.close();
-      yt.close();
-
-      await _player.setFilePath(outPath);
-      final dur = _player.duration;
-
-      setState(() {
-        _downloadedPath = outPath;
-        _totalDuration = dur ?? Duration.zero;
-        _state = AppState.ready;
-        _statusMsg = 'Ready — ${_fmt(dur ?? Duration.zero)}';
-      });
-    } catch (e) {
-      setState(() {
-        _state = AppState.idle;
-        _statusMsg = 'Download failed: $e';
-      });
-    }
-  }
-
-  Future<void> _cutAndSend() async {
-    if (_downloadedPath == null) return;
-
-    final endSec = _selectedPreset;
-    final actualEnd = _totalDuration.inSeconds > 0
-        ? endSec.clamp(1, _totalDuration.inSeconds)
-        : endSec;
-
-    setState(() {
-      _state = AppState.trimming;
-      _statusMsg = 'Trimming 0~${endSec}s...';
-    });
-    await _player.stop();
-
-    final dir = await getTemporaryDirectory();
-    final outPath = '${dir.path}/melody_cut_${endSec}s.mp3';
-
-    final cmd = '-y -i "$_downloadedPath" -t $actualEnd -acodec libmp3lame -ab 192k "$outPath"';
-    final session = await FFmpegKit.execute(cmd);
-    final rc = await session.getReturnCode();
-
-    if (!ReturnCode.isSuccess(rc)) {
-      setState(() {
-        _state = AppState.ready;
-        _statusMsg = 'Trim failed';
-      });
-      return;
-    }
-
-    setState(() {
-      _state = AppState.sending;
-      _statusMsg = 'Sending to Telegram...';
-    });
-
-    try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://api.telegram.org/bot$_botToken/sendDocument'),
-      );
-      request.fields['chat_id'] = _chatId;
-      request.files.add(await http.MultipartFile.fromPath('document', outPath,
-          filename: 'melody_${endSec}s.mp3'));
-
-      final response = await request.send();
-      final statusCode = response.statusCode;
-
-      setState(() {
-        _state = AppState.done;
-        _statusMsg = statusCode == 200
-            ? '✅ Sent! Check @parksy_bridges_bot'
-            : '❌ Telegram error $statusCode';
-      });
-    } catch (e) {
-      setState(() {
-        _state = AppState.ready;
-        _statusMsg = 'Send failed: $e';
-      });
-    }
-  }
-
-  String _fmt(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+    } catch (_) {}
   }
 
   bool get _busy =>
-      _state == AppState.downloading ||
-      _state == AppState.trimming ||
-      _state == AppState.sending;
+      _st == _State.downloading ||
+      _st == _State.trimming    ||
+      _st == _State.sending;
 
+  // ── 스타트 포인트 확정 ──────────────────────────────────────────
+  void _setStart() {
+    setState(() {
+      _startSec = _pos.inMilliseconds / 1000.0;
+      _msg = '📍 Start set → ${_fmtSec(_startSec)}';
+    });
+  }
+
+  // ── Download ──────────────────────────────────────────────────
+  Future<void> _download() async {
+    final url = _urlCtrl.text.trim();
+    if (url.isEmpty) return;
+
+    setState(() {
+      _st       = _State.downloading;
+      _prog     = 0.05;
+      _msg      = 'Getting stream URL...';
+      _startSec = 0.0;
+    });
+
+    await Permission.audio.request();
+    await Permission.storage.request();
+
+    try {
+      final streamUrl =
+          await _ch.invokeMethod<String>('getAudioUrl', {'url': url});
+      if (streamUrl == null) throw Exception('No stream URL returned');
+
+      setState(() { _prog = 0.1; _msg = 'Downloading audio...'; });
+
+      final client = http.Client();
+      try {
+        final request = http.Request('GET', Uri.parse(streamUrl));
+        request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 10)';
+        final response = await client.send(request);
+        final contentLength = response.contentLength ?? 0;
+
+        final sink = File(_rawPath).openWrite();
+        int downloaded = 0;
+        await for (final chunk in response.stream) {
+          sink.add(chunk);
+          downloaded += chunk.length;
+          if (contentLength > 0 && mounted) {
+            setState(() {
+              _prog = 0.1 + 0.8 * (downloaded / contentLength);
+              _msg  = 'Downloading... ${(downloaded / 1024 / 1024).toStringAsFixed(1)} MB';
+            });
+          }
+        }
+        await sink.close();
+      } finally {
+        client.close();
+      }
+
+      setState(() { _prog = 0.92; _msg = 'Converting to MP3...'; });
+
+      final session = await FFmpegKit.execute(
+          '-y -i "$_rawPath" -acodec libmp3lame -ab 192k "$_outPath"');
+      if (!ReturnCode.isSuccess(await session.getReturnCode())) {
+        await File(_rawPath).copy(_outPath);
+      }
+
+      setState(() { _prog = 0.97; _msg = 'Loading player...'; });
+      await _player.setFilePath(_outPath);
+      setState(() {
+        _dlPath = _outPath;
+        _dur    = _player.duration ?? Duration.zero;
+        _st     = _State.ready;
+        _msg    = 'Stolen ✓  ${_fmt(_dur)}  |  seek → SET START → CUT';
+        _prog   = 1.0;
+      });
+    } catch (e) {
+      setState(() { _st = _State.idle; _msg = 'ERR: $e'; });
+    }
+  }
+
+  // ── Cut & Send ────────────────────────────────────────────────
+  // 페이드아웃: 1.2 ~ 1.8s 랜덤 (자연스러운 루프/믹스 위해)
+  double get _fadeOut => 1.2 + _rng.nextDouble() * 0.6;  // [1.2, 1.8)
+  static const _fadeIn = 0.5;
+
+  Future<void> _cutAndSend() async {
+    if (_dlPath == null) return;
+
+    final totalDur = _dur.inSeconds > 0 ? _dur.inSeconds : _preset;
+    final maxStart = (totalDur - 1).clamp(0, totalDur).toDouble();
+    final start    = _startSec.clamp(0.0, maxStart);
+    final dur      = _preset.clamp(1, (totalDur - start.toInt()).clamp(1, _preset));
+    final fo       = _fadeOut;
+    final foStart  = (dur - fo).clamp(0.0, dur.toDouble());
+
+    setState(() {
+      _st  = _State.trimming;
+      _msg = 'Cutting ${_fmtSec(start)} → ${_fmtSec(start + dur)}  (fade out: ${fo.toStringAsFixed(1)}s)...';
+    });
+    await _player.stop();
+
+    final tmp = await getTemporaryDirectory();
+    final out = '${tmp.path}/cut_${_preset}s_${start.toInt()}s.mp3';
+
+    // -ss 앞에 위치 = 빠른 seek, 오디오는 정확도 충분
+    // afade=in 0.5s + afade=out 랜덤 1.2~1.8s
+    final cmd = '-y -ss ${start.toStringAsFixed(3)} -t $dur '
+        '-i "$_dlPath" '
+        '-af "afade=t=in:st=0:d=$_fadeIn,'
+        'afade=t=out:st=${foStart.toStringAsFixed(3)}:d=${fo.toStringAsFixed(3)}" '
+        '-acodec libmp3lame -ab 192k "$out"';
+
+    final session = await FFmpegKit.execute(cmd);
+    if (!ReturnCode.isSuccess(await session.getReturnCode())) {
+      setState(() { _st = _State.ready; _msg = 'Trim failed'; });
+      return;
+    }
+
+    setState(() { _st = _State.sending; _msg = 'Sending to Telegram...'; });
+    try {
+      final req = http.MultipartRequest(
+          'POST',
+          Uri.parse('https://api.telegram.org/bot$_botToken/sendDocument'));
+      req.fields['chat_id'] = _chatId;
+      req.files.add(await http.MultipartFile.fromPath(
+          'document', out,
+          filename: 'melody_${_preset}s_from${start.toInt()}s.mp3'));
+      final res = await req.send();
+      setState(() {
+        _st  = _State.done;
+        _msg = res.statusCode == 200
+            ? '✅ Sent → @parksy_bridges_bot'
+            : '❌ Telegram ${res.statusCode}';
+      });
+    } catch (e) {
+      setState(() { _st = _State.ready; _msg = 'Send error: $e'; });
+    }
+  }
+
+  String _fmt(Duration d) =>
+      '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}:'
+      '${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
+
+  String _fmtSec(double s) {
+    final m = (s ~/ 60).toString().padLeft(2, '0');
+    final sec = (s % 60).toStringAsFixed(0).padLeft(2, '0');
+    return '$m:$sec';
+  }
+
+  // ── Build ─────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _kBg,
-      appBar: AppBar(
-        backgroundColor: _kBg,
-        title: const Text('🎵 Parksy Melody',
-            style: TextStyle(color: _kGold, fontWeight: FontWeight.bold)),
-        elevation: 0,
-      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
-            _buildUrlCard(),
-            const SizedBox(height: 12),
-            if (_state != AppState.idle) _buildStatusCard(),
-            if (_state == AppState.downloading) ...[
-              const SizedBox(height: 8),
-              _buildProgressBar(),
-            ],
-            if (_state == AppState.ready ||
-                _state == AppState.trimming ||
-                _state == AppState.sending ||
-                _state == AppState.done) ...[
-              const SizedBox(height: 12),
-              _buildPlayerCard(),
-              const SizedBox(height: 12),
-              _buildPresetCard(),
-              const SizedBox(height: 16),
-              _buildSendButton(),
-            ],
+            _buildHeader(context),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _buildUrlCard(),
+                  const SizedBox(height: 12),
+                  if (_msg.isNotEmpty) _buildStatusRow(),
+                  if (_busy) ...[
+                    const SizedBox(height: 8),
+                    _buildProgressBar(),
+                  ],
+                  if (_st == _State.ready ||
+                      _st == _State.trimming ||
+                      _st == _State.sending ||
+                      _st == _State.done) ...[
+                    const SizedBox(height: 12),
+                    _buildPlayer(),
+                    const SizedBox(height: 12),
+                    _buildCutCard(),
+                    const SizedBox(height: 16),
+                    _buildSendBtn(),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: _kSurface,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: _kMuted, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => Navigator.pop(context),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _kRedDim,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: _kRed.withOpacity(0.6), width: 1.5),
+            ),
+            child: const Center(child: Text('🥷', style: TextStyle(fontSize: 18))),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('YOUTUBE 채집',
+                  style: TextStyle(
+                    color: _kText,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.5,
+                  )),
+              Text('steal → trim → send',
+                  style: TextStyle(
+                    color: _kRed.withOpacity(0.7),
+                    fontSize: 9,
+                    letterSpacing: 1.2,
+                  )),
+            ],
+          ),
+          const Spacer(),
+          if (_busy)
+            AnimatedBuilder(
+              animation: _pulseCtrl,
+              builder: (_, __) => Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kRed.withOpacity(0.4 + 0.6 * _pulseCtrl.value),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -266,60 +353,70 @@ class _MelodyScreenState extends State<MelodyScreen> {
   Widget _buildUrlCard() {
     return Container(
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: _kCard,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('YouTube URL',
-              style: TextStyle(color: _kGold, fontSize: 12,
-                  fontWeight: FontWeight.w600, letterSpacing: 1)),
-          const SizedBox(height: 8),
+          _sectionLabel('TARGET URL'),
+          const SizedBox(height: 10),
           TextField(
-            controller: _urlController,
+            controller: _urlCtrl,
             enabled: !_busy,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+            style: const TextStyle(color: _kText, fontSize: 14),
             decoration: InputDecoration(
-              hintText: 'Paste URL or share from YouTube app',
-              hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+              hintText: 'youtube.com/watch?v=...  또는 YouTube 공유',
+              hintStyle: const TextStyle(color: _kMuted, fontSize: 12),
               filled: true,
-              fillColor: _kDim,
+              fillColor: _kBg,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
+                borderSide: const BorderSide(color: _kBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _kBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _kRed),
               ),
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              suffixIcon: _urlController.text.isNotEmpty
+              suffixIcon: _urlCtrl.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.white38, size: 18),
-                      onPressed: () => setState(() => _urlController.clear()),
+                      icon: const Icon(Icons.close, color: _kMuted, size: 16),
+                      onPressed: () => setState(() => _urlCtrl.clear()),
                     )
                   : null,
             ),
             onChanged: (_) => setState(() {}),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
+            height: 46,
             child: ElevatedButton(
               onPressed: (_busy ||
-                      _urlController.text.trim().isEmpty ||
-                      _state == AppState.done)
+                      _urlCtrl.text.trim().isEmpty ||
+                      _st == _State.done)
                   ? null
                   : _download,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _kAccent,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                backgroundColor: _kRed,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: _kRedDim,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
               ),
               child: Text(
-                _state == AppState.downloading ? 'Downloading...' : 'DOWNLOAD',
-                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                _st == _State.downloading ? 'STEALING...' : 'STEAL AUDIO',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800, letterSpacing: 1.5, fontSize: 13),
               ),
             ),
           ),
@@ -328,33 +425,45 @@ class _MelodyScreenState extends State<MelodyScreen> {
     );
   }
 
-  Widget _buildStatusCard() {
+  Widget _buildStatusRow() {
+    final isOk  = _st == _State.done && _msg.startsWith('✅');
+    final isErr = _st == _State.idle && _msg.startsWith('ERR:');
     return Container(
-      decoration: BoxDecoration(
-        color: _kSurface,
-        borderRadius: BorderRadius.circular(8),
-      ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isOk
+              ? Colors.green.withOpacity(0.4)
+              : isErr
+                  ? Colors.red.withOpacity(0.5)
+                  : _kBorder,
+        ),
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_busy)
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: _kGold,
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: const SizedBox(
+                width: 12, height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2, color: _kRed),
               ),
             ),
           if (_busy) const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              _statusMsg,
-              style: TextStyle(
-                color: _state == AppState.done ? const Color(0xFF4CAF50) : _kGold,
-                fontSize: 13,
-              ),
-            ),
+            child: Text(_msg,
+                style: TextStyle(
+                  color: isOk
+                      ? Colors.greenAccent
+                      : isErr
+                          ? Colors.red[300]
+                          : _kText,
+                  fontSize: isErr ? 10 : 12,
+                  fontFamily: isErr ? 'monospace' : null,
+                )),
           ),
         ],
       ),
@@ -365,112 +474,166 @@ class _MelodyScreenState extends State<MelodyScreen> {
     return Column(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(3),
           child: LinearProgressIndicator(
-            value: _downloadProgress,
-            backgroundColor: _kDim,
-            valueColor: const AlwaysStoppedAnimation<Color>(_kAccent),
-            minHeight: 6,
+            value: _prog,
+            backgroundColor: _kBorder,
+            valueColor: const AlwaysStoppedAnimation<Color>(_kRed),
+            minHeight: 3,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          '${(_downloadProgress * 100).toStringAsFixed(0)}%',
-          style: const TextStyle(color: Colors.white38, fontSize: 11),
+        const SizedBox(height: 3),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text('${(_prog * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(color: _kMuted, fontSize: 10)),
         ),
       ],
     );
   }
 
-  Widget _buildPlayerCard() {
-    final progress = _totalDuration.inMilliseconds > 0
-        ? _position.inMilliseconds / _totalDuration.inMilliseconds
+  Widget _buildPlayer() {
+    final pct = _dur.inMilliseconds > 0
+        ? (_pos.inMilliseconds / _dur.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+    final startPct = _dur.inMilliseconds > 0
+        ? (_startSec * 1000 / _dur.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
 
     return Container(
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: _kCard,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       child: Column(
         children: [
+          // 시간 표시 + SET START 버튼
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_fmt(_position),
-                  style: const TextStyle(color: _kGold, fontSize: 13)),
-              Text(_fmt(_totalDuration),
-                  style: const TextStyle(color: Colors.white38, fontSize: 13)),
+              Text(_fmt(_pos),
+                  style: const TextStyle(
+                      color: _kText, fontSize: 12, fontFamily: 'monospace')),
+              GestureDetector(
+                onTap: _busy ? null : _setStart,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _startSec > 0
+                        ? _kGold.withOpacity(0.15)
+                        : _kRedDim,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _startSec > 0
+                          ? _kGold.withOpacity(0.6)
+                          : _kRed.withOpacity(0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.flag,
+                          size: 12,
+                          color: _startSec > 0 ? _kGold : _kRed),
+                      const SizedBox(width: 4),
+                      Text(
+                        _startSec > 0
+                            ? 'START: ${_fmtSec(_startSec)}'
+                            : 'SET START',
+                        style: TextStyle(
+                          color: _startSec > 0 ? _kGold : _kRed,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Text(_fmt(_dur),
+                  style: const TextStyle(
+                      color: _kMuted, fontSize: 12, fontFamily: 'monospace')),
             ],
           ),
-          const SizedBox(height: 6),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: _kAccent,
-              inactiveTrackColor: _kDim,
-              thumbColor: _kGold,
-              overlayColor: _kGold.withOpacity(0.2),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              trackHeight: 3,
-            ),
-            child: Slider(
-              value: progress.clamp(0.0, 1.0),
-              onChanged: _busy
-                  ? null
-                  : (val) {
-                      final pos = Duration(
-                          milliseconds:
-                              (val * _totalDuration.inMilliseconds).round());
-                      _player.seek(pos);
-                    },
-            ),
-          ),
           const SizedBox(height: 4),
+          // 슬라이더 + 스타트 마커
+          Stack(
+            children: [
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: _kRed,
+                  inactiveTrackColor: _kBorder,
+                  thumbColor: _kRed,
+                  overlayColor: _kRed.withOpacity(0.2),
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  trackHeight: 3,
+                ),
+                child: Slider(
+                  value: pct,
+                  onChanged: _busy
+                      ? null
+                      : (v) => _player.seek(Duration(
+                          milliseconds:
+                              (v * _dur.inMilliseconds).round())),
+                ),
+              ),
+              // 스타트 포인트 마커 (골드 삼각형)
+              if (_startSec > 0 && _dur.inMilliseconds > 0)
+                Positioned(
+                  left: 12 + startPct * (MediaQuery.of(context).size.width - 32 - 24),
+                  top: 14,
+                  child: Container(
+                    width: 2,
+                    height: 20,
+                    color: _kGold.withOpacity(0.8),
+                  ),
+                ),
+            ],
+          ),
+          // 컨트롤
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                icon: const Icon(Icons.replay_10, color: _kGold),
+                icon: const Icon(Icons.replay_10, color: _kMuted, size: 22),
                 onPressed: _busy
                     ? null
                     : () => _player.seek(Duration(
-                        seconds: (_position.inSeconds - 10).clamp(0,
-                            _totalDuration.inSeconds))),
+                        seconds:
+                            (_pos.inSeconds - 10).clamp(0, _dur.inSeconds))),
               ),
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: _busy
                     ? null
-                    : () {
-                        if (_isPlaying) {
-                          _player.pause();
-                        } else {
-                          _player.play();
-                        }
-                      },
+                    : () => _playing ? _player.pause() : _player.play(),
                 child: Container(
-                  width: 48,
-                  height: 48,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _busy ? _kDim : _kAccent,
+                    color: _busy ? _kRedDim : _kRed,
+                    boxShadow: _busy
+                        ? null
+                        : [BoxShadow(color: _kRed.withOpacity(0.4), blurRadius: 12)],
                   ),
-                  child: Icon(
-                    _isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.black,
-                    size: 28,
-                  ),
+                  child: Icon(_playing ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white, size: 24),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.forward_10, color: _kGold),
+                icon: const Icon(Icons.forward_10, color: _kMuted, size: 22),
                 onPressed: _busy
                     ? null
                     : () => _player.seek(Duration(
-                        seconds: (_position.inSeconds + 10).clamp(0,
-                            _totalDuration.inSeconds))),
+                        seconds:
+                            (_pos.inSeconds + 10).clamp(0, _dur.inSeconds))),
               ),
             ],
           ),
@@ -479,82 +642,159 @@ class _MelodyScreenState extends State<MelodyScreen> {
     );
   }
 
-  Widget _buildPresetCard() {
+  Widget _buildCutCard() {
+    final endSec = _startSec + _preset;
     return Container(
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: _kCard,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('CUT PRESET',
-              style: TextStyle(
-                  color: _kGold, fontSize: 12,
-                  fontWeight: FontWeight.w600, letterSpacing: 1)),
+          _sectionLabel('CUT LENGTH'),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: _presets.map((p) {
-              final selected = _selectedPreset == p.seconds;
+              final sel = _preset == p.sec;
               return GestureDetector(
-                onTap: _busy ? null : () => setState(() => _selectedPreset = p.seconds),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                onTap: _busy ? null : () => setState(() => _preset = p.sec),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   decoration: BoxDecoration(
-                    color: selected ? _kAccent : _kDim,
-                    borderRadius: BorderRadius.circular(8),
-                    border: selected
-                        ? null
-                        : Border.all(color: Colors.white12),
+                    color: sel ? _kRed : _kBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: sel ? _kRed : _kBorder, width: 1),
                   ),
-                  child: Text(
-                    p.label,
-                    style: TextStyle(
-                      color: selected ? Colors.black : Colors.white70,
-                      fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 14,
-                    ),
-                  ),
+                  child: Text(p.label,
+                      style: TextStyle(
+                        color: sel ? Colors.white : _kMuted,
+                        fontWeight:
+                            sel ? FontWeight.w700 : FontWeight.normal,
+                        fontSize: 13,
+                      )),
                 ),
               );
             }).toList(),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Will cut from 0:00 to ${_fmt(Duration(seconds: _selectedPreset))}',
-            style: const TextStyle(color: Colors.white38, fontSize: 12),
+          const SizedBox(height: 12),
+          // 컷 범위 + 페이드 정보
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _kBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _kBorder),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _infoChip('START', _fmtSec(_startSec),
+                        _startSec > 0 ? _kGold : _kMuted),
+                    const Icon(Icons.arrow_forward, color: _kMuted, size: 14),
+                    _infoChip('END', _fmtSec(endSec), _kText),
+                    const Icon(Icons.arrow_forward, color: _kMuted, size: 14),
+                    _infoChip('DUR', '${_preset}s', _kRed),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.graphic_eq, color: _kMuted, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      'fade in: ${_fadeIn}s  |  fade out: 1.2~1.8s (random)',
+                      style: const TextStyle(color: _kMuted, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSendButton() {
-    final canSend = _state == AppState.ready || _state == AppState.done;
+  Widget _infoChip(String label, String value, Color valueColor) {
+    return Column(
+      children: [
+        Text(label,
+            style: const TextStyle(color: _kMuted, fontSize: 9, letterSpacing: 1)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: TextStyle(
+                color: valueColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'monospace')),
+      ],
+    );
+  }
+
+  Widget _buildSendBtn() {
+    final can = _st == _State.ready || _st == _State.done;
     return SizedBox(
       width: double.infinity,
-      height: 52,
-      child: ElevatedButton.icon(
-        onPressed: canSend ? _cutAndSend : null,
-        icon: const Icon(Icons.send, size: 18),
-        label: Text(
-          _state == AppState.trimming
-              ? 'Trimming...'
-              : _state == AppState.sending
-                  ? 'Sending...'
-                  : 'CUT & SEND TO TELEGRAM',
-          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.8),
-        ),
+      height: 50,
+      child: ElevatedButton(
+        onPressed: can ? _cutAndSend : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: canSend ? const Color(0xFF0088CC) : _kDim,
+          backgroundColor: can ? const Color(0xFF0088CC) : _kCard,
           foregroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          disabledForegroundColor: _kMuted,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+          elevation: 0,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.send, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              _st == _State.trimming
+                  ? 'CUTTING...'
+                  : _st == _State.sending
+                      ? 'SENDING...'
+                      : 'CUT & SEND TO TELEGRAM',
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, letterSpacing: 1, fontSize: 13),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _sectionLabel(String label) {
+    return Row(
+      children: [
+        Container(
+          width: 4, height: 14,
+          decoration: BoxDecoration(
+            color: _kRed, borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(label,
+            style: const TextStyle(
+              color: _kMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.5,
+            )),
+      ],
     );
   }
 }
