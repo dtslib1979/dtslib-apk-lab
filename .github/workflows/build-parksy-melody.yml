@@ -68,19 +68,21 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: parksy-melody-v1.1.0
-          name: Parksy Melody v1.1.0
+          tag_name: parksy-melody-v2.0.0
+          name: Parksy Melody v2.0.0
           files: apps/parksy-melody/build/app/outputs/flutter-apk/app-debug.apk
           body: |
-            ## Parksy Melody v1.1.0
+            ## Parksy Melody v2.0.0
 
-            YouTube audio cutter with preset clips & Telegram bridge.
+            YouTube audio cutter with launcher dashboard, start-point trim & fade.
 
             ### Features
+            - Launcher dashboard (MIXER/ANALYZER coming in v2.1/v2.2)
             - Share from YouTube app → auto-fills URL
-            - Download audio via cobalt API (reliable, no binary)
-            - Preset cuts: 10s / 20s / 30s / 1min / 3min
-            - Playback with seek
+            - Download audio via NewPipeExtractor (Android native)
+            - Start-point seek → SET START → cut from any position
+            - Preset cuts: 10s / 20s / 30s / 1min / 2min / 3min
+            - Fade in 0.5s + fade out 1.2~1.8s (random)
             - Cut & send to @parksy_bridges_bot
 
             ### Requirements

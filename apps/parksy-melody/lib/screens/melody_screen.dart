@@ -53,8 +53,9 @@ class _MelodyScreenState extends State<MelodyScreen>
   // ── 스타트 포인트 (초 단위) ─────────────────────────────────────
   double _startSec = 0.0;
 
-  static const _rawPath = '/sdcard/Download/melody_raw.tmp';
-  static const _outPath = '/sdcard/Download/melody_dl.mp3';
+  // path_provider 기반 — Android 11+ 스코프드 스토리지 대응
+  String _rawPath = '';
+  String _outPath = '';
 
   static const _presets = [
     (label: '10s',   sec: 10),
@@ -78,7 +79,18 @@ class _MelodyScreenState extends State<MelodyScreen>
     _player.playerStateStream.listen((s) {
       if (mounted) setState(() => _playing = s.playing);
     });
+    _initPaths();
     _loadSharedUrl();
+  }
+
+  Future<void> _initPaths() async {
+    final tmp = await getTemporaryDirectory();
+    if (mounted) {
+      setState(() {
+        _rawPath = '${tmp.path}/melody_raw.tmp';
+        _outPath = '${tmp.path}/melody_dl.mp3';
+      });
+    }
   }
 
   @override
@@ -116,6 +128,7 @@ class _MelodyScreenState extends State<MelodyScreen>
   Future<void> _download() async {
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) return;
+    if (_rawPath.isEmpty) await _initPaths(); // 경로 미초기화 방어
 
     setState(() {
       _st       = _State.downloading;
