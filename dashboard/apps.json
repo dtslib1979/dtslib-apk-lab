@@ -10,7 +10,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-capture-latest/app-debug.apk",
     "workflow": "build-capture-pipeline.yml",
     "releaseTag": "parksy-capture-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "chrono-call",
@@ -23,7 +23,7 @@
     "downloadUrl": null,
     "workflow": "build-chrono-call.yml",
     "releaseTag": "chrono-call-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-pen",
@@ -36,7 +36,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-pen-latest/app-debug.apk",
     "workflow": "build-laser-pen.yml",
     "releaseTag": "parksy-pen-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "midi-converter",
@@ -49,7 +49,7 @@
     "downloadUrl": null,
     "workflow": "build-midi-converter.yml",
     "releaseTag": "midi-converter-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-audio-tools",
@@ -62,7 +62,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-audio-tools.yml",
     "releaseTag": "parksy-audio-tools-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-axis",
@@ -75,7 +75,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-axis-latest/app-debug.apk",
     "workflow": "build-parksy-axis.yml",
     "releaseTag": "parksy-axis-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-glot",
@@ -88,7 +88,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-glot.yml",
     "releaseTag": "parksy-glot-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-studio",
@@ -101,7 +101,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-studio.yml",
     "releaseTag": "parksy-studio-v1.0.0",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-liner",
@@ -114,7 +114,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-liner.yml",
     "releaseTag": "parksy-liner-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-wavesy",
@@ -127,12 +127,12 @@
     "downloadUrl": null,
     "workflow": "build-parksy-wavesy.yml",
     "releaseTag": "parksy-wavesy-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-melody",
     "name": "Parksy Melody",
-    "version": "v1.1.0",
+    "version": "v2.0.0",
     "registryStatus": "store-registered",
     "category": "audio",
     "description": "YouTube audio cutter — preset clips (10s/20s/30s/1min/3min) + Telegram bridge",
@@ -140,7 +140,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-melody-v1.1.0/app-debug.apk",
     "workflow": "build-parksy-melody.yml",
     "releaseTag": "parksy-melody-v1.1.0",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-printer",
@@ -153,7 +153,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-printer.yml",
     "releaseTag": "parksy-printer-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   },
   {
     "id": "parksy-tts",
@@ -166,6 +166,6 @@
     "downloadUrl": null,
     "workflow": "build-tts-factory.yml",
     "releaseTag": "tts-factory-latest",
-    "lastUpdated": "2026-03-17"
+    "lastUpdated": "2026-03-18"
   }
 ]
