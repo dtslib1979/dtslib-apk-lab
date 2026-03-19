@@ -11,6 +11,8 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaType
 import java.util.concurrent.TimeUnit
 
 class MainActivity : FlutterActivity() {
@@ -27,6 +29,20 @@ class MainActivity : FlutterActivity() {
             val reqBuilder = okhttp3.Request.Builder().url(request.url())
             request.headers().forEach { (key, values) ->
                 values.forEach { reqBuilder.addHeader(key, it) }
+            }
+            // POST body 처리 (visitor_id 등 YouTube API는 POST + JSON body 필수)
+            val body = request.dataToSend()
+            val method = request.httpMethod()
+            when {
+                method.equals("POST", ignoreCase = true) ->
+                    reqBuilder.post(
+                        (body ?: ByteArray(0)).toRequestBody(
+                            "application/json; charset=utf-8".toMediaType()
+                        )
+                    )
+                method.equals("HEAD", ignoreCase = true) ->
+                    reqBuilder.head()
+                // GET은 기본값
             }
             val response = okHttpClient.newCall(reqBuilder.build()).execute()
             return Response(
