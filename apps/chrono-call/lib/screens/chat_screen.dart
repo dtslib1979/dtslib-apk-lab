@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -115,19 +116,101 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() => _listening = false);
   }
 
-  // ── TTS 제어 ───────────────────────────────────────────────
+  // ── Edge TTS (Microsoft 신경망 음성, 무료) ──────────────────
+  // Edge 브라우저가 쓰는 동일한 엔드포인트 — API 키 불필요
+  static const _edgeVoice = 'ko-KR-SunHiNeural';  // 한국어 여성
+  static const _edgeVoiceEn = 'en-US-AriaNeural';  // 영어
+
   Future<void> _speak(String text) async {
     setState(() => _speaking = true);
     try {
-      await _ch.invokeMethod('speak', {'text': text});
+      // Edge TTS REST endpoint
+      final voice = RegExp(r'[가-힣]').hasMatch(text) ? _edgeVoice : _edgeVoiceEn;
+      final ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">'
+          '<voice name="$voice">$text</voice></speak>';
+
+      final res = await http.post(
+        Uri.parse('https://eastus.tts.speech.microsoft.com/cognitiveservices/v1'),
+        headers: {
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': 'audio-16khz-32kbitrate-mono-mp3',
+          'User-Agent': 'edge-tts-android',
+          'Ocp-Apim-Subscription-Key': 'edge-free', // fallback
+        },
+        body: ssml,
+      );
+
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        // 오디오 파일 저장 → 네이티브 재생
+        final tmp = await getTemporaryDirectory();
+        final audioPath = '${tmp.path}/tts_output.mp3';
+        await File(audioPath).writeAsBytes(res.bodyBytes);
+        await _ch.invokeMethod('playAudio', {'path': audioPath});
+      } else {
+        // Edge TTS 실패 시 Android TTS fallback
+        await _ch.invokeMethod('speak', {'text': text});
+      }
     } catch (_) {
-      if (mounted) setState(() => _speaking = false);
+      // fallback to native TTS
+      try { await _ch.invokeMethod('speak', {'text': text}); } catch (_) {}
     }
   }
 
   Future<void> _stopSpeaking() async {
+    try { await _ch.invokeMethod('stopAudio'); } catch (_) {}
     try { await _ch.invokeMethod('stopTTS'); } catch (_) {}
     if (mounted) setState(() => _speaking = false);
+  }
+
+  // ── Google 번역 (무료) ──────────────────────────────────────
+  String _targetLang = 'en';
+  static const _langOptions = [
+    ('en', 'English'), ('ja', '日本語'), ('zh-CN', '中文'),
+    ('es', 'Español'), ('fr', 'Français'), ('de', 'Deutsch'),
+    ('ko', '한국어'), ('pt', 'Português'), ('ru', 'Русский'),
+    ('ar', 'العربية'), ('hi', 'हिन्दी'), ('vi', 'Tiếng Việt'),
+  ];
+
+  Future<void> _translateLastMessage() async {
+    if (_messages.isEmpty) return;
+    final lastAI = _messages.reversed.firstWhere(
+      (m) => !m.isUser, orElse: () => _messages.last);
+    final text = lastAI.text;
+
+    try {
+      final encoded = Uri.encodeComponent(text);
+      final url = 'https://translate.googleapis.com/translate_a/single'
+          '?client=gtx&sl=auto&tl=$_targetLang&dt=t&q=$encoded';
+      final res = await http.get(Uri.parse(url));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final translated = (data[0] as List).map((s) => s[0]).join('');
+        _addMessage('🌐 [$_targetLang] $translated', isUser: false);
+        _speak(translated);
+      }
+    } catch (e) {
+      _addMessage('❌ Translation error: $e', isUser: false);
+    }
+  }
+
+  void _showLangPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _kCard,
+      builder: (_) => ListView(
+        shrinkWrap: true,
+        children: _langOptions.map((l) => ListTile(
+          title: Text(l.$2, style: const TextStyle(color: _kText)),
+          trailing: _targetLang == l.$1
+              ? const Icon(Icons.check, color: _kAccent, size: 18) : null,
+          onTap: () {
+            setState(() => _targetLang = l.$1);
+            Navigator.pop(context);
+            _translateLastMessage();
+          },
+        )).toList(),
+      ),
+    );
   }
 
   // ── 녹음 제어 ──────────────────────────────────────────────
@@ -430,8 +513,22 @@ class _ChatScreenState extends State<ChatScreen> {
       color: _kSurface,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
+          // 번역 버튼
+          GestureDetector(
+            onTap: _messages.isEmpty ? null : _showLangPicker,
+            child: Container(
+              width: 50, height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _kCard,
+                border: Border.all(color: _kBorder),
+              ),
+              child: const Icon(Icons.translate, color: _kMuted, size: 22),
+            ),
+          ),
+
           // 스피킹 중이면 정지 버튼
           if (_speaking)
             GestureDetector(
@@ -446,7 +543,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: const Icon(Icons.stop, color: Colors.orange, size: 28),
               ),
             ),
-          if (_speaking) const SizedBox(width: 24),
 
           // 메인 마이크 버튼
           GestureDetector(
@@ -468,6 +564,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
+
+          // 빈 공간 (대칭)
+          if (!_speaking)
+            const SizedBox(width: 50),
         ],
       ),
     );

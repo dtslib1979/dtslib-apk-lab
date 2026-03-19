@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.Bundle
@@ -28,6 +29,7 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var recorder: MediaRecorder? = null
     private var recordPath: String? = null
+    private var mediaPlayer: MediaPlayer? = null
     private var isListening = false
 
     // 미디어 버튼 수신
@@ -106,6 +108,18 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
                     result.success(true)
                 }
                 "stopTTS"  -> { tts?.stop(); result.success(true) }
+                "playAudio" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    playAudio(path)
+                    result.success(true)
+                }
+                "stopAudio" -> {
+                    mediaPlayer?.stop()
+                    mediaPlayer?.release()
+                    mediaPlayer = null
+                    runOnUiThread { channel?.invokeMethod("onTTSDone", null) }
+                    result.success(true)
+                }
                 "startRecording" -> { startRecording(); result.success(true) }
                 "stopRecording"  -> { stopRecording(); result.success(recordPath) }
                 "startForeground" -> {
@@ -173,6 +187,22 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
     // ── TTS ───────────────────────────────────────────────
     private fun speak(text: String) {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chronocall_utterance")
+    }
+
+    // ── Audio Playback (Edge TTS MP3) ──────────────────────
+    private fun playAudio(path: String) {
+        mediaPlayer?.release()
+        mediaPlayer = MediaPlayer().apply {
+            setDataSource(path)
+            setAudioStreamType(AudioManager.STREAM_VOICE_CALL)
+            setOnCompletionListener {
+                release()
+                mediaPlayer = null
+                runOnUiThread { channel?.invokeMethod("onTTSDone", null) }
+            }
+            prepare()
+            start()
+        }
     }
 
     // ── Recording ─────────────────────────────────────────
