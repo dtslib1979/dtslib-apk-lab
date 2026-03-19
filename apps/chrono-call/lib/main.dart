@@ -1,10 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'screens/chat_screen.dart';
+import 'package:flutter/services.dart';
+import 'screens/landing_screen.dart';
 
 void main() {
   runZonedGuarded(() {
     WidgetsFlutterBinding.ensureInitialized();
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ));
     runApp(const ChronoCallApp());
   }, (error, stack) {
     debugPrint('ChronoCall error: $error\n$stack');
@@ -20,15 +25,16 @@ class ChronoCallApp extends StatelessWidget {
       title: 'ChronoCall',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
-        colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF4FC3F7),
-          surface: const Color(0xFF141414),
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: Colors.white,
+        fontFamily: 'sans-serif',
+        colorScheme: ColorScheme.light(
+          primary: const Color(0xFF007AFF),
+          surface: Colors.white,
         ),
         useMaterial3: true,
       ),
-      home: const ChatScreen(),
+      home: const LandingScreen(),
     );
   }
 }

@@ -66,7 +66,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _apiKey = prefs.getString('claude_api_key'));
+    setState(() => _apiKey = prefs.getString('gemini_api_key'));
   }
 
   void _setupNativeCallbacks() {
@@ -79,7 +79,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (mounted) setState(() { _listening = false; _partial = ''; });
           if (text.isNotEmpty && mounted) {
             _addMessage(text, isUser: true);
-            _sendToClaude(text);
+            _sendToLLM(text);
           } else if (_inCall) {
             // 아무 말 안 했으면 다시 듣기
             await Future.delayed(const Duration(milliseconds: 500));
@@ -300,34 +300,35 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ── Claude API ──────────────────────────────────────────────
-  Future<void> _sendToClaude(String userText) async {
+  // ── Gemini API (무료) ───────────────────────────────────────
+  Future<void> _sendToLLM(String userText) async {
     if (_apiKey == null || _apiKey!.isEmpty) return;
     setState(() => _thinking = true);
 
+    // Gemini 대화 이력 구성
     final history = _messages
         .where((m) => !m.isTranslation && !m.isSystem)
         .toList().reversed.take(40).toList().reversed
-        .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text})
-        .toList();
+        .map((m) => {
+          'role': m.isUser ? 'user' : 'model',
+          'parts': [{'text': m.text}],
+        }).toList();
 
     try {
       final res = await http.post(
-        Uri.parse('https://api.anthropic.com/v1/messages'),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': _apiKey!,
-          'anthropic-version': '2023-06-01',
-        },
+        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/'
+            'gemini-2.0-flash:generateContent?key=$_apiKey'),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'model': 'claude-sonnet-4-20250514',
-          'max_tokens': 1024,
-          'system': _systemPrompt,
-          'messages': history,
+          'system_instruction': {'parts': [{'text': _systemPrompt}]},
+          'contents': history,
+          'generationConfig': {'maxOutputTokens': 1024},
         }),
-      );
+      ).timeout(const Duration(seconds: 30));
+
       if (res.statusCode == 200) {
-        final reply = jsonDecode(res.body)['content'][0]['text'] as String;
+        final data = jsonDecode(res.body);
+        final reply = data['candidates'][0]['content']['parts'][0]['text'] as String;
         _addMessage(reply, isUser: false);
         await _speak(reply);
       } else {
@@ -335,7 +336,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) setState(() => _speaking = false);
       }
     } catch (e) {
-      _addMessage('네트워크 오류', isUser: false);
+      _addMessage('Network error', isUser: false);
       if (mounted) setState(() => _speaking = false);
     }
     if (mounted) setState(() => _thinking = false);
@@ -383,13 +384,13 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
-        title: const Text('Claude API Key',
+        title: const Text('Gemini API Key',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700)),
         content: TextField(
           controller: ctrl,
           style: const TextStyle(color: Colors.black87, fontSize: 13, fontFamily: 'monospace'),
           decoration: InputDecoration(
-            hintText: 'sk-ant-api03-...',
+            hintText: 'AIzaSy...',
             hintStyle: TextStyle(color: Colors.grey[400]),
             filled: true, fillColor: Colors.grey[100],
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -401,7 +402,7 @@ class _ChatScreenState extends State<ChatScreen> {
           TextButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('claude_api_key', ctrl.text.trim());
+              await prefs.setString('gemini_api_key', ctrl.text.trim());
               setState(() => _apiKey = ctrl.text.trim());
               Navigator.pop(context);
             },
@@ -451,7 +452,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Claude Scholar',
+              const Text('AI Scholar',
                   style: TextStyle(color: Colors.white, fontSize: 15,
                       fontWeight: FontWeight.w700)),
               Row(children: [
@@ -461,7 +462,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(width: 5),
                 Text(
                   _inCall ? 'In call $durStr' :
-                  'AI Scholar Hotline  v3.1',
+                  'AI Scholar Hotline  v3.3',
                   style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
               ]),
             ],
@@ -586,7 +587,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Flexible(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(msg.isTranslation ? 'Translated' : 'Claude Scholar',
+                Text(msg.isTranslation ? 'Translated' : 'AI Scholar',
                     style: const TextStyle(color: Color(0xFF5A6B7D),
                         fontSize: 11, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 3),
