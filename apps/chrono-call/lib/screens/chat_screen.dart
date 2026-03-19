@@ -163,9 +163,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() { _inCall = true; _callStart = DateTime.now(); });
 
-    // ForegroundService + 녹음 시작
+    // ForegroundService 시작 (녹음은 마이크 충돌 방지로 분리 — 텍스트 로그로 대체)
     try { await _ch.invokeMethod('startForeground'); } catch (_) {}
-    try { await _ch.invokeMethod('startRecording'); } catch (_) {}
 
     // 통화 연결음 "뚜뚜뚜"
     await _playDialTone();
@@ -180,6 +179,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _addMessage('$_scholarName 연결됨', isUser: false, isSystem: true);
       await _speak('안녕하세요, $_scholarName입니다. 무엇이든 물어보세요.');
     }
+    // 키보드 자동 포커스 (삼성 키보드 🎤 바로 사용 가능)
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
   Future<void> _endCall() async {
@@ -193,8 +196,6 @@ class _ChatScreenState extends State<ChatScreen> {
     // 통화 End음
     await _playHangupTone();
 
-    // 녹음 정지
-    try { await _ch.invokeMethod('stopRecording'); } catch (_) {}
     try { await _ch.invokeMethod('stopForeground'); } catch (_) {}
 
     // 통화 시간 계산

@@ -153,7 +153,12 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
                 "startRecording" -> { startRecording(); result.success(true) }
                 "stopRecording"  -> { stopRecording(); result.success(recordPath) }
                 "startForeground" -> {
-                    enableBluetoothAudio()
+                    // 블루투스 이어버드 연결 시에만 오디오 모드 변경
+                    // 폰 마이크 사용 시 MODE_NORMAL 유지 (키보드 STT 간섭 방지)
+                    val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    if (am.isBluetoothScoAvailableOffCall && am.isBluetoothScoOn) {
+                        enableBluetoothAudio()
+                    }
                     val svc = Intent(this, VoiceService::class.java)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(svc)
