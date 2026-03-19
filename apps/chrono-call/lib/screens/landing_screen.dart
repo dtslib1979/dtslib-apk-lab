@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -504,31 +505,126 @@ class _LandingScreenState extends State<LandingScreen>
     );
   }
 
-  // ── RECENTS ─────────────────────────────────────────────────
+  // ── 녹취록 ──────────────────────────────────────────────────
+  List<FileSystemEntity> _recordings = [];
+
+  Future<void> _loadRecordings() async {
+    final dir = Directory('/sdcard/Download/ChronoCall');
+    if (await dir.exists()) {
+      final files = dir.listSync()
+          ..sort((a, b) => b.path.compareTo(a.path));
+      setState(() => _recordings = files);
+    }
+  }
+
   Widget _buildRecents() {
+    if (_recordings.isEmpty) _loadRecordings();
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-          child: ShaderMask(
-            shaderCallback: (b) => const LinearGradient(
-                colors: [_kCyan, _kBlue]).createShader(b),
-            child: const Text('최근 통화',
-                style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white)),
-          ),
+          child: Row(children: [
+            ShaderMask(
+              shaderCallback: (b) => const LinearGradient(
+                  colors: [_kCyan, _kBlue]).createShader(b),
+              child: const Text('녹취록',
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white)),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () { _recordings.clear(); _loadRecordings(); },
+              child: Icon(Icons.refresh, color: _kTextSec, size: 20),
+            ),
+          ]),
         ),
         Expanded(
-          child: Center(child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.history, size: 48, color: _kTextDim.withOpacity(0.3)),
-              const SizedBox(height: 12),
-              Text('통화 기록 없음', style: TextStyle(color: _kTextSec, fontSize: 15)),
-            ],
-          )),
+          child: _recordings.isEmpty
+              ? Center(child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.description, size: 48, color: _kTextDim.withOpacity(0.3)),
+                    const SizedBox(height: 12),
+                    Text('녹취록 없음', style: TextStyle(color: _kTextSec, fontSize: 15)),
+                    const SizedBox(height: 4),
+                    Text('통화 후 자동 저장됩니다',
+                        style: TextStyle(color: _kTextDim, fontSize: 12)),
+                  ],
+                ))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _recordings.length,
+                  itemBuilder: (_, i) {
+                    final file = _recordings[i];
+                    final name = file.path.split('/').last;
+                    final stat = file.statSync();
+                    final date = stat.modified;
+                    final isMd = name.endsWith('.md');
+                    final isAudio = name.endsWith('.m4a') || name.endsWith('.mp3');
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: _kCard,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _kSep.withOpacity(0.3)),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          isMd ? Icons.description : isAudio ? Icons.audiotrack : Icons.insert_drive_file,
+                          color: isMd ? _kCyan : isAudio ? _kGold : _kTextSec, size: 24),
+                        title: Text(name,
+                            style: const TextStyle(color: _kText, fontSize: 13),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(
+                            '${date.month}/${date.day} ${date.hour}:${date.minute.toString().padLeft(2, '0')}  ·  ${(stat.size / 1024).toStringAsFixed(0)} KB',
+                            style: TextStyle(color: _kTextDim, fontSize: 10)),
+                        trailing: Icon(Icons.chevron_right, color: _kTextDim, size: 18),
+                        onTap: () {
+                          // 텍스트 파일이면 내용 보기
+                          if (isMd) {
+                            _showTranscript(file.path);
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
+  }
+
+  void _showTranscript(String path) async {
+    try {
+      final content = await File(path).readAsString();
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: _kCard,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (_) => DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.7,
+          maxChildSize: 0.95,
+          builder: (_, ctrl) => ListView(
+            controller: ctrl,
+            padding: const EdgeInsets.all(20),
+            children: [
+              Row(children: [
+                const Icon(Icons.description, color: _kCyan, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text(path.split('/').last,
+                    style: const TextStyle(color: _kText, fontSize: 14,
+                        fontWeight: FontWeight.w600))),
+              ]),
+              const SizedBox(height: 16),
+              Text(content, style: TextStyle(color: _kText.withOpacity(0.8),
+                  fontSize: 13, height: 1.6)),
+            ],
+          ),
+        ),
+      );
+    } catch (_) {}
   }
 
   // ── TAB BAR ─────────────────────────────────────────────────
@@ -544,7 +640,7 @@ class _LandingScreenState extends State<LandingScreen>
         children: [
           _buildTab(0, Icons.dialpad, '키패드'),
           _buildTab(1, Icons.contacts, '연락처'),
-          _buildTab(2, Icons.access_time, '최근'),
+          _buildTab(2, Icons.description, '녹취록'),
         ],
       ),
     );

@@ -163,10 +163,19 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
     // ── STT ───────────────────────────────────────────────
     private fun startSTT() {
         if (isListening) return
+
+        // 가용성 체크
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            runOnUiThread { channel?.invokeMethod("onSTTError", -1) }
+            return
+        }
+
         speechRecognizer?.destroy()
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
         speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onReadyForSpeech(params: Bundle?) {
+                runOnUiThread { channel?.invokeMethod("onSTTReady", null) }
+            }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
@@ -196,9 +205,19 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            // 말 끝난 후 4초 대기 (빠른 컷오프 방지)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 4000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2000L)
         }
-        speechRecognizer?.startListening(intent)
-        isListening = true
+
+        try {
+            speechRecognizer?.startListening(intent)
+            isListening = true
+        } catch (e: Exception) {
+            isListening = false
+            runOnUiThread { channel?.invokeMethod("onSTTError", -2) }
+        }
     }
 
     private fun stopSTT() {

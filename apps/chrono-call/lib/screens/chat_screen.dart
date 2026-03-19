@@ -87,6 +87,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _requestPermissions() async {
     await Permission.microphone.request();
     await Permission.notification.request();
+    await Permission.bluetooth.request();
+    await Permission.bluetoothConnect.request();
   }
 
   Future<void> _loadApiKey() async {
@@ -223,9 +225,10 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() => _listening = false);
   }
 
-  // ── Edge TTS ──────────────────────────────────────────────
-  static const _edgeVoiceKo = 'ko-KR-SunHiNeural';
-  static const _edgeVoiceEn = 'en-US-AriaNeural';
+  // ── Edge TTS (성별 매칭) ─────────────────────────────────────
+  String get _voiceGender => widget.scholar?['voiceGender'] ?? 'male';
+  String get _edgeVoiceKo => _voiceGender == 'female' ? 'ko-KR-SunHiNeural' : 'ko-KR-InJoonNeural';
+  String get _edgeVoiceEn => _voiceGender == 'female' ? 'en-US-AriaNeural' : 'en-US-GuyNeural';
 
   Future<void> _speak(String text) async {
     if (!mounted) return;
