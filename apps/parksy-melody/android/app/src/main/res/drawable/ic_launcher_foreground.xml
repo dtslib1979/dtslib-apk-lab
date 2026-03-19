@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 음표 (메인 심볼) -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M58,30 L58,62 C58,67 53.5,71 48,71 C42.5,71 38,67 38,62 C38,57 42.5,53 48,53 C50.8,53 53.3,54 55,55.7 L55,36.5 L70,32.5 L70,56 C70,61 65.5,65 60,65 C54.5,65 50,61 50,56 C50,51 54.5,47 60,47 C62.8,47 65.3,48 67,49.7 L67,34.8 L58,37 L58,30z"/>
+    <!-- 닌자 밴드 -->
+    <path
+        android:fillColor="#F5F5F5"
+        android:strokeColor="#F5F5F5"
+        android:strokeWidth="2.5"
+        android:pathData="M28,44 Q40,39 54,41 Q68,39 80,44"
+        android:fillAlpha="0"/>
+    <!-- 왼쪽 눈 -->
+    <path
+        android:fillColor="#FFCDD2"
+        android:pathData="M42,42 m-3,0 a3,2 0,1,1 6,0 a3,2 0,1,1 -6,0"/>
+    <!-- 오른쪽 눈 -->
+    <path
+        android:fillColor="#FFCDD2"
+        android:pathData="M66,42 m-3,0 a3,2 0,1,1 6,0 a3,2 0,1,1 -6,0"/>
+</vector>

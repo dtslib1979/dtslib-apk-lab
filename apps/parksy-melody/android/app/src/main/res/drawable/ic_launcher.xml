@@ -4,10 +4,31 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- 다크 배경 원형 -->
     <path
-        android:fillColor="#2196F3"
+        android:fillColor="#0A0A0A"
         android:pathData="M0,0h108v108H0z"/>
+    <!-- 레드 그라데이션 서클 -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M30,54 L45,35 L45,50 L63,50 L63,35 L78,54 L63,73 L63,58 L45,58 L45,73 Z"/>
+        android:fillColor="#E53935"
+        android:pathData="M54,54m-32,0a32,32 0,1,1 64,0a32,32 0,1,1 -64,0"
+        android:fillAlpha="0.15"/>
+    <!-- 음표 심볼 (♪) -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M62,32 L62,62 C62,66.4 58.4,70 54,70 C49.6,70 46,66.4 46,62 C46,57.6 49.6,54 54,54 C56.2,54 58.2,54.8 59.6,56.2 L59.6,38 L72,34.5 L72,56 C72,60.4 68.4,64 64,64 C59.6,64 56,60.4 56,56 C56,51.6 59.6,48 64,48 C66.2,48 68.2,48.8 69.6,50.2 L69.6,36.2 L62,38 L62,32z"/>
+    <!-- 닌자 마스크 라인 -->
+    <path
+        android:fillColor="#F5F5F5"
+        android:pathData="M34,46 L42,42 L54,44 L66,42 L74,46"
+        android:strokeWidth="1.5"
+        android:strokeColor="#F5F5F5"
+        android:fillAlpha="0"/>
+    <!-- 닌자 눈 -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M44,44 m-2.5,0 a2.5,1.8 0,1,1 5,0 a2.5,1.8 0,1,1 -5,0"/>
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M64,44 m-2.5,0 a2.5,1.8 0,1,1 5,0 a2.5,1.8 0,1,1 -5,0"/>
 </vector>

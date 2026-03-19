@@ -231,23 +231,32 @@ class _MelodyScreenState extends State<MelodyScreen>
       return;
     }
 
-    setState(() { _st = _State.sending; _msg = 'Sending to Telegram...'; });
+    setState(() { _st = _State.sending; _msg = 'Saving + Sending...'; });
     try {
+      // 로컬 저장: /sdcard/Download/Melody/
+      final localDir = Directory('/sdcard/Download/Melody');
+      if (!await localDir.exists()) await localDir.create(recursive: true);
+      final localName = 'melody_${_preset}s_from${start.toInt()}s.mp3';
+      final localPath = '${localDir.path}/$localName';
+      await File(out).copy(localPath);
+
+      // 텔레그램 전송
       final req = http.MultipartRequest(
           'POST',
           Uri.parse('https://api.telegram.org/bot$_botToken/sendDocument'));
       req.fields['chat_id'] = _chatId;
       req.files.add(await http.MultipartFile.fromPath(
-          'document', out,
-          filename: 'melody_${_preset}s_from${start.toInt()}s.mp3'));
+          'document', out, filename: localName));
       final res = await req.send();
+      final tgOk = res.statusCode == 200;
       setState(() {
         _st  = _State.done;
-        _msg = res.statusCode == 200
-            ? '✅ Sent → @parksy_bridges_bot'
-            : '❌ Telegram ${res.statusCode}';
+        _msg = tgOk
+            ? '✅ Saved + Sent  |  $localPath'
+            : '⚠️ Saved locally  |  Telegram ${res.statusCode}';
       });
     } catch (e) {
+      // 텔레그램 실패해도 로컬 저장은 시도
       setState(() { _st = _State.ready; _msg = 'Send error: $e'; });
     }
   }
