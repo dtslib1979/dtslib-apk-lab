@@ -30,7 +30,8 @@ Keep it conversational — this is a phone call, not a lecture. Under 150 words 
 
 class ChatScreen extends StatefulWidget {
   final Map<String, dynamic>? scholar;
-  const ChatScreen({super.key, this.scholar});
+  final List<Map<String, dynamic>>? conferenceScholars;
+  const ChatScreen({super.key, this.scholar, this.conferenceScholars});
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
@@ -43,9 +44,26 @@ class _ChatScreenState extends State<ChatScreen> {
   final _ttsFiles = <String>[];
 
   // 학자 정보
-  String get _scholarName => widget.scholar?['name'] ?? 'AI Scholar';
+  bool get _isConference => widget.conferenceScholars != null && widget.conferenceScholars!.length >= 2;
+  String get _scholarName => _isConference
+      ? widget.conferenceScholars!.map((s) => s['nameKr'] ?? s['name']).join(' · ')
+      : (widget.scholar?['nameKr'] ?? widget.scholar?['name'] ?? 'AI Scholar');
   String get _scholarEmoji => widget.scholar?['emoji'] ?? '🧑‍🎓';
-  String get _scholarPrompt => widget.scholar?['prompt'] ?? _systemPrompt;
+  String get _scholarPrompt {
+    if (_isConference) {
+      final scholars = widget.conferenceScholars!;
+      final names = scholars.map((s) => s['name']).join(', ');
+      final prompts = scholars.map((s) =>
+          '- ${s['name']}: ${s['prompt']}').join('\n');
+      return 'This is a conference call with $names.\n'
+          'The user is the moderator. When they address a specific scholar by name, respond AS that scholar.\n'
+          'When scholars disagree, they should debate each other.\n'
+          'Each scholar maintains their unique perspective and speaking style.\n'
+          'Prefix each response with the scholar\'s name in brackets like [Einstein]: ...\n\n'
+          'Scholar personalities:\n$prompts';
+    }
+    return widget.scholar?['prompt'] ?? _systemPrompt;
+  }
   String get _scholarPhone => widget.scholar?['phone'] ?? '070-0000-0000';
 
   bool _listening = false;
@@ -140,8 +158,14 @@ class _ChatScreenState extends State<ChatScreen> {
     await Future.delayed(const Duration(milliseconds: 800));
 
     // 인사 메시지
-    _addMessage('$_scholarName 연결됨', isUser: false, isSystem: true);
-    await _speak('안녕하세요, $_scholarName입니다. 무엇이든 물어보세요.');
+    if (_isConference) {
+      final names = widget.conferenceScholars!.map((s) => s['nameKr'] ?? s['name']).join(', ');
+      _addMessage('컨퍼런스 콜: $names', isUser: false, isSystem: true);
+      await _speak('컨퍼런스 콜이 연결되었습니다. 사회를 시작하세요.');
+    } else {
+      _addMessage('$_scholarName 연결됨', isUser: false, isSystem: true);
+      await _speak('안녕하세요, $_scholarName입니다. 무엇이든 물어보세요.');
+    }
   }
 
   Future<void> _endCall() async {
