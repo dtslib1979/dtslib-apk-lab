@@ -1,6 +1,7 @@
 package com.dtslib.parksy_melody
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -69,6 +70,19 @@ class MainActivity : FlutterActivity() {
                     "getSharedUrl" -> {
                         result.success(sharedUrl)
                         sharedUrl = null
+                    }
+                    "startForeground" -> {
+                        val svcIntent = Intent(this@MainActivity, DownloadService::class.java)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(svcIntent)
+                        } else {
+                            startService(svcIntent)
+                        }
+                        result.success(true)
+                    }
+                    "stopForeground" -> {
+                        stopService(Intent(this@MainActivity, DownloadService::class.java))
+                        result.success(true)
                     }
                     "getAudioUrl" -> {
                         val url = call.argument<String>("url")

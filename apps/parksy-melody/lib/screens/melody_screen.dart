@@ -50,8 +50,10 @@ class _MelodyScreenState extends State<MelodyScreen>
   int  _preset   = 30;
   bool _playing  = false;
 
-  // ── 스타트 포인트 (초 단위) ─────────────────────────────────────
+  // ── 구간 지정 ──────────────────────────────────────────────────
   double _startSec = 0.0;
+  double _endSec   = 0.0;       // 0 = 미설정 (프리셋 모드)
+  bool   _pinMode  = false;     // true = 핀포인트 모드, false = 프리셋 모드
 
   // path_provider 기반 — Android 11+ 스코프드 스토리지 대응
   String _rawPath = '';
@@ -116,11 +118,24 @@ class _MelodyScreenState extends State<MelodyScreen>
       _st == _State.trimming    ||
       _st == _State.sending;
 
-  // ── 스타트 포인트 확정 ──────────────────────────────────────────
+  // ── 핀포인트 설정 ──────────────────────────────────────────────
   void _setStart() {
     setState(() {
       _startSec = _pos.inMilliseconds / 1000.0;
-      _msg = '📍 Start set → ${_fmtSec(_startSec)}';
+      if (_endSec > 0 && _endSec <= _startSec) _endSec = 0.0;
+      _msg = '📍 Start → ${_fmtSec(_startSec)}';
+    });
+  }
+
+  void _setEnd() {
+    final cur = _pos.inMilliseconds / 1000.0;
+    if (cur <= _startSec) {
+      setState(() => _msg = '❌ End must be after start');
+      return;
+    }
+    setState(() {
+      _endSec = cur;
+      _msg = '📍 End → ${_fmtSec(_endSec)}  (${(_endSec - _startSec).toStringAsFixed(1)}s)';
     });
   }
 
@@ -135,10 +150,15 @@ class _MelodyScreenState extends State<MelodyScreen>
       _prog     = 0.05;
       _msg      = 'Getting stream URL...';
       _startSec = 0.0;
+      _endSec   = 0.0;
     });
 
     await Permission.audio.request();
     await Permission.storage.request();
+    await Permission.notification.request();
+
+    // ForegroundService 시작 — 백그라운드 다운로드 유지
+    try { await _ch.invokeMethod('startForeground'); } catch (_) {}
 
     try {
       final streamUrl =
@@ -181,14 +201,19 @@ class _MelodyScreenState extends State<MelodyScreen>
 
       setState(() { _prog = 0.97; _msg = 'Loading player...'; });
       await _player.setFilePath(_outPath);
+
+      // ForegroundService 종료
+      try { await _ch.invokeMethod('stopForeground'); } catch (_) {}
+
       setState(() {
         _dlPath = _outPath;
         _dur    = _player.duration ?? Duration.zero;
         _st     = _State.ready;
-        _msg    = 'Stolen ✓  ${_fmt(_dur)}  |  seek → SET START → CUT';
+        _msg    = 'Stolen ✓  ${_fmt(_dur)}  |  seek → SET START/END → CUT';
         _prog   = 1.0;
       });
     } catch (e) {
+      try { await _ch.invokeMethod('stopForeground'); } catch (_) {}
       setState(() { _st = _State.idle; _msg = 'ERR: $e'; });
     }
   }
@@ -204,22 +229,27 @@ class _MelodyScreenState extends State<MelodyScreen>
     final totalDur = _dur.inSeconds > 0 ? _dur.inSeconds : _preset;
     final maxStart = (totalDur - 1).clamp(0, totalDur).toDouble();
     final start    = _startSec.clamp(0.0, maxStart);
-    final dur      = _preset.clamp(1, (totalDur - start.toInt()).clamp(1, _preset));
-    final fo       = _fadeOut;
-    final foStart  = (dur - fo).clamp(0.0, dur.toDouble());
+
+    // 핀포인트 모드: endSec로 구간, 프리셋 모드: preset 길이
+    final double dur;
+    if (_pinMode && _endSec > _startSec) {
+      dur = (_endSec - start).clamp(1.0, (totalDur - start).toDouble());
+    } else {
+      dur = _preset.clamp(1, (totalDur - start.toInt()).clamp(1, _preset)).toDouble();
+    }
+    final fo      = _fadeOut;
+    final foStart = (dur - fo).clamp(0.0, dur);
 
     setState(() {
       _st  = _State.trimming;
-      _msg = 'Cutting ${_fmtSec(start)} → ${_fmtSec(start + dur)}  (fade out: ${fo.toStringAsFixed(1)}s)...';
+      _msg = 'Cutting ${_fmtSec(start)} → ${_fmtSec(start + dur)}  (${dur.toStringAsFixed(1)}s, fade out: ${fo.toStringAsFixed(1)}s)...';
     });
     await _player.stop();
 
     final tmp = await getTemporaryDirectory();
-    final out = '${tmp.path}/cut_${_preset}s_${start.toInt()}s.mp3';
+    final out = '${tmp.path}/cut_${dur.toInt()}s_${start.toInt()}s.mp3';
 
-    // -ss 앞에 위치 = 빠른 seek, 오디오는 정확도 충분
-    // afade=in 0.5s + afade=out 랜덤 1.2~1.8s
-    final cmd = '-y -ss ${start.toStringAsFixed(3)} -t $dur '
+    final cmd = '-y -ss ${start.toStringAsFixed(3)} -t ${dur.toStringAsFixed(3)} '
         '-i "$_dlPath" '
         '-af "afade=t=in:st=0:d=$_fadeIn,'
         'afade=t=out:st=${foStart.toStringAsFixed(3)}:d=${fo.toStringAsFixed(3)}" '
@@ -236,7 +266,7 @@ class _MelodyScreenState extends State<MelodyScreen>
       // 로컬 저장: /sdcard/Download/Melody/
       final localDir = Directory('/sdcard/Download/Melody');
       if (!await localDir.exists()) await localDir.create(recursive: true);
-      final localName = 'melody_${_preset}s_from${start.toInt()}s.mp3';
+      final localName = 'melody_${dur.toInt()}s_from${start.toInt()}s.mp3';
       final localPath = '${localDir.path}/$localName';
       await File(out).copy(localPath);
 
@@ -604,7 +634,7 @@ class _MelodyScreenState extends State<MelodyScreen>
                               (v * _dur.inMilliseconds).round())),
                 ),
               ),
-              // 스타트 포인트 마커 (골드 삼각형)
+              // 스타트 포인트 마커
               if (_startSec > 0 && _dur.inMilliseconds > 0)
                 Positioned(
                   left: 12 + startPct * (MediaQuery.of(context).size.width - 32 - 24),
@@ -615,6 +645,21 @@ class _MelodyScreenState extends State<MelodyScreen>
                     color: _kGold.withOpacity(0.8),
                   ),
                 ),
+              // 엔드 포인트 마커 (핀포인트 모드)
+              if (_endSec > 0 && _dur.inMilliseconds > 0) ...[
+                Builder(builder: (_) {
+                  final endPct = (_endSec * 1000 / _dur.inMilliseconds).clamp(0.0, 1.0);
+                  return Positioned(
+                    left: 12 + endPct * (MediaQuery.of(context).size.width - 32 - 24),
+                    top: 14,
+                    child: Container(
+                      width: 2,
+                      height: 20,
+                      color: _kRed.withOpacity(0.8),
+                    ),
+                  );
+                }),
+              ],
             ],
           ),
           // 컨트롤
@@ -665,7 +710,10 @@ class _MelodyScreenState extends State<MelodyScreen>
   }
 
   Widget _buildCutCard() {
-    final endSec = _startSec + _preset;
+    final pinEnd = _pinMode && _endSec > _startSec;
+    final effectiveDur = pinEnd ? (_endSec - _startSec) : _preset.toDouble();
+    final endSec = _startSec + effectiveDur;
+
     return Container(
       decoration: BoxDecoration(
         color: _kCard,
@@ -676,36 +724,131 @@ class _MelodyScreenState extends State<MelodyScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionLabel('CUT LENGTH'),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _presets.map((p) {
-              final sel = _preset == p.sec;
-              return GestureDetector(
-                onTap: _busy ? null : () => setState(() => _preset = p.sec),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          // 모드 토글
+          Row(
+            children: [
+              _sectionLabel('CUT MODE'),
+              const Spacer(),
+              GestureDetector(
+                onTap: _busy ? null : () => setState(() => _pinMode = !_pinMode),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: sel ? _kRed : _kBg,
+                    color: _pinMode ? _kGold.withOpacity(0.15) : _kRedDim,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                        color: sel ? _kRed : _kBorder, width: 1),
+                      color: _pinMode ? _kGold.withOpacity(0.6) : _kRed.withOpacity(0.5)),
                   ),
-                  child: Text(p.label,
-                      style: TextStyle(
-                        color: sel ? Colors.white : _kMuted,
-                        fontWeight:
-                            sel ? FontWeight.w700 : FontWeight.normal,
-                        fontSize: 13,
-                      )),
+                  child: Text(
+                    _pinMode ? 'PINPOINT' : 'PRESET',
+                    style: TextStyle(
+                      color: _pinMode ? _kGold : _kRed,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                  ),
                 ),
-              );
-            }).toList(),
+              ),
+            ],
           ),
+          const SizedBox(height: 10),
+
+          // 프리셋 모드: 칩 선택
+          if (!_pinMode) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _presets.map((p) {
+                final sel = _preset == p.sec;
+                return GestureDetector(
+                  onTap: _busy ? null : () => setState(() => _preset = p.sec),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: sel ? _kRed : _kBg,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: sel ? _kRed : _kBorder, width: 1),
+                    ),
+                    child: Text(p.label,
+                        style: TextStyle(
+                          color: sel ? Colors.white : _kMuted,
+                          fontWeight:
+                              sel ? FontWeight.w700 : FontWeight.normal,
+                          fontSize: 13,
+                        )),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+
+          // 핀포인트 모드: SET END 버튼
+          if (_pinMode) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _busy ? null : _setEnd,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _endSec > 0 ? _kGold.withOpacity(0.12) : _kBg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _endSec > 0 ? _kGold.withOpacity(0.5) : _kBorder),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.flag, size: 14,
+                              color: _endSec > 0 ? _kGold : _kMuted),
+                          const SizedBox(width: 6),
+                          Text(
+                            _endSec > 0
+                                ? 'END: ${_fmtSec(_endSec)}'
+                                : 'SET END (seek → tap)',
+                            style: TextStyle(
+                              color: _endSec > 0 ? _kGold : _kMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (_endSec > 0) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _endSec = 0.0),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _kBg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _kBorder),
+                      ),
+                      child: const Icon(Icons.close, color: _kMuted, size: 16),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (!pinEnd)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Seek to end position, then tap SET END',
+                  style: TextStyle(color: _kMuted.withOpacity(0.7), fontSize: 10),
+                ),
+              ),
+          ],
+
           const SizedBox(height: 12),
           // 컷 범위 + 페이드 정보
           Container(
@@ -723,9 +866,10 @@ class _MelodyScreenState extends State<MelodyScreen>
                     _infoChip('START', _fmtSec(_startSec),
                         _startSec > 0 ? _kGold : _kMuted),
                     const Icon(Icons.arrow_forward, color: _kMuted, size: 14),
-                    _infoChip('END', _fmtSec(endSec), _kText),
+                    _infoChip('END', _fmtSec(endSec),
+                        pinEnd ? _kGold : _kText),
                     const Icon(Icons.arrow_forward, color: _kMuted, size: 14),
-                    _infoChip('DUR', '${_preset}s', _kRed),
+                    _infoChip('DUR', '${effectiveDur.toStringAsFixed(1)}s', _kRed),
                   ],
                 ),
                 const SizedBox(height: 8),
