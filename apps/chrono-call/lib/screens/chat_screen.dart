@@ -8,17 +8,18 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
-// ── 카톡 스타일 팔레트 ─────────────────────────────────────────
-const _kBg      = Color(0xFF9BBBD4);   // 카톡 채팅방 배경 (블루그레이)
-const _kHeader  = Color(0xFF3B4890);   // 상단 바 (진한 네이비)
-const _kMyBubble   = Color(0xFFFFEB33); // 내 버블 (카톡 노랑)
-const _kAIBubble   = Color(0xFFFFFFFF); // AI 버블 (흰색)
-const _kMyText     = Color(0xFF1A1A1A); // 내 텍스트 (검정)
-const _kAIText     = Color(0xFF1A1A1A); // AI 텍스트 (검정)
-const _kTimeText   = Color(0xFF6B7B8D); // 시간 텍스트
-const _kInputBg    = Color(0xFFFFFFFF); // 입력 영역 배경
-const _kBottomBar  = Color(0xFFEFEFEF); // 하단 바
-const _kAccent     = Color(0xFF4FC3F7);
+// ── 카톡 팔레트 ─────────────────────────────────────────────────
+const _kBg        = Color(0xFF9BBBD4);
+const _kHeader    = Color(0xFF3B4890);
+const _kMyBubble  = Color(0xFFFFEB33);
+const _kAIBubble  = Color(0xFFFFFFFF);
+const _kMyText    = Color(0xFF1A1A1A);
+const _kAIText    = Color(0xFF1A1A1A);
+const _kTimeText  = Color(0xFF6B7B8D);
+const _kBottomBar = Color(0xFFEFEFEF);
+const _kAccent    = Color(0xFF4FC3F7);
+const _kCallGreen = Color(0xFF4CAF50);
+const _kCallRed   = Color(0xFFE53935);
 
 const _systemPrompt = '''You are a world-class scholar and expert across all academic disciplines.
 The user is a non-specialist curious thinker who tests hypotheses through conversation.
@@ -38,13 +39,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final _scrollCtrl = ScrollController();
   final _messages = <_Msg>[];
+  final _ttsFiles = <String>[];  // AI TTS MP3 경로 (나중에 합성용)
 
   bool _listening = false;
   bool _thinking  = false;
   bool _speaking  = false;
   String _partial = '';
   String? _apiKey;
-  bool _recording = false;
+
+  // ── 통화 세션 ──────────────────────────────────────────────
+  bool _inCall    = false;
+  DateTime? _callStart;
 
   @override
   void initState() {
@@ -71,17 +76,33 @@ class _ChatScreenState extends State<ChatScreen> {
           if (mounted) setState(() => _partial = call.arguments as String);
         case 'onSTTDone':
           final text = call.arguments as String;
+          if (mounted) setState(() { _listening = false; _partial = ''; });
           if (text.isNotEmpty && mounted) {
-            setState(() => _partial = '');
             _addMessage(text, isUser: true);
             _sendToClaude(text);
+          } else if (_inCall) {
+            // 아무 말 안 했으면 다시 듣기
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (_inCall && mounted) _startListening();
           }
         case 'onSTTError':
           if (mounted) setState(() { _listening = false; _partial = ''; });
+          // 에러나도 통화 중이면 다시 시도
+          if (_inCall) {
+            await Future.delayed(const Duration(seconds: 1));
+            if (_inCall && mounted) _startListening();
+          }
         case 'onTTSDone':
           if (mounted) setState(() => _speaking = false);
+          // AI 말 끝 → 자동으로 내 턴 (삐 소리 + 마이크 ON)
+          if (_inCall && mounted) {
+            await _playBeep();
+            await Future.delayed(const Duration(milliseconds: 300));
+            if (_inCall && mounted) _startListening();
+          }
         case 'onMediaButton':
-          _listening ? _stopListening() : _startListening();
+          // Buds Pro 1탭 → 통화 시작/종료 토글
+          _inCall ? _endCall() : _startCall();
       }
     });
   }
@@ -92,9 +113,72 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  // ══════════════════════════════════════════════════════════
+  // ── 통화 세션 제어 ─────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+  Future<void> _startCall() async {
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      _addMessage('⚠️ API 키를 먼저 설정하세요', isUser: false);
+      return;
+    }
+
+    setState(() { _inCall = true; _callStart = DateTime.now(); });
+
+    // ForegroundService + 녹음 시작
+    try { await _ch.invokeMethod('startForeground'); } catch (_) {}
+    try { await _ch.invokeMethod('startRecording'); } catch (_) {}
+
+    // 통화 연결음 "뚜뚜뚜"
+    await _playDialTone();
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // 인사 메시지
+    _addMessage('통화가 연결되었습니다. 무엇이든 물어보세요.', isUser: false);
+    await _speak('안녕하세요, 무엇이든 물어보세요.');
+  }
+
+  Future<void> _endCall() async {
+    setState(() { _inCall = false; _listening = false; });
+
+    // STT/TTS 정지
+    try { await _ch.invokeMethod('stopSTT'); } catch (_) {}
+    try { await _ch.invokeMethod('stopAudio'); } catch (_) {}
+    try { await _ch.invokeMethod('stopTTS'); } catch (_) {}
+
+    // 통화 종료음
+    await _playHangupTone();
+
+    // 녹음 정지
+    try { await _ch.invokeMethod('stopRecording'); } catch (_) {}
+    try { await _ch.invokeMethod('stopForeground'); } catch (_) {}
+
+    // 통화 시간 계산
+    final duration = _callStart != null
+        ? DateTime.now().difference(_callStart!) : Duration.zero;
+    final durStr = '${duration.inMinutes}분 ${duration.inSeconds % 60}초';
+
+    _addMessage('📞 통화 종료 ($durStr)', isUser: false, isSystem: true);
+
+    // 자동 저장
+    await _saveConversation();
+  }
+
+  // ── 효과음 (MethodChannel로 Kotlin 재생) ──────────────────
+  Future<void> _playBeep() async {
+    try { await _ch.invokeMethod('playTone', {'type': 'beep'}); } catch (_) {}
+  }
+
+  Future<void> _playDialTone() async {
+    try { await _ch.invokeMethod('playTone', {'type': 'dial'}); } catch (_) {}
+  }
+
+  Future<void> _playHangupTone() async {
+    try { await _ch.invokeMethod('playTone', {'type': 'hangup'}); } catch (_) {}
+  }
+
   // ── STT ──────────────────────────────────────────────────
   Future<void> _startListening() async {
-    if (_thinking || _speaking) return;
+    if (_thinking || _speaking || _listening) return;
     try {
       await _ch.invokeMethod('startSTT');
       if (mounted) setState(() => _listening = true);
@@ -108,7 +192,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() => _listening = false);
   }
 
-  // ── Edge TTS (Microsoft 신경망 음성) ────────────────────────
+  // ── Edge TTS ──────────────────────────────────────────────
   static const _edgeVoiceKo = 'ko-KR-SunHiNeural';
   static const _edgeVoiceEn = 'en-US-AriaNeural';
 
@@ -116,9 +200,9 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _speaking = true);
     try {
       final voice = RegExp(r'[가-힣]').hasMatch(text) ? _edgeVoiceKo : _edgeVoiceEn;
-      final escapedText = text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+      final escaped = text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
       final ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">'
-          '<voice name="$voice">$escapedText</voice></speak>';
+          '<voice name="$voice">$escaped</voice></speak>';
 
       final res = await http.post(
         Uri.parse('https://eastus.tts.speech.microsoft.com/cognitiveservices/v1'),
@@ -134,6 +218,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final tmp = await getTemporaryDirectory();
         final path = '${tmp.path}/tts_${DateTime.now().millisecondsSinceEpoch}.mp3';
         await File(path).writeAsBytes(res.bodyBytes);
+        _ttsFiles.add(path);
         await _ch.invokeMethod('playAudio', {'path': path});
       } else {
         await _ch.invokeMethod('speak', {'text': text});
@@ -160,7 +245,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _translateLastMessage() async {
     if (_messages.isEmpty) return;
-    final lastAI = _messages.reversed.firstWhere((m) => !m.isUser,
+    final lastAI = _messages.reversed.firstWhere((m) => !m.isUser && !m.isSystem,
         orElse: () => _messages.last);
     try {
       final encoded = Uri.encodeComponent(lastAI.text);
@@ -171,7 +256,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final data = jsonDecode(res.body);
         final translated = (data[0] as List).map((s) => s[0]).join('');
         _addMessage(translated, isUser: false, isTranslation: true);
-        _speak(translated);
+        if (_inCall) _speak(translated);
       }
     } catch (e) {
       _addMessage('번역 실패: $e', isUser: false);
@@ -183,16 +268,13 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (_) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('번역 언어 선택', style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87)),
-          ),
+          const Padding(padding: EdgeInsets.all(16),
+            child: Text('번역 언어', style: TextStyle(fontSize: 16,
+                fontWeight: FontWeight.w700, color: Colors.black87))),
           ...(_langOptions.map((l) => ListTile(
             title: Text(l.$2, style: const TextStyle(color: Colors.black87)),
             trailing: _targetLang == l.$1
@@ -209,31 +291,14 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ── 녹음 ────────────────────────────────────────────────────
-  Future<void> _toggleRecording() async {
-    if (_recording) {
-      await _ch.invokeMethod('stopRecording');
-      await _ch.invokeMethod('stopForeground');
-      setState(() => _recording = false);
-    } else {
-      await _ch.invokeMethod('startForeground');
-      await _ch.invokeMethod('startRecording');
-      setState(() => _recording = true);
-    }
-  }
-
   // ── Claude API ──────────────────────────────────────────────
   Future<void> _sendToClaude(String userText) async {
-    if (_apiKey == null || _apiKey!.isEmpty) {
-      _addMessage('API 키를 설정하세요 (상단 ⚙️)', isUser: false);
-      return;
-    }
+    if (_apiKey == null || _apiKey!.isEmpty) return;
     setState(() => _thinking = true);
 
     final history = _messages
-        .where((m) => !m.isTranslation)
-        .toList()
-        .reversed.take(40).toList().reversed
+        .where((m) => !m.isTranslation && !m.isSystem)
+        .toList().reversed.take(40).toList().reversed
         .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text})
         .toList();
 
@@ -255,20 +320,23 @@ class _ChatScreenState extends State<ChatScreen> {
       if (res.statusCode == 200) {
         final reply = jsonDecode(res.body)['content'][0]['text'] as String;
         _addMessage(reply, isUser: false);
-        _speak(reply);
+        await _speak(reply);
       } else {
         _addMessage('API Error ${res.statusCode}', isUser: false);
+        if (mounted) setState(() => _speaking = false);
       }
     } catch (e) {
-      _addMessage('네트워크 오류: $e', isUser: false);
+      _addMessage('네트워크 오류', isUser: false);
+      if (mounted) setState(() => _speaking = false);
     }
     if (mounted) setState(() => _thinking = false);
   }
 
-  void _addMessage(String text, {required bool isUser, bool isTranslation = false}) {
+  void _addMessage(String text, {required bool isUser,
+      bool isTranslation = false, bool isSystem = false}) {
     setState(() {
       _messages.add(_Msg(text: text, isUser: isUser, time: DateTime.now(),
-          isTranslation: isTranslation));
+          isTranslation: isTranslation, isSystem: isSystem));
     });
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollCtrl.hasClients) {
@@ -287,15 +355,15 @@ class _ChatScreenState extends State<ChatScreen> {
     final file = File('${dir.path}/call_$ts.md');
     final buf = StringBuffer('# ChronoCall — $ts\n\n');
     for (final m in _messages) {
-      final prefix = m.isUser ? '**나**' : (m.isTranslation ? '**번역**' : '**Claude**');
+      final prefix = m.isUser ? '**나**' :
+          m.isSystem ? '**시스템**' :
+          m.isTranslation ? '**번역**' : '**Claude**';
       buf.writeln('[${DateFormat('HH:mm:ss').format(m.time)}] $prefix: ${m.text}\n');
     }
     await file.writeAsString(buf.toString());
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('저장됨: call_$ts.md'),
-            backgroundColor: _kHeader),
-      );
+        SnackBar(content: Text('저장: call_$ts.md'), backgroundColor: _kHeader));
     }
   }
 
@@ -356,87 +424,73 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ── 카톡 헤더 ───────────────────────────────────────────────
   Widget _buildHeader() {
+    final callDur = _inCall && _callStart != null
+        ? DateTime.now().difference(_callStart!) : Duration.zero;
+    final durStr = _inCall
+        ? '${callDur.inMinutes.toString().padLeft(2,'0')}:${(callDur.inSeconds%60).toString().padLeft(2,'0')}'
+        : '';
+
     return Container(
       color: _kHeader,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
-          // AI 프로필
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: Colors.white,
-            child: const Text('🧑‍🎓', style: TextStyle(fontSize: 20)),
-          ),
+          CircleAvatar(radius: 18, backgroundColor: Colors.white,
+            child: const Text('🧑‍🎓', style: TextStyle(fontSize: 20))),
           const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Claude Scholar',
-                    style: TextStyle(color: Colors.white, fontSize: 15,
-                        fontWeight: FontWeight.w700)),
-                Row(children: [
-                  Container(
-                    width: 6, height: 6,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _recording ? Colors.redAccent :
-                             _speaking ? Colors.orangeAccent :
-                             _listening ? Colors.greenAccent : Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    _recording ? 'REC' :
-                    _thinking ? 'thinking...' :
-                    _speaking ? 'speaking...' :
-                    _listening ? 'listening...' : 'online',
-                    style: TextStyle(color: Colors.white.withOpacity(0.7),
-                        fontSize: 11),
-                  ),
-                ]),
-              ],
-            ),
-          ),
-          // 녹음
-          IconButton(
-            icon: Icon(_recording ? Icons.stop_circle_outlined : Icons.radio_button_checked,
-                color: _recording ? Colors.redAccent : Colors.white.withOpacity(0.7), size: 22),
-            onPressed: _toggleRecording,
-          ),
-          // 저장
-          IconButton(
-            icon: Icon(Icons.bookmark_border,
-                color: Colors.white.withOpacity(0.7), size: 22),
-            onPressed: _saveConversation,
-          ),
-          // 설정
-          IconButton(
-            icon: Icon(Icons.more_vert,
-                color: Colors.white.withOpacity(0.7), size: 22),
-            onPressed: _showSettings,
-          ),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Claude Scholar',
+                  style: TextStyle(color: Colors.white, fontSize: 15,
+                      fontWeight: FontWeight.w700)),
+              Row(children: [
+                Container(width: 6, height: 6,
+                  decoration: BoxDecoration(shape: BoxShape.circle,
+                    color: _inCall ? _kCallGreen : Colors.grey)),
+                const SizedBox(width: 5),
+                Text(
+                  _inCall ? '통화 중 $durStr' :
+                  'AI Scholar Hotline  v3.0',
+                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+              ]),
+            ],
+          )),
+          IconButton(icon: Icon(Icons.translate,
+              color: Colors.white.withOpacity(0.7), size: 22),
+            onPressed: _messages.isEmpty ? null : _showLangPicker),
+          IconButton(icon: Icon(Icons.bookmark_border,
+              color: Colors.white.withOpacity(0.7), size: 22),
+            onPressed: _saveConversation),
+          IconButton(icon: Icon(Icons.more_vert,
+              color: Colors.white.withOpacity(0.7), size: 22),
+            onPressed: _showSettings),
         ],
       ),
     );
   }
 
-  // ── 채팅 리스트 ──────────────────────────────────────────────
   Widget _buildChatList() {
-    if (_messages.isEmpty) {
-      return Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Text('마이크 버튼을 눌러 대화를 시작하세요',
-              style: TextStyle(color: Color(0xFF5A6B7D), fontSize: 13)),
-        ),
-      );
+    if (_messages.isEmpty && !_inCall) {
+      return Center(child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('📞', style: TextStyle(fontSize: 56)),
+          const SizedBox(height: 20),
+          const Text('전화 버튼을 눌러 통화 시작',
+              style: TextStyle(color: Color(0xFF5A6B7D), fontSize: 15,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text('이어버드 1탭으로도 시작 가능',
+              style: TextStyle(color: const Color(0xFF5A6B7D).withOpacity(0.6),
+                  fontSize: 12)),
+          const SizedBox(height: 24),
+          Text('화면을 보지 않아도 됩니다',
+              style: TextStyle(color: const Color(0xFF5A6B7D).withOpacity(0.4),
+                  fontSize: 11)),
+        ],
+      ));
     }
     return ListView.builder(
       controller: _scrollCtrl,
@@ -445,12 +499,11 @@ class _ChatScreenState extends State<ChatScreen> {
       itemBuilder: (_, i) {
         final msg = _messages[i];
         final showDate = i == 0 || !_sameDay(_messages[i-1].time, msg.time);
-        return Column(
-          children: [
-            if (showDate) _buildDateDivider(msg.time),
-            _buildBubble(msg),
-          ],
-        );
+        return Column(children: [
+          if (showDate) _buildDateDivider(msg.time),
+          if (msg.isSystem) _buildSystemMsg(msg)
+          else _buildBubble(msg),
+        ]);
       },
     );
   }
@@ -465,10 +518,23 @@ class _ChatScreenState extends State<ChatScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(12),
-        ),
+          borderRadius: BorderRadius.circular(12)),
         child: Text(DateFormat('yyyy년 M월 d일 EEEE', 'ko').format(d),
             style: const TextStyle(color: Colors.white, fontSize: 11)),
+      ),
+    );
+  }
+
+  Widget _buildSystemMsg(_Msg msg) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12)),
+        child: Text(msg.text, textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFF5A6B7D), fontSize: 11)),
       ),
     );
   }
@@ -478,7 +544,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final timeStr = DateFormat('HH:mm').format(msg.time);
 
     if (isUser) {
-      // 내 메시지 (오른쪽, 노랑)
       return Padding(
         padding: const EdgeInsets.only(bottom: 6, left: 50),
         child: Row(
@@ -487,94 +552,72 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             Text(timeStr, style: const TextStyle(color: _kTimeText, fontSize: 10)),
             const SizedBox(width: 6),
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(
-                  color: _kMyBubble,
-                  borderRadius: BorderRadius.circular(14).copyWith(
-                    topRight: const Radius.circular(4)),
-                ),
-                child: Text(msg.text,
-                    style: const TextStyle(color: _kMyText, fontSize: 14, height: 1.4)),
-              ),
-            ),
+            Flexible(child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(color: _kMyBubble,
+                borderRadius: BorderRadius.circular(14).copyWith(
+                    topRight: const Radius.circular(4))),
+              child: Text(msg.text,
+                  style: const TextStyle(color: _kMyText, fontSize: 14, height: 1.4)),
+            )),
           ],
         ),
       );
     } else {
-      // AI 메시지 (왼쪽, 흰색, 프로필 아이콘)
       return Padding(
         padding: const EdgeInsets.only(bottom: 6, right: 50),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 16,
+            CircleAvatar(radius: 16,
               backgroundColor: _kHeader.withOpacity(0.15),
               child: Text(msg.isTranslation ? '🌐' : '🧑‍🎓',
-                  style: const TextStyle(fontSize: 16)),
-            ),
+                  style: const TextStyle(fontSize: 16))),
             const SizedBox(width: 6),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(msg.isTranslation ? '번역' : 'Claude Scholar',
-                      style: const TextStyle(color: Color(0xFF5A6B7D),
-                          fontSize: 11, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 3),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: msg.isTranslation
-                                ? const Color(0xFFE8F5E9) : _kAIBubble,
-                            borderRadius: BorderRadius.circular(14).copyWith(
-                              topLeft: const Radius.circular(4)),
-                          ),
-                          child: Text(msg.text,
-                              style: const TextStyle(color: _kAIText,
-                                  fontSize: 14, height: 1.4)),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(timeStr,
-                          style: const TextStyle(color: _kTimeText, fontSize: 10)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            Flexible(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(msg.isTranslation ? '번역' : 'Claude Scholar',
+                    style: const TextStyle(color: Color(0xFF5A6B7D),
+                        fontSize: 11, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 3),
+                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Flexible(child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: msg.isTranslation ? const Color(0xFFE8F5E9) : _kAIBubble,
+                      borderRadius: BorderRadius.circular(14).copyWith(
+                          topLeft: const Radius.circular(4))),
+                    child: Text(msg.text,
+                        style: const TextStyle(color: _kAIText, fontSize: 14, height: 1.4)),
+                  )),
+                  const SizedBox(width: 6),
+                  Text(timeStr, style: const TextStyle(color: _kTimeText, fontSize: 10)),
+                ]),
+              ],
+            )),
           ],
         ),
       );
     }
   }
 
-  // ── 실시간 STT 표시 ──────────────────────────────────────────
   Widget _buildPartialBar() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.green.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 8, height: 8,
-              child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.green)),
-          const SizedBox(width: 10),
-          Expanded(child: Text(_partial,
-              style: const TextStyle(color: Colors.green, fontSize: 13,
-                  fontStyle: FontStyle.italic),
-              overflow: TextOverflow.ellipsis, maxLines: 2)),
-        ],
-      ),
+        borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        const SizedBox(width: 8, height: 8,
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.green)),
+        const SizedBox(width: 10),
+        Expanded(child: Text(_partial,
+            style: const TextStyle(color: Colors.green, fontSize: 13,
+                fontStyle: FontStyle.italic),
+            overflow: TextOverflow.ellipsis, maxLines: 2)),
+      ]),
     );
   }
 
@@ -584,86 +627,105 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: _kAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: const Row(
-        children: [
-          SizedBox(width: 12, height: 12,
-              child: CircularProgressIndicator(strokeWidth: 2, color: _kAccent)),
-          SizedBox(width: 10),
-          Text('Claude가 생각 중...', style: TextStyle(color: _kAccent, fontSize: 12)),
-        ],
-      ),
+        borderRadius: BorderRadius.circular(14)),
+      child: const Row(children: [
+        SizedBox(width: 12, height: 12,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _kAccent)),
+        SizedBox(width: 10),
+        Text('Claude가 생각 중...', style: TextStyle(color: _kAccent, fontSize: 12)),
+      ]),
     );
   }
 
-  // ── 하단 바 (카톡 스타일) ──────────────────────────────────────
+  // ── 하단 바: 통화 시작/종료 중심 ──────────────────────────────
   Widget _buildBottomBar() {
     return Container(
       color: _kBottomBar,
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-      child: Row(
-        children: [
-          // 번역 버튼
-          IconButton(
-            icon: const Icon(Icons.translate, color: Color(0xFF888888), size: 24),
-            onPressed: _messages.isEmpty ? null : _showLangPicker,
-          ),
-          const SizedBox(width: 4),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: _inCall ? _buildInCallBar() : _buildIdleBar(),
+    );
+  }
 
-          // 상태 텍스트 영역
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFDDDDDD)),
-              ),
-              child: Text(
-                _listening ? '듣고 있습니다...' :
-                _speaking ? 'Claude가 말하는 중...' :
-                _thinking ? 'Claude가 생각하는 중...' :
-                '마이크 버튼을 눌러 말하기',
-                style: TextStyle(
-                  color: _listening ? Colors.green :
-                         _speaking ? Colors.orange :
-                         Colors.grey[500],
-                  fontSize: 13,
-                ),
-              ),
+  // 대기 상태: 큰 전화 버튼
+  Widget _buildIdleBar() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: _startCall,
+          child: Container(
+            width: 68, height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _kCallGreen,
+              boxShadow: [BoxShadow(color: _kCallGreen.withOpacity(0.4), blurRadius: 16)],
             ),
+            child: const Icon(Icons.call, color: Colors.white, size: 32),
           ),
-          const SizedBox(width: 4),
+        ),
+        const SizedBox(height: 8),
+        Text('전화 걸기', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+      ],
+    );
+  }
 
-          // AI 말 끊기 버튼
-          if (_speaking)
-            IconButton(
-              icon: const Icon(Icons.stop_circle, color: Colors.orange, size: 28),
-              onPressed: _stopSpeaking,
-            ),
-
-          // 마이크 버튼
+  // 통화 중: 마이크 상태 + 끊기 버튼
+  Widget _buildInCallBar() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        // AI 말 끊기
+        if (_speaking)
           GestureDetector(
-            onTap: _thinking ? null : (_listening ? _stopListening : _startListening),
-            child: Container(
-              width: 48, height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _listening ? Colors.green :
-                       _thinking ? Colors.grey[400] : _kHeader,
-                boxShadow: _listening ? [
-                  BoxShadow(color: Colors.green.withOpacity(0.3), blurRadius: 12),
-                ] : null,
-              ),
-              child: Icon(
-                _listening ? Icons.mic : Icons.mic_none,
-                color: Colors.white, size: 24,
-              ),
-            ),
+            onTap: _stopSpeaking,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 50, height: 50,
+                decoration: BoxDecoration(shape: BoxShape.circle,
+                  color: Colors.orange.withOpacity(0.15),
+                  border: Border.all(color: Colors.orange)),
+                child: const Icon(Icons.stop, color: Colors.orange, size: 24)),
+              const SizedBox(height: 4),
+              const Text('끊기', style: TextStyle(color: Colors.orange, fontSize: 10)),
+            ]),
           ),
-        ],
-      ),
+
+        // 마이크 상태 표시 (자동이라 누를 필요 없음)
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 56, height: 56,
+            decoration: BoxDecoration(shape: BoxShape.circle,
+              color: _listening ? Colors.green :
+                     _thinking ? Colors.blue.withOpacity(0.3) :
+                     _speaking ? Colors.orange.withOpacity(0.3) :
+                     Colors.grey.withOpacity(0.2)),
+            child: Icon(
+              _listening ? Icons.mic :
+              _thinking ? Icons.psychology :
+              _speaking ? Icons.volume_up : Icons.mic_off,
+              color: _listening ? Colors.white :
+                     _thinking ? Colors.blue : Colors.grey,
+              size: 28)),
+          const SizedBox(height: 4),
+          Text(
+            _listening ? '듣는 중' :
+            _thinking ? '생각 중' :
+            _speaking ? '말하는 중' : '대기',
+            style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+        ]),
+
+        // 통화 종료
+        GestureDetector(
+          onTap: _endCall,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 56, height: 56,
+              decoration: BoxDecoration(shape: BoxShape.circle,
+                color: _kCallRed,
+                boxShadow: [BoxShadow(color: _kCallRed.withOpacity(0.4), blurRadius: 12)]),
+              child: const Icon(Icons.call_end, color: Colors.white, size: 28)),
+            const SizedBox(height: 4),
+            const Text('종료', style: TextStyle(color: _kCallRed, fontSize: 10)),
+          ]),
+        ),
+      ],
     );
   }
 }
@@ -673,6 +735,7 @@ class _Msg {
   final bool isUser;
   final DateTime time;
   final bool isTranslation;
+  final bool isSystem;
   const _Msg({required this.text, required this.isUser, required this.time,
-      this.isTranslation = false});
+      this.isTranslation = false, this.isSystem = false});
 }

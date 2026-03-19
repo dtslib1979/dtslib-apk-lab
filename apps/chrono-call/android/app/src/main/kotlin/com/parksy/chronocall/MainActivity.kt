@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
@@ -120,6 +121,11 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
                     runOnUiThread { channel?.invokeMethod("onTTSDone", null) }
                     result.success(true)
                 }
+                "playTone" -> {
+                    val type = call.argument<String>("type") ?: "beep"
+                    playTone(type)
+                    result.success(true)
+                }
                 "startRecording" -> { startRecording(); result.success(true) }
                 "stopRecording"  -> { stopRecording(); result.success(recordPath) }
                 "startForeground" -> {
@@ -187,6 +193,32 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
     // ── TTS ───────────────────────────────────────────────
     private fun speak(text: String) {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chronocall_utterance")
+    }
+
+    // ── 통화 효과음 ───────────────────────────────────────────
+    private fun playTone(type: String) {
+        Thread {
+            try {
+                val toneGen = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 80)
+                when (type) {
+                    "beep" -> {
+                        toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+                        Thread.sleep(250)
+                    }
+                    "dial" -> {
+                        repeat(3) {
+                            toneGen.startTone(ToneGenerator.TONE_SUP_RINGTONE, 300)
+                            Thread.sleep(500)
+                        }
+                    }
+                    "hangup" -> {
+                        toneGen.startTone(ToneGenerator.TONE_SUP_BUSY, 600)
+                        Thread.sleep(700)
+                    }
+                }
+                toneGen.release()
+            } catch (_: Exception) {}
+        }.start()
     }
 
     // ── Audio Playback (Edge TTS MP3) ──────────────────────
