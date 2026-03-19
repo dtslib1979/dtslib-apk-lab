@@ -9,18 +9,18 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
-// ── 카톡 팔레트 ─────────────────────────────────────────────────
-const _kBg        = Color(0xFF9BBBD4);
-const _kHeader    = Color(0xFF3B4890);
-const _kMyBubble  = Color(0xFFFFEB33);
-const _kAIBubble  = Color(0xFFFFFFFF);
+// ── 파피루스 + 카톡 팔레트 ────────────────────────────────────────
+const _kBg        = Color(0xFFEDE4D3);  // 파피루스 채팅 배경
+const _kHeader    = Color(0xFF2C1810);  // 잉크 헤더
+const _kMyBubble  = Color(0xFFFFEB33);  // 카톡 노랑
+const _kAIBubble  = Color(0xFFFFFDF5);  // 따뜻한 흰색
 const _kMyText    = Color(0xFF1A1A1A);
-const _kAIText    = Color(0xFF1A1A1A);
-const _kTimeText  = Color(0xFF6B7B8D);
-const _kBottomBar = Color(0xFFEFEFEF);
-const _kAccent    = Color(0xFF4FC3F7);
-const _kCallGreen = Color(0xFF4CAF50);
-const _kCallRed   = Color(0xFFE53935);
+const _kAIText    = Color(0xFF2C1810);
+const _kTimeText  = Color(0xFF8B7355);
+const _kBottomBar = Color(0xFFF5ECD7);  // 파피루스 하단
+const _kAccent    = Color(0xFF007AFF);  // iOS 블루
+const _kCallGreen = Color(0xFF34C759);  // iOS 그린
+const _kCallRed   = Color(0xFFFF3B30);  // iOS 레드
 
 const _systemPrompt = '''You are a world-class scholar and polymath.
 The user is a curious non-specialist who tests hypotheses through conversation.
@@ -29,7 +29,8 @@ Be precise, cite theories/scholars when relevant, help develop thinking step by 
 Keep it conversational — this is a phone call, not a lecture. Under 150 words per turn.''';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final Map<String, dynamic>? scholar;
+  const ChatScreen({super.key, this.scholar});
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
@@ -39,7 +40,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final _scrollCtrl = ScrollController();
   final _messages = <_Msg>[];
-  final _ttsFiles = <String>[];  // AI TTS MP3 경로 (나중에 합성용)
+  final _ttsFiles = <String>[];
+
+  // 학자 정보
+  String get _scholarName => widget.scholar?['name'] ?? 'AI Scholar';
+  String get _scholarEmoji => widget.scholar?['emoji'] ?? '🧑‍🎓';
+  String get _scholarPrompt => widget.scholar?['prompt'] ?? _systemPrompt;
+  String get _scholarPhone => widget.scholar?['phone'] ?? '070-0000-0000';
 
   bool _listening = false;
   bool _thinking  = false;
@@ -133,8 +140,8 @@ class _ChatScreenState extends State<ChatScreen> {
     await Future.delayed(const Duration(milliseconds: 800));
 
     // 인사 메시지
-    _addMessage('Connected. Ask me anything.', isUser: false);
-    await _speak('안녕하세요, 무엇이든 물어보세요.');
+    _addMessage('Connected to $_scholarName', isUser: false, isSystem: true);
+    await _speak('안녕하세요, $_scholarName입니다. 무엇이든 물어보세요.');
   }
 
   Future<void> _endCall() async {
@@ -320,7 +327,7 @@ class _ChatScreenState extends State<ChatScreen> {
             'gemini-2.0-flash:generateContent?key=$_apiKey'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'system_instruction': {'parts': [{'text': _systemPrompt}]},
+          'system_instruction': {'parts': [{'text': '$_scholarPrompt\n\nAlways respond in the same language the user speaks. Default: Korean. Keep under 150 words.'}]},
           'contents': history,
           'generationConfig': {'maxOutputTokens': 1024},
         }),
@@ -446,13 +453,13 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
-          CircleAvatar(radius: 18, backgroundColor: Colors.white,
-            child: const Text('🧑‍🎓', style: TextStyle(fontSize: 20))),
+          CircleAvatar(radius: 18, backgroundColor: Colors.white.withOpacity(0.9),
+            child: Text(_scholarEmoji, style: const TextStyle(fontSize: 20))),
           const SizedBox(width: 10),
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('AI Scholar',
+              Text(_scholarName,
                   style: TextStyle(color: Colors.white, fontSize: 15,
                       fontWeight: FontWeight.w700)),
               Row(children: [
@@ -462,7 +469,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(width: 5),
                 Text(
                   _inCall ? 'In call $durStr' :
-                  'AI Scholar Hotline  v3.3',
+                  'AI Scholar Hotline  v3.5',
                   style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
               ]),
             ],
@@ -581,13 +588,13 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(radius: 16,
               backgroundColor: _kHeader.withOpacity(0.15),
-              child: Text(msg.isTranslation ? '🌐' : '🧑‍🎓',
+              child: Text(msg.isTranslation ? '🌐' : _scholarEmoji,
                   style: const TextStyle(fontSize: 16))),
             const SizedBox(width: 6),
             Flexible(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(msg.isTranslation ? 'Translated' : 'AI Scholar',
+                Text(msg.isTranslation ? 'Translated' : _scholarName,
                     style: const TextStyle(color: Color(0xFF5A6B7D),
                         fontSize: 11, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 3),
