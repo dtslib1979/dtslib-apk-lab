@@ -57,16 +57,26 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
         super.onCreate(savedInstanceState)
         tts = TextToSpeech(this, this)
 
-        // 블루투스 오디오 라우팅
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        am.mode = AudioManager.MODE_IN_COMMUNICATION
-        am.isBluetoothScoOn = true
-        am.startBluetoothSco()
+        // 블루투스 오디오 라우팅 (이어버드 미연결 시 무시)
+        try {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.mode = AudioManager.MODE_IN_COMMUNICATION
+            if (am.isBluetoothScoAvailableOffCall) {
+                am.isBluetoothScoOn = true
+                am.startBluetoothSco()
+            }
+        } catch (_: Exception) {}
 
         // 미디어 버튼 등록
-        val filter = IntentFilter(Intent.ACTION_MEDIA_BUTTON)
-        filter.priority = IntentFilter.SYSTEM_HIGH_PRIORITY
-        registerReceiver(mediaButtonReceiver, filter)
+        try {
+            val filter = IntentFilter(Intent.ACTION_MEDIA_BUTTON)
+            filter.priority = IntentFilter.SYSTEM_HIGH_PRIORITY
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(mediaButtonReceiver, filter, RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(mediaButtonReceiver, filter)
+            }
+        } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
@@ -74,9 +84,11 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
         speechRecognizer?.destroy()
         tts?.shutdown()
         recorder?.release()
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        am.stopBluetoothSco()
-        am.isBluetoothScoOn = false
+        try {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.stopBluetoothSco()
+            am.isBluetoothScoOn = false
+        } catch (_: Exception) {}
         super.onDestroy()
     }
 

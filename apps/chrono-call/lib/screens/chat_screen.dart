@@ -519,7 +519,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.12),
           borderRadius: BorderRadius.circular(12)),
-        child: Text(DateFormat('yyyy년 M월 d일 EEEE', 'ko').format(d),
+        child: Text(DateFormat('yyyy-MM-dd').format(d),
             style: const TextStyle(color: Colors.white, fontSize: 11)),
       ),
     );

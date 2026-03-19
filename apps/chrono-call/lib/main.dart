@@ -1,7 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'screens/chat_screen.dart';
 
-void main() => runApp(const ChronoCallApp());
+void main() {
+  runZonedGuarded(() {
+    WidgetsFlutterBinding.ensureInitialized();
+    runApp(const ChronoCallApp());
+  }, (error, stack) {
+    debugPrint('ChronoCall error: $error\n$stack');
+  });
+}
 
 class ChronoCallApp extends StatelessWidget {
   const ChronoCallApp({super.key});
