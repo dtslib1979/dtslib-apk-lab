@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -197,10 +198,16 @@ class _ChatScreenState extends State<ChatScreen> {
   static const _edgeVoiceEn = 'en-US-AriaNeural';
 
   Future<void> _speak(String text) async {
+    if (!mounted) return;
     setState(() => _speaking = true);
     try {
       final voice = RegExp(r'[가-힣]').hasMatch(text) ? _edgeVoiceKo : _edgeVoiceEn;
-      final escaped = text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+      final escaped = text
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&apos;');
       final ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">'
           '<voice name="$voice">$escaped</voice></speak>';
 
@@ -212,7 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'User-Agent': 'edge-tts-android',
         },
         body: ssml,
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (res.statusCode == 200 && res.bodyBytes.length > 1000) {
         final tmp = await getTemporaryDirectory();
@@ -220,11 +227,14 @@ class _ChatScreenState extends State<ChatScreen> {
         await File(path).writeAsBytes(res.bodyBytes);
         _ttsFiles.add(path);
         await _ch.invokeMethod('playAudio', {'path': path});
-      } else {
-        await _ch.invokeMethod('speak', {'text': text});
+        return; // playAudio → onTTSDone 콜백이 speaking=false 처리
       }
+    } catch (_) {}
+    // Edge TTS 실패 → Android TTS fallback
+    try {
+      await _ch.invokeMethod('speak', {'text': text});
     } catch (_) {
-      try { await _ch.invokeMethod('speak', {'text': text}); } catch (_) {}
+      if (mounted) setState(() => _speaking = false);
     }
   }
 

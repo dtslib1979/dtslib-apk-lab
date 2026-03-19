@@ -127,8 +127,12 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
                     result.success(true)
                 }
                 "stopAudio" -> {
-                    mediaPlayer?.stop()
-                    mediaPlayer?.release()
+                    try {
+                        mediaPlayer?.let {
+                            if (it.isPlaying) it.stop()
+                            it.release()
+                        }
+                    } catch (_: Exception) {}
                     mediaPlayer = null
                     runOnUiThread { channel?.invokeMethod("onTTSDone", null) }
                     result.success(true)
@@ -235,17 +239,32 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
 
     // ── Audio Playback (Edge TTS MP3) ──────────────────────
     private fun playAudio(path: String) {
-        mediaPlayer?.release()
-        mediaPlayer = MediaPlayer().apply {
-            setDataSource(path)
-            setAudioStreamType(AudioManager.STREAM_VOICE_CALL)
-            setOnCompletionListener {
-                release()
-                mediaPlayer = null
-                runOnUiThread { channel?.invokeMethod("onTTSDone", null) }
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(path)
+                setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                setOnCompletionListener {
+                    it.release()
+                    mediaPlayer = null
+                    runOnUiThread { channel?.invokeMethod("onTTSDone", null) }
+                }
+                setOnErrorListener { _, _, _ ->
+                    mediaPlayer = null
+                    runOnUiThread { channel?.invokeMethod("onTTSDone", null) }
+                    true
+                }
+                prepare()
+                start()
             }
-            prepare()
-            start()
+        } catch (e: Exception) {
+            mediaPlayer = null
+            runOnUiThread { channel?.invokeMethod("onTTSDone", null) }
         }
     }
 
