@@ -347,46 +347,68 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ── Gemini API (무료) ───────────────────────────────────────
+  // ── Gemini API (무료, 429 재시도) ──────────────────────────────
+  static const _models = [
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ];
+
   Future<void> _sendToLLM(String userText) async {
     if (_apiKey == null || _apiKey!.isEmpty) return;
     setState(() => _thinking = true);
 
-    // Gemini 대화 이력 구성
     final history = _messages
         .where((m) => !m.isTranslation && !m.isSystem)
-        .toList().reversed.take(40).toList().reversed
+        .toList().reversed.take(20).toList().reversed
         .map((m) => {
           'role': m.isUser ? 'user' : 'model',
           'parts': [{'text': m.text}],
         }).toList();
 
-    try {
-      final res = await http.post(
-        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/'
-            'gemini-2.0-flash:generateContent?key=$_apiKey'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'system_instruction': {'parts': [{'text': '$_scholarPrompt\n\nAlways respond in the same language the user speaks. Default: Korean. Keep under 150 words.'}]},
-          'contents': history,
-          'generationConfig': {'maxOutputTokens': 1024},
-        }),
-      ).timeout(const Duration(seconds: 30));
+    final body = jsonEncode({
+      'system_instruction': {'parts': [{'text': '$_scholarPrompt\n\nAlways respond in the same language the user speaks. Default: Korean. Keep under 150 words.'}]},
+      'contents': history,
+      'generationConfig': {'maxOutputTokens': 1024},
+    });
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        final reply = data['candidates'][0]['content']['parts'][0]['text'] as String;
-        _addMessage(reply, isUser: false);
-        await _speak(reply);
-      } else {
-        _addMessage('API Error ${res.statusCode}', isUser: false);
-        if (mounted) setState(() => _speaking = false);
+    // 모델 fallback + 429 재시도
+    for (final model in _models) {
+      for (int retry = 0; retry < 3; retry++) {
+        try {
+          final res = await http.post(
+            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/'
+                '$model:generateContent?key=$_apiKey'),
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          ).timeout(const Duration(seconds: 30));
+
+          if (res.statusCode == 200) {
+            final data = jsonDecode(res.body);
+            final candidates = data['candidates'] as List?;
+            if (candidates != null && candidates.isNotEmpty) {
+              final reply = candidates[0]['content']['parts'][0]['text'] as String;
+              _addMessage(reply, isUser: false);
+              await _speak(reply);
+              if (mounted) setState(() => _thinking = false);
+              return;
+            }
+          } else if (res.statusCode == 429) {
+            // Rate limit — 3초 대기 후 재시도
+            await Future.delayed(Duration(seconds: 3 * (retry + 1)));
+            continue;
+          } else {
+            _addMessage('API $model ${res.statusCode}', isUser: false);
+            if (mounted) setState(() => _thinking = false);
+            return;
+          }
+        } catch (e) {
+          if (retry == 2) {
+            _addMessage('네트워크 오류', isUser: false);
+          }
+        }
       }
-    } catch (e) {
-      _addMessage('네트워크 오류', isUser: false);
-      if (mounted) setState(() => _speaking = false);
     }
-    if (mounted) setState(() => _thinking = false);
+    if (mounted) setState(() { _thinking = false; _speaking = false; });
   }
 
   void _addMessage(String text, {required bool isUser,

@@ -1,7 +1,7 @@
 name: chrono_call
 description: AI voice call — handsfree LLM conversation via earbud
 publish_to: 'none'
-version: 4.2.0+1
+version: 4.3.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
