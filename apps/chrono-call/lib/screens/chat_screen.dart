@@ -22,12 +22,11 @@ const _kAccent    = Color(0xFF4FC3F7);
 const _kCallGreen = Color(0xFF4CAF50);
 const _kCallRed   = Color(0xFFE53935);
 
-const _systemPrompt = '''You are a world-class scholar and expert across all academic disciplines.
-The user is a non-specialist curious thinker who tests hypotheses through conversation.
-Respond in Korean unless the user switches to another language.
-Be precise, cite relevant theories/scholars when applicable, and help the user
-develop their thinking step by step. Keep responses conversational — this is a
-phone call, not a lecture. Under 150 words per turn.''';
+const _systemPrompt = '''You are a world-class scholar and polymath.
+The user is a curious non-specialist who tests hypotheses through conversation.
+Respond in the same language the user speaks. Default: Korean.
+Be precise, cite theories/scholars when relevant, help develop thinking step by step.
+Keep it conversational — this is a phone call, not a lecture. Under 150 words per turn.''';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -102,7 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
             if (_inCall && mounted) _startListening();
           }
         case 'onMediaButton':
-          // Buds Pro 1탭 → 통화 시작/종료 토글
+          // Buds Pro 1탭 → 통화 시작/End 토글
           _inCall ? _endCall() : _startCall();
       }
     });
@@ -119,7 +118,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // ══════════════════════════════════════════════════════════
   Future<void> _startCall() async {
     if (_apiKey == null || _apiKey!.isEmpty) {
-      _addMessage('⚠️ API 키를 먼저 설정하세요', isUser: false);
+      _addMessage('Set your API key first (tap ⋮)', isUser: false);
       return;
     }
 
@@ -134,7 +133,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await Future.delayed(const Duration(milliseconds: 800));
 
     // 인사 메시지
-    _addMessage('통화가 연결되었습니다. 무엇이든 물어보세요.', isUser: false);
+    _addMessage('Connected. Ask me anything.', isUser: false);
     await _speak('안녕하세요, 무엇이든 물어보세요.');
   }
 
@@ -146,7 +145,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try { await _ch.invokeMethod('stopAudio'); } catch (_) {}
     try { await _ch.invokeMethod('stopTTS'); } catch (_) {}
 
-    // 통화 종료음
+    // 통화 End음
     await _playHangupTone();
 
     // 녹음 정지
@@ -156,11 +155,11 @@ class _ChatScreenState extends State<ChatScreen> {
     // 통화 시간 계산
     final duration = _callStart != null
         ? DateTime.now().difference(_callStart!) : Duration.zero;
-    final durStr = '${duration.inMinutes}분 ${duration.inSeconds % 60}초';
+    final durStr = '${duration.inMinutes}m ${duration.inSeconds % 60}s';
 
-    _addMessage('📞 통화 종료 ($durStr)', isUser: false, isSystem: true);
+    _addMessage('📞 Call ended ($durStr)', isUser: false, isSystem: true);
 
-    // 자동 저장
+    // 자동 Save
     await _saveConversation();
   }
 
@@ -269,7 +268,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (_inCall) _speak(translated);
       }
     } catch (e) {
-      _addMessage('번역 실패: $e', isUser: false);
+      _addMessage('Translation failed: $e', isUser: false);
     }
   }
 
@@ -283,7 +282,7 @@ class _ChatScreenState extends State<ChatScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Padding(padding: EdgeInsets.all(16),
-            child: Text('번역 언어', style: TextStyle(fontSize: 16,
+            child: Text('Translate to', style: TextStyle(fontSize: 16,
                 fontWeight: FontWeight.w700, color: Colors.black87))),
           ...(_langOptions.map((l) => ListTile(
             title: Text(l.$2, style: const TextStyle(color: Colors.black87)),
@@ -356,7 +355,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  // ── 대화 저장 ───────────────────────────────────────────────
+  // ── 대화 Save ───────────────────────────────────────────────
   Future<void> _saveConversation() async {
     if (_messages.isEmpty) return;
     final dir = Directory('/sdcard/Download/ChronoCall');
@@ -365,15 +364,15 @@ class _ChatScreenState extends State<ChatScreen> {
     final file = File('${dir.path}/call_$ts.md');
     final buf = StringBuffer('# ChronoCall — $ts\n\n');
     for (final m in _messages) {
-      final prefix = m.isUser ? '**나**' :
-          m.isSystem ? '**시스템**' :
-          m.isTranslation ? '**번역**' : '**Claude**';
+      final prefix = m.isUser ? '**Me**' :
+          m.isSystem ? '**System**' :
+          m.isTranslation ? '**Translated**' : '**Claude**';
       buf.writeln('[${DateFormat('HH:mm:ss').format(m.time)}] $prefix: ${m.text}\n');
     }
     await file.writeAsString(buf.toString());
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('저장: call_$ts.md'), backgroundColor: _kHeader));
+        SnackBar(content: Text('Saved: call_$ts.md'), backgroundColor: _kHeader));
     }
   }
 
@@ -398,7 +397,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context),
-              child: const Text('취소', style: TextStyle(color: Colors.grey))),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
           TextButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
@@ -406,7 +405,7 @@ class _ChatScreenState extends State<ChatScreen> {
               setState(() => _apiKey = ctrl.text.trim());
               Navigator.pop(context);
             },
-            child: const Text('저장', style: TextStyle(color: _kHeader)),
+            child: const Text('Save', style: TextStyle(color: _kHeader)),
           ),
         ],
       ),
@@ -461,8 +460,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: _inCall ? _kCallGreen : Colors.grey)),
                 const SizedBox(width: 5),
                 Text(
-                  _inCall ? '통화 중 $durStr' :
-                  'AI Scholar Hotline  v3.0',
+                  _inCall ? 'In call $durStr' :
+                  'AI Scholar Hotline  v3.1',
                   style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
               ]),
             ],
@@ -488,15 +487,15 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           const Text('📞', style: TextStyle(fontSize: 56)),
           const SizedBox(height: 20),
-          const Text('전화 버튼을 눌러 통화 시작',
+          const Text('Tap to start a call',
               style: TextStyle(color: Color(0xFF5A6B7D), fontSize: 15,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Text('이어버드 1탭으로도 시작 가능',
+          Text('or tap your earbuds',
               style: TextStyle(color: const Color(0xFF5A6B7D).withOpacity(0.6),
                   fontSize: 12)),
           const SizedBox(height: 24),
-          Text('화면을 보지 않아도 됩니다',
+          Text('no screen needed',
               style: TextStyle(color: const Color(0xFF5A6B7D).withOpacity(0.4),
                   fontSize: 11)),
         ],
@@ -587,7 +586,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Flexible(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(msg.isTranslation ? '번역' : 'Claude Scholar',
+                Text(msg.isTranslation ? 'Translated' : 'Claude Scholar',
                     style: const TextStyle(color: Color(0xFF5A6B7D),
                         fontSize: 11, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 3),
@@ -642,12 +641,12 @@ class _ChatScreenState extends State<ChatScreen> {
         SizedBox(width: 12, height: 12,
             child: CircularProgressIndicator(strokeWidth: 2, color: _kAccent)),
         SizedBox(width: 10),
-        Text('Claude가 생각 중...', style: TextStyle(color: _kAccent, fontSize: 12)),
+        Text('Claude is thinking...', style: TextStyle(color: _kAccent, fontSize: 12)),
       ]),
     );
   }
 
-  // ── 하단 바: 통화 시작/종료 중심 ──────────────────────────────
+  // ── 하단 바: 통화 시작/End 중심 ──────────────────────────────
   Widget _buildBottomBar() {
     return Container(
       color: _kBottomBar,
@@ -656,7 +655,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 대기 상태: 큰 전화 버튼
+  // Standby 상태: 큰 전화 버튼
   Widget _buildIdleBar() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -674,17 +673,17 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Text('전화 걸기', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        Text('Call', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
       ],
     );
   }
 
-  // 통화 중: 마이크 상태 + 끊기 버튼
+  // 통화 중: 마이크 상태 + Stop 버튼
   Widget _buildInCallBar() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        // AI 말 끊기
+        // AI 말 Stop
         if (_speaking)
           GestureDetector(
             onTap: _stopSpeaking,
@@ -695,7 +694,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   border: Border.all(color: Colors.orange)),
                 child: const Icon(Icons.stop, color: Colors.orange, size: 24)),
               const SizedBox(height: 4),
-              const Text('끊기', style: TextStyle(color: Colors.orange, fontSize: 10)),
+              const Text('Stop', style: TextStyle(color: Colors.orange, fontSize: 10)),
             ]),
           ),
 
@@ -716,13 +715,13 @@ class _ChatScreenState extends State<ChatScreen> {
               size: 28)),
           const SizedBox(height: 4),
           Text(
-            _listening ? '듣는 중' :
-            _thinking ? '생각 중' :
-            _speaking ? '말하는 중' : '대기',
+            _listening ? 'Listening' :
+            _thinking ? 'Thinking' :
+            _speaking ? 'Speaking' : 'Standby',
             style: TextStyle(color: Colors.grey[600], fontSize: 10)),
         ]),
 
-        // 통화 종료
+        // 통화 End
         GestureDetector(
           onTap: _endCall,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -732,7 +731,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 boxShadow: [BoxShadow(color: _kCallRed.withOpacity(0.4), blurRadius: 12)]),
               child: const Icon(Icons.call_end, color: Colors.white, size: 28)),
             const SizedBox(height: 4),
-            const Text('종료', style: TextStyle(color: _kCallRed, fontSize: 10)),
+            const Text('End', style: TextStyle(color: _kCallRed, fontSize: 10)),
           ]),
         ),
       ],
