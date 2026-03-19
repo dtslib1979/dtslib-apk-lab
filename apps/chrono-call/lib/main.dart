@@ -26,11 +26,10 @@ class ChronoCallApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF5ECD7),
-        fontFamily: 'sans-serif',
+        scaffoldBackgroundColor: const Color(0xFFF2F2F7),
         colorScheme: ColorScheme.light(
           primary: const Color(0xFF007AFF),
-          surface: const Color(0xFFF5ECD7),
+          surface: const Color(0xFFF2F2F7),
         ),
         useMaterial3: true,
       ),

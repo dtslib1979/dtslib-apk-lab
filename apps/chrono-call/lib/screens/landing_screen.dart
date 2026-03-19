@@ -4,16 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'chat_screen.dart';
 
-// ── 아이폰 + 파피루스 팔레트 ──────────────────────────────────
-const _kPapyrus    = Color(0xFFF5ECD7);  // 파피루스 배경
-const _kPapyrusDk  = Color(0xFFE8DCC8);  // 파피루스 진한
-const _kInk        = Color(0xFF2C1810);  // 잉크 텍스트
-const _kInkLight   = Color(0xFF8B7355);  // 연한 잉크
-const _kIosBlue    = Color(0xFF007AFF);  // iOS 블루
-const _kIosGreen   = Color(0xFF34C759);  // iOS 그린
-const _kIosGrey    = Color(0xFFF2F2F7);  // iOS 그레이 배경
-const _kSeparator  = Color(0xFFD4C5A9);  // 구분선
-
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
   @override
@@ -21,9 +11,10 @@ class LandingScreen extends StatefulWidget {
 }
 
 class _LandingScreenState extends State<LandingScreen> {
+  int _tabIndex = 0; // 0=Keypad, 1=Contacts, 2=Recents
   List<Map<String, dynamic>> _scholars = [];
   String? _apiKey;
-  String _searchQuery = '';
+  String _dialDisplay = '';
 
   @override
   void initState() {
@@ -43,31 +34,19 @@ class _LandingScreenState extends State<LandingScreen> {
     setState(() => _apiKey = prefs.getString('gemini_api_key'));
   }
 
-  List<Map<String, dynamic>> get _filtered {
-    if (_searchQuery.isEmpty) return _scholars;
-    final q = _searchQuery.toLowerCase();
-    return _scholars.where((s) =>
-        s['name'].toString().toLowerCase().contains(q) ||
-        s['field'].toString().toLowerCase().contains(q)).toList();
-  }
-
-  Map<String, List<Map<String, dynamic>>> get _grouped {
-    final map = <String, List<Map<String, dynamic>>>{};
-    for (final s in _filtered) {
-      final field = s['field'].toString().split(' / ').first;
-      map.putIfAbsent(field, () => []).add(s);
-    }
-    return map;
-  }
-
   void _call(Map<String, dynamic> scholar) {
     if (_apiKey == null || _apiKey!.isEmpty) {
       _showApiKeyDialog();
       return;
     }
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => ChatScreen(scholar: scholar),
-    ));
+    Navigator.push(context,
+        MaterialPageRoute(builder: (_) => ChatScreen(scholar: scholar)));
+  }
+
+  void _callRandom() {
+    if (_scholars.isEmpty) return;
+    final scholar = (_scholars.toList()..shuffle()).first;
+    _call(scholar);
   }
 
   void _showApiKeyDialog() {
@@ -76,20 +55,21 @@ class _LandingScreenState extends State<LandingScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        backgroundColor: Colors.white,
         title: const Text('Gemini API Key',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17)),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Free from aistudio.google.com',
-                style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                style: TextStyle(color: Colors.grey[400], fontSize: 12)),
             const SizedBox(height: 14),
             TextField(
               controller: ctrl,
               style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
               decoration: InputDecoration(
                 hintText: 'AIzaSy...',
-                filled: true, fillColor: _kIosGrey,
+                filled: true, fillColor: const Color(0xFFF2F2F7),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none),
@@ -99,7 +79,7 @@ class _LandingScreenState extends State<LandingScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey[400]))),
           TextButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
@@ -107,7 +87,8 @@ class _LandingScreenState extends State<LandingScreen> {
               setState(() => _apiKey = ctrl.text.trim());
               Navigator.pop(context);
             },
-            child: const Text('Save', style: TextStyle(color: _kIosBlue)),
+            child: const Text('Done',
+                style: TextStyle(color: Color(0xFF007AFF), fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -117,191 +98,305 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kPapyrus,
+      backgroundColor: const Color(0xFFF2F2F7),
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
-            _buildSearchBar(),
-            Expanded(child: _buildPhonebook()),
-            _buildFooter(),
+            Expanded(
+              child: _tabIndex == 0 ? _buildKeypad() :
+                     _tabIndex == 1 ? _buildContacts() :
+                     _buildRecents(),
+            ),
+            _buildTabBar(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  // ═══════════════════════════════════════════════════════════
+  // ── KEYPAD (아이폰 전화 키패드) ─────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildKeypad() {
+    return Column(
+      children: [
+        const Spacer(flex: 1),
+        // 번호 표시
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Text(
+            _dialDisplay.isEmpty ? 'ChronoCall' : _dialDisplay,
+            style: TextStyle(
+              fontSize: _dialDisplay.isEmpty ? 22 : 32,
+              fontWeight: _dialDisplay.isEmpty ? FontWeight.w300 : FontWeight.w400,
+              color: _dialDisplay.isEmpty ? Colors.grey[400] : Colors.black,
+              letterSpacing: _dialDisplay.isEmpty ? 4 : 2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        if (_dialDisplay.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('v3.6', style: TextStyle(color: Colors.grey[300], fontSize: 11)),
+          ),
+        const Spacer(flex: 1),
+        // 키패드 그리드
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30),
+          child: Column(
             children: [
-              Text('CHRONOCALL',
-                  style: TextStyle(
-                    color: _kInk,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 4,
-                  )),
-              const SizedBox(height: 2),
-              Text('Scholar Hotline  ·  v3.5',
-                  style: TextStyle(color: _kInkLight, fontSize: 12,
-                      letterSpacing: 1.5)),
+              _buildKeyRow(['1', '2', '3'], ['', 'ABC', 'DEF']),
+              const SizedBox(height: 16),
+              _buildKeyRow(['4', '5', '6'], ['GHI', 'JKL', 'MNO']),
+              const SizedBox(height: 16),
+              _buildKeyRow(['7', '8', '9'], ['PQRS', 'TUV', 'WXYZ']),
+              const SizedBox(height: 16),
+              _buildKeyRow(['*', '0', '#'], ['', '+', '']),
             ],
-          )),
-          GestureDetector(
-            onTap: _showApiKeyDialog,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _kPapyrusDk,
-                borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // 전화 버튼 + 백스페이스
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(width: 60),
+            GestureDetector(
+              onTap: _callRandom,
+              child: Container(
+                width: 72, height: 72,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF34C759),
+                ),
+                child: const Icon(Icons.call, color: Colors.white, size: 32),
               ),
-              child: Icon(Icons.key,
+            ),
+            const SizedBox(width: 12),
+            if (_dialDisplay.isNotEmpty)
+              GestureDetector(
+                onTap: () => setState(() =>
+                    _dialDisplay = _dialDisplay.substring(0, _dialDisplay.length - 1)),
+                child: const SizedBox(
+                  width: 48, height: 48,
+                  child: Icon(Icons.backspace_outlined, color: Colors.grey, size: 24),
+                ),
+              )
+            else
+              const SizedBox(width: 48),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // 설정 버튼
+        TextButton(
+          onPressed: _showApiKeyDialog,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.key, size: 14,
                   color: _apiKey != null && _apiKey!.isNotEmpty
-                      ? _kIosGreen : _kInkLight, size: 20),
+                      ? const Color(0xFF34C759) : Colors.grey[400]),
+              const SizedBox(width: 4),
+              Text(
+                _apiKey != null && _apiKey!.isNotEmpty ? 'API Key Set' : 'Set API Key',
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildKeyRow(List<String> nums, List<String> subs) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: List.generate(3, (i) => _buildKey(nums[i], subs[i])),
+    );
+  }
+
+  Widget _buildKey(String num, String sub) {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _dialDisplay += num);
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        width: 78, height: 78,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFFE5E5EA),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(num, style: const TextStyle(
+                fontSize: 28, fontWeight: FontWeight.w300, color: Colors.black)),
+            if (sub.isNotEmpty)
+              Text(sub, style: TextStyle(
+                  fontSize: 9, fontWeight: FontWeight.w600,
+                  color: Colors.grey[600], letterSpacing: 1.5)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ── CONTACTS (학자 전화번호부) ──────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildContacts() {
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final s in _scholars) {
+      final field = s['field'].toString().split(' / ').first;
+      grouped.putIfAbsent(field, () => []).add(s);
+    }
+
+    return Column(
+      children: [
+        // 헤더
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          child: Row(
+            children: [
+              const Text('Contacts',
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              Text('${_scholars.length}',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+            ],
+          ),
+        ),
+        // 리스트
+        Expanded(
+          child: ListView(
+            children: grouped.entries.map((entry) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 섹션 헤더
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                  color: const Color(0xFFF2F2F7),
+                  child: Text(entry.key.toUpperCase(),
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12,
+                          fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                ),
+                // 학자들
+                Container(
+                  color: Colors.white,
+                  child: Column(
+                    children: entry.value.asMap().entries.map((e) {
+                      final s = e.value;
+                      final isLast = e.key == entry.value.length - 1;
+                      return Column(children: [
+                        ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFFF2F2F7),
+                            child: Text(s['emoji'], style: const TextStyle(fontSize: 20)),
+                          ),
+                          title: Text(s['name'],
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400)),
+                          subtitle: Text(s['tagline'],
+                              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          trailing: GestureDetector(
+                            onTap: () => _call(s),
+                            child: const Icon(Icons.call, color: Color(0xFF34C759), size: 22),
+                          ),
+                          onTap: () => _call(s),
+                        ),
+                        if (!isLast) Divider(height: 1, indent: 72,
+                            color: Colors.grey[200]),
+                      ]);
+                    }).toList(),
+                  ),
+                ),
+              ],
+            )).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ── RECENTS (최근 통화) ────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildRecents() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          child: Row(
+            children: [
+              const Text('Recents',
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700)),
+              const Spacer(),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.call_made, size: 48, color: Colors.grey[300]),
+                const SizedBox(height: 12),
+                Text('No recent calls',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 15)),
+                const SizedBox(height: 4),
+                Text('Your call history will appear here',
+                    style: TextStyle(color: Colors.grey[300], fontSize: 12)),
+              ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ── TAB BAR (아이폰 하단 탭) ──────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  Widget _buildTabBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F8F8),
+        border: Border(top: BorderSide(color: Colors.grey[300]!, width: 0.5)),
+      ),
+      padding: const EdgeInsets.fromLTRB(0, 6, 0, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildTab(0, Icons.dialpad, 'Keypad'),
+          _buildTab(1, Icons.contacts, 'Contacts'),
+          _buildTab(2, Icons.access_time, 'Recents'),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: TextField(
-        onChanged: (v) => setState(() => _searchQuery = v),
-        style: TextStyle(color: _kInk, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: 'Search scholars...',
-          hintStyle: TextStyle(color: _kInkLight.withOpacity(0.5)),
-          prefixIcon: Icon(Icons.search, color: _kInkLight, size: 20),
-          filled: true,
-          fillColor: _kPapyrusDk.withOpacity(0.6),
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPhonebook() {
-    final groups = _grouped;
-    if (groups.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-      children: groups.entries.map((entry) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildTab(int index, IconData icon, String label) {
+    final active = _tabIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _tabIndex = index),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 80,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 섹션 헤더
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
-              child: Text(entry.key.toUpperCase(),
-                  style: TextStyle(color: _kInkLight, fontSize: 11,
-                      fontWeight: FontWeight.w700, letterSpacing: 1.5)),
-            ),
-            // 학자 카드들
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _kSeparator.withOpacity(0.5)),
-              ),
-              child: Column(
-                children: entry.value.asMap().entries.map((e) {
-                  final scholar = e.value;
-                  final isLast = e.key == entry.value.length - 1;
-                  return Column(children: [
-                    _buildScholarTile(scholar),
-                    if (!isLast) Divider(height: 1, indent: 72,
-                        color: _kSeparator.withOpacity(0.4)),
-                  ]);
-                }).toList(),
-              ),
-            ),
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildScholarTile(Map<String, dynamic> scholar) {
-    return InkWell(
-      onTap: () => _call(scholar),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            // 프로필 아이콘
-            Container(
-              width: 46, height: 46,
-              decoration: BoxDecoration(
-                color: _kPapyrusDk,
-                borderRadius: BorderRadius.circular(23),
-              ),
-              child: Center(child: Text(scholar['emoji'],
-                  style: const TextStyle(fontSize: 22))),
-            ),
-            const SizedBox(width: 12),
-            // 이름 + 분야 + 명언
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Text(scholar['name'],
-                      style: TextStyle(color: _kInk, fontSize: 15,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 6),
-                  Text(scholar['years'],
-                      style: TextStyle(color: _kInkLight.withOpacity(0.6),
-                          fontSize: 10)),
-                ]),
-                const SizedBox(height: 2),
-                Text(scholar['tagline'],
-                    style: TextStyle(color: _kInkLight, fontSize: 11),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
-            )),
-            // 전화 버튼
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: _kIosGreen.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Icon(Icons.call, color: _kIosGreen, size: 18),
-            ),
+            Icon(icon, size: 24,
+                color: active ? const Color(0xFF007AFF) : Colors.grey[400]),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 10,
+                color: active ? const Color(0xFF007AFF) : Colors.grey[400])),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildFooter() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: _kSeparator.withOpacity(0.4))),
-      ),
-      child: Column(children: [
-        Text('${_scholars.length} scholars · All public domain (70yr+)',
-            style: TextStyle(color: _kInkLight.withOpacity(0.5), fontSize: 10)),
-        const SizedBox(height: 2),
-        Text('Powered by Gemini · No screen needed',
-            style: TextStyle(color: _kInkLight.withOpacity(0.3), fontSize: 9)),
-      ]),
     );
   }
 }
