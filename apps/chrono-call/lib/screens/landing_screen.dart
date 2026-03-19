@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show MethodChannel, HapticFeedback, rootBundle;
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'chat_screen.dart';
 
@@ -32,6 +33,7 @@ class _LandingScreenState extends State<LandingScreen>
   int _tabIndex = 1; // 기본 = 연락처
   List<Map<String, dynamic>> _scholars = [];
   String? _apiKey;
+  String _apiStatus = '';  // '', 'checking', 'valid', 'invalid'
   String _dialDisplay = '';
 
   // 컨퍼런스 모드
@@ -65,7 +67,27 @@ class _LandingScreenState extends State<LandingScreen>
 
   Future<void> _loadApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _apiKey = prefs.getString('gemini_api_key'));
+    final key = prefs.getString('gemini_api_key');
+    setState(() => _apiKey = key);
+    if (key != null && key.isNotEmpty) _verifyApiKey(key);
+  }
+
+  Future<void> _verifyApiKey(String key) async {
+    setState(() => _apiStatus = 'checking');
+    try {
+      final res = await http.post(
+        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/'
+            'gemini-2.0-flash:generateContent?key=$key'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'contents': [{'role': 'user', 'parts': [{'text': 'hi'}]}],
+          'generationConfig': {'maxOutputTokens': 5},
+        }),
+      ).timeout(const Duration(seconds: 10));
+      setState(() => _apiStatus = res.statusCode == 200 ? 'valid' : 'invalid:${res.statusCode}');
+    } catch (_) {
+      setState(() => _apiStatus = 'invalid:network');
+    }
   }
 
   void _call(Map<String, dynamic> scholar) {
@@ -134,12 +156,15 @@ class _LandingScreenState extends State<LandingScreen>
               child: Text('취소', style: TextStyle(color: _kTextSec))),
           TextButton(
             onPressed: () async {
+              final key = ctrl.text.trim();
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('gemini_api_key', ctrl.text.trim());
-              setState(() => _apiKey = ctrl.text.trim());
+              await prefs.setString('gemini_api_key', key);
+              setState(() => _apiKey = key);
               Navigator.pop(context);
+              // 저장 후 검증
+              _verifyApiKey(key);
             },
-            child: const Text('저장', style: TextStyle(color: _kCyan, fontWeight: FontWeight.w600)),
+            child: const Text('저장 + 검증', style: TextStyle(color: _kCyan, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -251,11 +276,27 @@ class _LandingScreenState extends State<LandingScreen>
         GestureDetector(
           onTap: _showApiKeyDialog,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.key, size: 12,
-                color: _apiKey != null && _apiKey!.isNotEmpty ? _kCyan : _kTextDim),
+            Icon(
+              _apiStatus == 'valid' ? Icons.check_circle :
+              _apiStatus == 'checking' ? Icons.sync :
+              _apiStatus.startsWith('invalid') ? Icons.error :
+              Icons.key,
+              size: 14,
+              color: _apiStatus == 'valid' ? _kGreen :
+                     _apiStatus == 'checking' ? _kGold :
+                     _apiStatus.startsWith('invalid') ? _kRed : _kTextDim,
+            ),
             const SizedBox(width: 4),
-            Text(_apiKey != null && _apiKey!.isNotEmpty ? 'API 연결됨' : 'API 키 설정',
-                style: TextStyle(color: _kTextDim, fontSize: 11)),
+            Text(
+              _apiStatus == 'valid' ? 'API 연결 확인됨' :
+              _apiStatus == 'checking' ? '검증 중...' :
+              _apiStatus.startsWith('invalid') ? 'API 오류 (${_apiStatus.split(':').last})' :
+              _apiKey != null && _apiKey!.isNotEmpty ? 'API 키 미검증' : 'API 키 설정',
+              style: TextStyle(
+                color: _apiStatus == 'valid' ? _kGreen :
+                       _apiStatus.startsWith('invalid') ? _kRed : _kTextDim,
+                fontSize: 11),
+            ),
           ]),
         ),
         const SizedBox(height: 8),
