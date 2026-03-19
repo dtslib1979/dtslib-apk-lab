@@ -93,7 +93,11 @@ class _ChatScreenState extends State<ChatScreen> {
     await Permission.bluetoothConnect.request();
   }
 
-  List<Map<String, String>> _apiKeys = [];
+  List<Map<String, String>> _apiKeys = [
+    {'name': 'C-Cloud', 'key': 'AIzaSyCNdo8wSKEBcKJINEdNOk7Fk7g_YUANZII'},
+    {'name': 'B-dtslib', 'key': 'AIzaSyBicw-8lT30xZfVoR9TvYajItXujyKX_Ws'},
+    {'name': 'A-dimas', 'key': 'AIzaSyDxyBoqpgtok-jHQu2FvPZzzmHtrU510lw'},
+  ];
   int _activeKeyIndex = 0;
 
   Future<void> _loadApiKey() async {
