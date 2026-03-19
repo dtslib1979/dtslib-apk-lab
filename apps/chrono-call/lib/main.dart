@@ -8,7 +8,7 @@ void main() {
     WidgetsFlutterBinding.ensureInitialized();
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.light,
     ));
     runApp(const ChronoCallApp());
   }, (error, stack) {
@@ -25,11 +25,11 @@ class ChronoCallApp extends StatelessWidget {
       title: 'ChronoCall',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF2F2F7),
-        colorScheme: ColorScheme.light(
-          primary: const Color(0xFF007AFF),
-          surface: const Color(0xFFF2F2F7),
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF000000),
+        colorScheme: ColorScheme.dark(
+          primary: const Color(0xFF0A84FF),
+          surface: const Color(0xFF1C1C1E),
         ),
         useMaterial3: true,
       ),

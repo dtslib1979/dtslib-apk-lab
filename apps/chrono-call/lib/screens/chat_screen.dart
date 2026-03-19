@@ -9,18 +9,18 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
-// ── 파피루스 + 카톡 팔레트 ────────────────────────────────────────
-const _kBg        = Color(0xFFEDE4D3);  // 파피루스 채팅 배경
-const _kHeader    = Color(0xFF2C1810);  // 잉크 헤더
+// ── 다크 + 카톡 팔레트 ───────────────────────────────────────────
+const _kBg        = Color(0xFF000000);  // 블랙 배경
+const _kHeader    = Color(0xFF1C1C1E);  // 다크 헤더
 const _kMyBubble  = Color(0xFFFFEB33);  // 카톡 노랑
-const _kAIBubble  = Color(0xFFFFFDF5);  // 따뜻한 흰색
-const _kMyText    = Color(0xFF1A1A1A);
-const _kAIText    = Color(0xFF2C1810);
-const _kTimeText  = Color(0xFF8B7355);
-const _kBottomBar = Color(0xFFF5ECD7);  // 파피루스 하단
-const _kAccent    = Color(0xFF007AFF);  // iOS 블루
-const _kCallGreen = Color(0xFF34C759);  // iOS 그린
-const _kCallRed   = Color(0xFFFF3B30);  // iOS 레드
+const _kAIBubble  = Color(0xFF2C2C2E);  // 다크 AI 버블
+const _kMyText    = Color(0xFF1A1A1A);  // 노랑 위 검정
+const _kAIText    = Color(0xFFFFFFFF);  // 다크 위 흰색
+const _kTimeText  = Color(0xFF8E8E93);
+const _kBottomBar = Color(0xFF1C1C1E);
+const _kAccent    = Color(0xFF0A84FF);
+const _kCallGreen = Color(0xFF30D158);
+const _kCallRed   = Color(0xFFFF453A);
 
 const _systemPrompt = '''You are a world-class scholar and polymath.
 The user is a curious non-specialist who tests hypotheses through conversation.
@@ -125,7 +125,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // ══════════════════════════════════════════════════════════
   Future<void> _startCall() async {
     if (_apiKey == null || _apiKey!.isEmpty) {
-      _addMessage('Set your API key first (tap ⋮)', isUser: false);
+      _addMessage('API 키를 먼저 설정하세요', isUser: false);
       return;
     }
 
@@ -140,7 +140,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await Future.delayed(const Duration(milliseconds: 800));
 
     // 인사 메시지
-    _addMessage('Connected to $_scholarName', isUser: false, isSystem: true);
+    _addMessage('$_scholarName 연결됨', isUser: false, isSystem: true);
     await _speak('안녕하세요, $_scholarName입니다. 무엇이든 물어보세요.');
   }
 
@@ -275,7 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (_inCall) _speak(translated);
       }
     } catch (e) {
-      _addMessage('Translation failed: $e', isUser: false);
+      _addMessage('번역 실패: $e', isUser: false);
     }
   }
 
@@ -289,7 +289,7 @@ class _ChatScreenState extends State<ChatScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Padding(padding: EdgeInsets.all(16),
-            child: Text('Translate to', style: TextStyle(fontSize: 16,
+            child: Text('번역 언어', style: TextStyle(fontSize: 16,
                 fontWeight: FontWeight.w700, color: Colors.black87))),
           ...(_langOptions.map((l) => ListTile(
             title: Text(l.$2, style: const TextStyle(color: Colors.black87)),
@@ -343,7 +343,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) setState(() => _speaking = false);
       }
     } catch (e) {
-      _addMessage('Network error', isUser: false);
+      _addMessage('네트워크 오류', isUser: false);
       if (mounted) setState(() => _speaking = false);
     }
     if (mounted) setState(() => _thinking = false);
@@ -380,7 +380,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await file.writeAsString(buf.toString());
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved: call_$ts.md'), backgroundColor: _kHeader));
+        SnackBar(content: Text('저장됨: call_$ts.md'), backgroundColor: _kHeader));
     }
   }
 
@@ -391,7 +391,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
-        title: const Text('Gemini API Key',
+        title: const Text('Gemini API 키',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700)),
         content: TextField(
           controller: ctrl,
@@ -405,7 +405,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
+              child: const Text('취소', style: TextStyle(color: Colors.grey))),
           TextButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
@@ -413,7 +413,7 @@ class _ChatScreenState extends State<ChatScreen> {
               setState(() => _apiKey = ctrl.text.trim());
               Navigator.pop(context);
             },
-            child: const Text('Save', style: TextStyle(color: _kHeader)),
+            child: const Text('저장', style: TextStyle(color: _kHeader)),
           ),
         ],
       ),
@@ -468,8 +468,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: _inCall ? _kCallGreen : Colors.grey)),
                 const SizedBox(width: 5),
                 Text(
-                  _inCall ? 'In call $durStr' :
-                  'AI Scholar Hotline  v3.5',
+                  _inCall ? '통화 중 $durStr' :
+                  '학자 핫라인  v3.7',
                   style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
               ]),
             ],
@@ -495,15 +495,15 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           const Text('📞', style: TextStyle(fontSize: 56)),
           const SizedBox(height: 20),
-          const Text('Tap to start a call',
+          const Text('전화 버튼을 눌러 통화 시작',
               style: TextStyle(color: Color(0xFF5A6B7D), fontSize: 15,
                   fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Text('or tap your earbuds',
+          Text('이어버드 1탭으로 시작',
               style: TextStyle(color: const Color(0xFF5A6B7D).withOpacity(0.6),
                   fontSize: 12)),
           const SizedBox(height: 24),
-          Text('no screen needed',
+          Text('화면을 보지 않아도 됩니다',
               style: TextStyle(color: const Color(0xFF5A6B7D).withOpacity(0.4),
                   fontSize: 11)),
         ],
@@ -594,7 +594,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Flexible(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(msg.isTranslation ? 'Translated' : _scholarName,
+                Text(msg.isTranslation ? '번역' : _scholarName,
                     style: const TextStyle(color: Color(0xFF5A6B7D),
                         fontSize: 11, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 3),
@@ -649,7 +649,7 @@ class _ChatScreenState extends State<ChatScreen> {
         SizedBox(width: 12, height: 12,
             child: CircularProgressIndicator(strokeWidth: 2, color: _kAccent)),
         SizedBox(width: 10),
-        Text('Claude is thinking...', style: TextStyle(color: _kAccent, fontSize: 12)),
+        Text('생각 중...', style: TextStyle(color: _kAccent, fontSize: 12)),
       ]),
     );
   }
@@ -681,7 +681,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Text('Call', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        Text('전화', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
       ],
     );
   }
@@ -702,7 +702,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   border: Border.all(color: Colors.orange)),
                 child: const Icon(Icons.stop, color: Colors.orange, size: 24)),
               const SizedBox(height: 4),
-              const Text('Stop', style: TextStyle(color: Colors.orange, fontSize: 10)),
+              const Text('정지', style: TextStyle(color: Colors.orange, fontSize: 10)),
             ]),
           ),
 
@@ -723,9 +723,9 @@ class _ChatScreenState extends State<ChatScreen> {
               size: 28)),
           const SizedBox(height: 4),
           Text(
-            _listening ? 'Listening' :
-            _thinking ? 'Thinking' :
-            _speaking ? 'Speaking' : 'Standby',
+            _listening ? '듣는 중' :
+            _thinking ? '생각 중' :
+            _speaking ? '말하는 중' : '대기',
             style: TextStyle(color: Colors.grey[600], fontSize: 10)),
         ]),
 
@@ -739,7 +739,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 boxShadow: [BoxShadow(color: _kCallRed.withOpacity(0.4), blurRadius: 12)]),
               child: const Icon(Icons.call_end, color: Colors.white, size: 28)),
             const SizedBox(height: 4),
-            const Text('End', style: TextStyle(color: _kCallRed, fontSize: 10)),
+            const Text('종료', style: TextStyle(color: _kCallRed, fontSize: 10)),
           ]),
         ),
       ],
