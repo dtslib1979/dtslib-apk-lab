@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show MethodChannel, HapticFeedback, rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'chat_screen.dart';
 
@@ -579,9 +579,10 @@ class _LandingScreenState extends State<LandingScreen>
                             style: TextStyle(color: _kTextDim, fontSize: 10)),
                         trailing: Icon(Icons.chevron_right, color: _kTextDim, size: 18),
                         onTap: () {
-                          // 텍스트 파일이면 내용 보기
                           if (isMd) {
                             _showTranscript(file.path);
+                          } else if (isAudio) {
+                            _playRecording(file.path);
                           }
                         },
                       ),
@@ -591,6 +592,17 @@ class _LandingScreenState extends State<LandingScreen>
         ),
       ],
     );
+  }
+
+  static const _voiceCh = MethodChannel('com.parksy.chronocall/voice');
+
+  void _playRecording(String path) async {
+    try {
+      await _voiceCh.invokeMethod('playFile', {'path': path});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('재생 중: ${path.split('/').last}'),
+            backgroundColor: _kGreen.withOpacity(0.8)));
+    } catch (_) {}
   }
 
   void _showTranscript(String path) async {

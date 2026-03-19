@@ -57,16 +57,7 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
         super.onCreate(savedInstanceState)
         tts = TextToSpeech(this, this)
 
-        // 블루투스 오디오 라우팅 (이어버드 미연결 시 무시)
-        try {
-            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            am.mode = AudioManager.MODE_IN_COMMUNICATION
-            if (am.isBluetoothScoAvailableOffCall) {
-                am.isBluetoothScoOn = true
-                am.startBluetoothSco()
-            }
-        } catch (_: Exception) {}
-
+        // 블루투스 오디오는 통화 시작 시에만 활성화 (여기서 하면 마이크 충돌)
         // 미디어 버튼 등록
         try {
             val filter = IntentFilter(Intent.ACTION_MEDIA_BUTTON)
@@ -79,16 +70,33 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
         } catch (_: Exception) {}
     }
 
+    // 통화 시작 시에만 블루투스 오디오 활성화
+    private fun enableBluetoothAudio() {
+        try {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (am.isBluetoothScoAvailableOffCall) {
+                am.mode = AudioManager.MODE_IN_COMMUNICATION
+                am.isBluetoothScoOn = true
+                am.startBluetoothSco()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun disableBluetoothAudio() {
+        try {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.mode = AudioManager.MODE_NORMAL
+            am.stopBluetoothSco()
+            am.isBluetoothScoOn = false
+        } catch (_: Exception) {}
+    }
+
     override fun onDestroy() {
         try { unregisterReceiver(mediaButtonReceiver) } catch (_: Exception) {}
         speechRecognizer?.destroy()
         tts?.shutdown()
         recorder?.release()
-        try {
-            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            am.stopBluetoothSco()
-            am.isBluetoothScoOn = false
-        } catch (_: Exception) {}
+        disableBluetoothAudio()
         super.onDestroy()
     }
 
@@ -145,6 +153,7 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
                 "startRecording" -> { startRecording(); result.success(true) }
                 "stopRecording"  -> { stopRecording(); result.success(recordPath) }
                 "startForeground" -> {
+                    enableBluetoothAudio()
                     val svc = Intent(this, VoiceService::class.java)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(svc)
@@ -152,7 +161,13 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
                     result.success(true)
                 }
                 "stopForeground" -> {
+                    disableBluetoothAudio()
                     stopService(Intent(this, VoiceService::class.java))
+                    result.success(true)
+                }
+                "playFile" -> {
+                    val path = call.argument<String>("path") ?: ""
+                    playAudio(path)
                     result.success(true)
                 }
                 else -> result.notImplemented()
