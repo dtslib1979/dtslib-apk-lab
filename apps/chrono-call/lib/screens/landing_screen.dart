@@ -577,7 +577,17 @@ class _LandingScreenState extends State<LandingScreen>
                         subtitle: Text(
                             '${date.month}/${date.day} ${date.hour}:${date.minute.toString().padLeft(2, '0')}  ·  ${(stat.size / 1024).toStringAsFixed(0)} KB',
                             style: TextStyle(color: _kTextDim, fontSize: 10)),
-                        trailing: Icon(Icons.chevron_right, color: _kTextDim, size: 18),
+                        trailing: isAudio
+                            ? GestureDetector(
+                                onTap: () => _playRecording(file.path),
+                                child: Container(
+                                  width: 34, height: 34,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _kGold.withOpacity(0.15)),
+                                  child: const Icon(Icons.play_arrow, color: _kGold, size: 20)),
+                              )
+                            : Icon(Icons.chevron_right, color: _kTextDim, size: 18),
                         onTap: () {
                           if (isMd) {
                             _showTranscript(file.path);

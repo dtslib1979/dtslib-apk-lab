@@ -40,6 +40,8 @@ class _ChatScreenState extends State<ChatScreen> {
   static const _ch = MethodChannel('com.parksy.chronocall/voice');
 
   final _scrollCtrl = ScrollController();
+  final _textCtrl   = TextEditingController();
+  final _focusNode  = FocusNode();
   final _messages = <_Msg>[];
   final _ttsFiles = <String>[];
 
@@ -137,7 +139,17 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _scrollCtrl.dispose();
+    _textCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _sendText() {
+    final text = _textCtrl.text.trim();
+    if (text.isEmpty) return;
+    _textCtrl.clear();
+    _addMessage(text, isUser: true);
+    _sendToLLM(text);
   }
 
   // ══════════════════════════════════════════════════════════
@@ -681,16 +693,15 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ── 하단 바: 통화 시작/End 중심 ──────────────────────────────
+  // ── 하단 바 ──────────────────────────────────────────────────
   Widget _buildBottomBar() {
     return Container(
       color: _kBottomBar,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
       child: _inCall ? _buildInCallBar() : _buildIdleBar(),
     );
   }
 
-  // Standby 상태: 큰 전화 버튼
   Widget _buildIdleBar() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -713,61 +724,93 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 통화 중: 마이크 상태 + Stop 버튼
+  // 통화 중: 카톡 스타일 입력창 + 전송 + 종료
   Widget _buildInCallBar() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // AI 말 Stop
-        if (_speaking)
-          GestureDetector(
-            onTap: _stopSpeaking,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 50, height: 50,
-                decoration: BoxDecoration(shape: BoxShape.circle,
-                  color: Colors.orange.withOpacity(0.15),
-                  border: Border.all(color: Colors.orange)),
-                child: const Icon(Icons.stop, color: Colors.orange, size: 24)),
-              const SizedBox(height: 4),
-              const Text('정지', style: TextStyle(color: Colors.orange, fontSize: 10)),
-            ]),
+        // 상태 표시
+        if (_thinking || _speaking)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(width: 10, height: 10,
+                    child: CircularProgressIndicator(strokeWidth: 1.5,
+                        color: _thinking ? _kAccent : Colors.orange)),
+                const SizedBox(width: 8),
+                Text(_thinking ? '생각 중...' : '말하는 중...',
+                    style: TextStyle(color: _thinking ? _kAccent : Colors.orange, fontSize: 11)),
+                if (_speaking) ...[
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: _stopSpeaking,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.withOpacity(0.5))),
+                      child: const Text('정지', style: TextStyle(color: Colors.orange, fontSize: 10)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-
-        // 마이크 상태 표시 (자동이라 누를 필요 없음)
-        Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 56, height: 56,
-            decoration: BoxDecoration(shape: BoxShape.circle,
-              color: _listening ? Colors.green :
-                     _thinking ? Colors.blue.withOpacity(0.3) :
-                     _speaking ? Colors.orange.withOpacity(0.3) :
-                     Colors.grey.withOpacity(0.2)),
-            child: Icon(
-              _listening ? Icons.mic :
-              _thinking ? Icons.psychology :
-              _speaking ? Icons.volume_up : Icons.mic_off,
-              color: _listening ? Colors.white :
-                     _thinking ? Colors.blue : Colors.grey,
-              size: 28)),
-          const SizedBox(height: 4),
-          Text(
-            _listening ? '듣는 중' :
-            _thinking ? '생각 중' :
-            _speaking ? '말하는 중' : '대기',
-            style: TextStyle(color: Colors.grey[600], fontSize: 10)),
-        ]),
-
-        // 통화 End
-        GestureDetector(
-          onTap: _endCall,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 56, height: 56,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                color: _kCallRed,
-                boxShadow: [BoxShadow(color: _kCallRed.withOpacity(0.4), blurRadius: 12)]),
-              child: const Icon(Icons.call_end, color: Colors.white, size: 28)),
-            const SizedBox(height: 4),
-            const Text('종료', style: TextStyle(color: _kCallRed, fontSize: 10)),
-          ]),
+        // 입력창 + 전송 + 종료
+        Row(
+          children: [
+            // 종료 버튼
+            GestureDetector(
+              onTap: _endCall,
+              child: Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kCallRed.withOpacity(0.15),
+                ),
+                child: Icon(Icons.call_end, color: _kCallRed, size: 20),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 텍스트 입력 (삼성 키보드 마이크 사용)
+            Expanded(
+              child: TextField(
+                controller: _textCtrl,
+                focusNode: _focusNode,
+                style: const TextStyle(color: _kAIText, fontSize: 14),
+                maxLines: 3,
+                minLines: 1,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendText(),
+                decoration: InputDecoration(
+                  hintText: '키보드 마이크(🎤)로 말하기...',
+                  hintStyle: TextStyle(color: Colors.grey[500], fontSize: 13),
+                  filled: true,
+                  fillColor: _kAIBubble,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 전송 버튼
+            GestureDetector(
+              onTap: _sendText,
+              child: Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kAccent,
+                ),
+                child: const Icon(Icons.arrow_upward, color: Colors.white, size: 20),
+              ),
+            ),
+          ],
         ),
       ],
     );

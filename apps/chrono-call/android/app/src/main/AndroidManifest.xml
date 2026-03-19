@@ -16,7 +16,7 @@
     <application
         android:label="ChronoCall"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
         android:requestLegacyExternalStorage="true">
 
         <activity
