@@ -32,8 +32,11 @@ class _LandingScreenState extends State<LandingScreen>
     with TickerProviderStateMixin {
   int _tabIndex = 1; // 기본 = 연락처
   List<Map<String, dynamic>> _scholars = [];
-  String? _apiKey;
-  String _apiStatus = '';  // '', 'checking', 'valid', 'invalid'
+  // 멀티키 관리
+  List<Map<String, String>> _apiKeys = []; // [{name, key, status}]
+  int _activeKeyIndex = 0;
+  String? get _apiKey => _apiKeys.isNotEmpty ? _apiKeys[_activeKeyIndex]['key'] : null;
+  String get _apiStatus => _apiKeys.isNotEmpty ? (_apiKeys[_activeKeyIndex]['status'] ?? '') : '';
   String _dialDisplay = '';
 
   // 컨퍼런스 모드
@@ -67,21 +70,42 @@ class _LandingScreenState extends State<LandingScreen>
 
   Future<void> _loadApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = prefs.getString('gemini_api_key');
-    setState(() => _apiKey = key);
-    if (key != null && key.isNotEmpty) _verifyApiKey(key);
+    final keysJson = prefs.getString('gemini_api_keys');
+    if (keysJson != null) {
+      final list = jsonDecode(keysJson) as List;
+      setState(() => _apiKeys = list.map((e) => Map<String, String>.from(e)).toList());
+    } else {
+      // 기존 단일 키 마이그레이션
+      final old = prefs.getString('gemini_api_key');
+      if (old != null && old.isNotEmpty) {
+        setState(() => _apiKeys = [{'name': 'Default', 'key': old, 'status': ''}]);
+        _saveKeys();
+      }
+    }
+    _activeKeyIndex = prefs.getInt('gemini_active_key') ?? 0;
+    if (_activeKeyIndex >= _apiKeys.length) _activeKeyIndex = 0;
+    // 전체 키 검증
+    for (int i = 0; i < _apiKeys.length; i++) {
+      _verifyKey(i);
+    }
   }
 
-  Future<void> _verifyApiKey(String key) async {
-    setState(() => _apiStatus = 'checking');
+  Future<void> _saveKeys() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('gemini_api_keys', jsonEncode(_apiKeys));
+    await prefs.setInt('gemini_active_key', _activeKeyIndex);
+  }
+
+  Future<void> _verifyKey(int index) async {
+    if (index >= _apiKeys.length) return;
+    setState(() => _apiKeys[index]['status'] = 'checking');
     try {
-      // 모델 목록 조회 — rate limit 안 걸림, 키 유효성만 확인
       final res = await http.get(
-        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$key'),
+        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=${_apiKeys[index]['key']}'),
       ).timeout(const Duration(seconds: 10));
-      setState(() => _apiStatus = res.statusCode == 200 ? 'valid' : 'invalid:${res.statusCode}');
+      setState(() => _apiKeys[index]['status'] = res.statusCode == 200 ? 'valid' : 'error:${res.statusCode}');
     } catch (_) {
-      setState(() => _apiStatus = 'invalid:network');
+      setState(() => _apiKeys[index]['status'] = 'error:network');
     }
   }
 
@@ -119,49 +143,120 @@ class _LandingScreenState extends State<LandingScreen>
   }
 
   void _showApiKeyDialog() {
-    final ctrl = TextEditingController(text: _apiKey ?? '');
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: _kCard,
-        title: const Text('Gemini API 키',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _kText)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('aistudio.google.com 에서 무료 발급',
-                style: TextStyle(color: _kTextSec, fontSize: 12)),
-            const SizedBox(height: 14),
-            TextField(
-              controller: ctrl,
-              style: const TextStyle(fontSize: 13, fontFamily: 'monospace', color: _kText),
-              decoration: InputDecoration(
-                hintText: 'AIzaSy...',
-                hintStyle: TextStyle(color: _kTextDim),
-                filled: true, fillColor: _kCardHi,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context),
-              child: Text('취소', style: TextStyle(color: _kTextSec))),
-          TextButton(
-            onPressed: () async {
-              final key = ctrl.text.trim();
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('gemini_api_key', key);
-              setState(() => _apiKey = key);
-              Navigator.pop(context);
-              // 저장 후 검증
-              _verifyApiKey(key);
-            },
-            child: const Text('저장 + 검증', style: TextStyle(color: _kCyan, fontWeight: FontWeight.w600)),
+      isScrollControlled: true,
+      backgroundColor: _kCard,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20,
+              MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Text('API Keys',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _kText)),
+                const Spacer(),
+                Text('${_apiKeys.length}/3', style: TextStyle(color: _kTextSec, fontSize: 12)),
+              ]),
+              const SizedBox(height: 4),
+              Text('429 한도 초과 시 다른 키로 자동 전환',
+                  style: TextStyle(color: _kTextDim, fontSize: 11)),
+              const SizedBox(height: 16),
+              // 키 목록
+              ...(_apiKeys.asMap().entries.map((e) {
+                final i = e.key;
+                final k = e.value;
+                final isActive = i == _activeKeyIndex;
+                final status = k['status'] ?? '';
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isActive ? _kCyan.withOpacity(0.08) : _kCardHi,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: isActive ? _kCyan.withOpacity(0.4) : _kSep),
+                  ),
+                  child: Row(children: [
+                    // 상태 아이콘
+                    Icon(
+                      status == 'valid' ? Icons.check_circle :
+                      status == 'checking' ? Icons.sync :
+                      status.startsWith('error') ? Icons.error : Icons.key,
+                      size: 16,
+                      color: status == 'valid' ? _kGreen :
+                             status == 'checking' ? _kGold :
+                             status.startsWith('error') ? _kRed : _kTextDim,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(k['name'] ?? 'Key ${i + 1}',
+                            style: TextStyle(color: _kText, fontSize: 13,
+                                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400)),
+                        Text('...${k['key']?.substring((k['key']?.length ?? 4) - 4)}',
+                            style: TextStyle(color: _kTextDim, fontSize: 10, fontFamily: 'monospace')),
+                      ],
+                    )),
+                    // 활성 선택
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => _activeKeyIndex = i);
+                        setSheetState(() {});
+                        _saveKeys();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isActive ? _kCyan.withOpacity(0.2) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8)),
+                        child: Text(isActive ? 'ACTIVE' : 'USE',
+                            style: TextStyle(
+                                color: isActive ? _kCyan : _kTextSec,
+                                fontSize: 10, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // 삭제
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _apiKeys.removeAt(i);
+                          if (_activeKeyIndex >= _apiKeys.length) {
+                            _activeKeyIndex = _apiKeys.isEmpty ? 0 : _apiKeys.length - 1;
+                          }
+                        });
+                        setSheetState(() {});
+                        _saveKeys();
+                      },
+                      child: Icon(Icons.close, color: _kTextDim, size: 16),
+                    ),
+                  ]),
+                );
+              })),
+              // 키 추가
+              if (_apiKeys.length < 3) ...[
+                const SizedBox(height: 8),
+                _AddKeyWidget(
+                  onAdd: (name, key) {
+                    setState(() {
+                      _apiKeys.add({'name': name, 'key': key, 'status': ''});
+                    });
+                    setSheetState(() {});
+                    _saveKeys();
+                    _verifyKey(_apiKeys.length - 1);
+                  },
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -719,5 +814,83 @@ class _LandingScreenState extends State<LandingScreen>
         ]),
       ),
     );
+  }
+}
+
+class _AddKeyWidget extends StatefulWidget {
+  final void Function(String name, String key) onAdd;
+  const _AddKeyWidget({required this.onAdd});
+  @override
+  State<_AddKeyWidget> createState() => _AddKeyWidgetState();
+}
+
+class _AddKeyWidgetState extends State<_AddKeyWidget> {
+  final _nameCtrl = TextEditingController();
+  final _keyCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _keyCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Row(children: [
+        Expanded(
+          flex: 2,
+          child: TextField(
+            controller: _nameCtrl,
+            style: const TextStyle(color: _kText, fontSize: 12),
+            decoration: InputDecoration(
+              hintText: 'Account name',
+              hintStyle: TextStyle(color: _kTextDim, fontSize: 11),
+              filled: true, fillColor: _kCardHi,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 4,
+          child: TextField(
+            controller: _keyCtrl,
+            style: const TextStyle(color: _kText, fontSize: 11, fontFamily: 'monospace'),
+            decoration: InputDecoration(
+              hintText: 'AIzaSy...',
+              hintStyle: TextStyle(color: _kTextDim, fontSize: 11),
+              filled: true, fillColor: _kCardHi,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () {
+            if (_keyCtrl.text.trim().isNotEmpty) {
+              widget.onAdd(
+                _nameCtrl.text.trim().isEmpty ? 'Key' : _nameCtrl.text.trim(),
+                _keyCtrl.text.trim(),
+              );
+              _nameCtrl.clear();
+              _keyCtrl.clear();
+            }
+          },
+          child: Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: _kCyan.withOpacity(0.2)),
+            child: const Icon(Icons.add, color: _kCyan, size: 18),
+          ),
+        ),
+      ]),
+    ]);
   }
 }

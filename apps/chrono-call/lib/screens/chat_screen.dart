@@ -93,9 +93,27 @@ class _ChatScreenState extends State<ChatScreen> {
     await Permission.bluetoothConnect.request();
   }
 
+  List<Map<String, String>> _apiKeys = [];
+  int _activeKeyIndex = 0;
+
   Future<void> _loadApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _apiKey = prefs.getString('gemini_api_key'));
+    final keysJson = prefs.getString('gemini_api_keys');
+    if (keysJson != null) {
+      final list = jsonDecode(keysJson) as List;
+      _apiKeys = list.map((e) => Map<String, String>.from(e)).toList();
+    }
+    _activeKeyIndex = prefs.getInt('gemini_active_key') ?? 0;
+    if (_activeKeyIndex >= _apiKeys.length) _activeKeyIndex = 0;
+    setState(() => _apiKey = _apiKeys.isNotEmpty ? _apiKeys[_activeKeyIndex]['key'] : null);
+  }
+
+  void _switchToNextKey() {
+    if (_apiKeys.length <= 1) return;
+    _activeKeyIndex = (_activeKeyIndex + 1) % _apiKeys.length;
+    _apiKey = _apiKeys[_activeKeyIndex]['key'];
+    final name = _apiKeys[_activeKeyIndex]['name'] ?? 'Key';
+    _addMessage('429 한도 초과 → $name 키로 전환', isUser: false, isSystem: true);
   }
 
   void _setupNativeCallbacks() {
@@ -393,8 +411,13 @@ class _ChatScreenState extends State<ChatScreen> {
               return;
             }
           } else if (res.statusCode == 429) {
-            // Rate limit — 3초 대기 후 재시도
-            await Future.delayed(Duration(seconds: 3 * (retry + 1)));
+            // 429 → 다른 키로 스위칭
+            if (_apiKeys.length > 1) {
+              _switchToNextKey();
+            } else {
+              _addMessage('429 한도 초과 — 다른 계정 키를 추가하세요', isUser: false, isSystem: true);
+            }
+            await Future.delayed(Duration(seconds: 2 * (retry + 1)));
             continue;
           } else {
             _addMessage('API $model ${res.statusCode}', isUser: false);
