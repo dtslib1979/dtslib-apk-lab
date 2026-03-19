@@ -75,14 +75,9 @@ class _LandingScreenState extends State<LandingScreen>
   Future<void> _verifyApiKey(String key) async {
     setState(() => _apiStatus = 'checking');
     try {
-      final res = await http.post(
-        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/'
-            'gemini-2.0-flash:generateContent?key=$key'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'contents': [{'role': 'user', 'parts': [{'text': 'hi'}]}],
-          'generationConfig': {'maxOutputTokens': 5},
-        }),
+      // 모델 목록 조회 — rate limit 안 걸림, 키 유효성만 확인
+      final res = await http.get(
+        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$key'),
       ).timeout(const Duration(seconds: 10));
       setState(() => _apiStatus = res.statusCode == 200 ? 'valid' : 'invalid:${res.statusCode}');
     } catch (_) {
