@@ -368,9 +368,14 @@ class _ChatScreenState extends State<ChatScreen> {
         return; // playAudio → onTTSDone 콜백이 speaking=false 처리
       }
     } catch (_) {}
-    // Edge TTS 실패 → Android TTS fallback
+    // Edge TTS 실패 → Android TTS fallback + 파일 저장
     try {
-      await _ch.invokeMethod('speak', {'text': text});
+      final tmp = await getTemporaryDirectory();
+      final path = '${tmp.path}/tts_${DateTime.now().millisecondsSinceEpoch}.wav';
+      await _ch.invokeMethod('speakToFile', {'text': _stripMarkdown(text), 'path': path});
+      _ttsFiles.add(path);
+      // 동시에 스피커로도 재생
+      await _ch.invokeMethod('speak', {'text': _stripMarkdown(text)});
     } catch (_) {
       if (mounted) setState(() => _speaking = false);
     }

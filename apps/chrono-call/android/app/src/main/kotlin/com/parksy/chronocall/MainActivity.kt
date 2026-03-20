@@ -129,6 +129,12 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
                     result.success(true)
                 }
                 "stopTTS"  -> { tts?.stop(); result.success(true) }
+                "speakToFile" -> {
+                    val text = call.argument<String>("text") ?: ""
+                    val path = call.argument<String>("path") ?: ""
+                    speakToFile(text, path)
+                    result.success(true)
+                }
                 "playAudio" -> {
                     val path = call.argument<String>("path") ?: ""
                     playAudio(path)
@@ -248,6 +254,12 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
     // ── TTS ───────────────────────────────────────────────
     private fun speak(text: String) {
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chronocall_utterance")
+    }
+
+    // TTS를 파일로 저장 (Edge TTS 실패 시 fallback)
+    private fun speakToFile(text: String, path: String) {
+        val file = File(path)
+        tts?.synthesizeToFile(text, null, file, "chronocall_file_${System.currentTimeMillis()}")
     }
 
     // ── 통화 효과음 ───────────────────────────────────────────
