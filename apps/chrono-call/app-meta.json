@@ -2,7 +2,7 @@
   "id": "chrono-call",
   "name": "Parksy ChronoCall",
   "desc": "AI 음성 통화 — 이어버드로 Claude와 핸즈프리 학술 대화",
-  "version": "v2.0.0",
+  "version": "v6.0.0",
   "icon": "🎙️",
   "cardClass": "chronocall",
   "workflow": "build-chrono-call"
