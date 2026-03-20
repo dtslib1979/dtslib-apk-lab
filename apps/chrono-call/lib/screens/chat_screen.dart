@@ -181,8 +181,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() { _inCall = true; _callStart = DateTime.now(); });
 
-    // ForegroundService 시작 (녹음은 마이크 충돌 방지로 분리 — 텍스트 로그로 대체)
+    // ForegroundService + 녹음 시작 (삼성 키보드 STT는 마이크 충돌 없음)
     try { await _ch.invokeMethod('startForeground'); } catch (_) {}
+    try { await _ch.invokeMethod('startRecording'); } catch (_) {}
 
     // 통화 연결음 "뚜뚜뚜"
     await _playDialTone();
@@ -211,6 +212,10 @@ class _ChatScreenState extends State<ChatScreen> {
     try { await _ch.invokeMethod('stopAudio'); } catch (_) {}
     try { await _ch.invokeMethod('stopTTS'); } catch (_) {}
 
+    // 녹음 정지 → 파일 경로 받기
+    String? recordPath;
+    try { recordPath = await _ch.invokeMethod<String>('stopRecording'); } catch (_) {}
+
     // 통화 End음
     await _playHangupTone();
 
@@ -219,12 +224,44 @@ class _ChatScreenState extends State<ChatScreen> {
     // 통화 시간 계산
     final duration = _callStart != null
         ? DateTime.now().difference(_callStart!) : Duration.zero;
-    final durStr = '${duration.inMinutes}m ${duration.inSeconds % 60}s';
+    final durStr = '${duration.inMinutes}분 ${duration.inSeconds % 60}초';
 
-    _addMessage('📞 Call ended ($durStr)', isUser: false, isSystem: true);
+    _addMessage('📞 통화 종료 ($durStr)', isUser: false, isSystem: true);
 
-    // 자동 Save
-    await _saveConversation();
+    // 자동 저장: 마크다운 + 녹음 파일을 같은 폴더에
+    await _saveCallData(recordPath);
+  }
+
+  Future<void> _saveCallData(String? recordPath) async {
+    if (_messages.isEmpty) return;
+    final dir = Directory('/sdcard/Download/ChronoCall');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    final ts = DateFormat('yyyyMMdd_HHmmss').format(_callStart ?? DateTime.now());
+    final baseName = 'call_$ts';
+
+    // 마크다운 저장
+    final mdFile = File('${dir.path}/$baseName.md');
+    final buf = StringBuffer('# ChronoCall — $_scholarName — $ts\n\n');
+    for (final m in _messages) {
+      final prefix = m.isUser ? '**나**' :
+          m.isSystem ? '**시스템**' :
+          m.isTranslation ? '**번역**' : '**$_scholarName**';
+      buf.writeln('[${DateFormat('HH:mm:ss').format(m.time)}] $prefix: ${m.text}\n');
+    }
+    await mdFile.writeAsString(buf.toString());
+
+    // 녹음 파일 이동 (cache → Download/ChronoCall/)
+    if (recordPath != null && await File(recordPath).exists()) {
+      final dest = '${dir.path}/$baseName.m4a';
+      await File(recordPath).copy(dest);
+      try { await File(recordPath).delete(); } catch (_) {}
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('저장됨: $baseName (.md + .m4a)'),
+            backgroundColor: _kCallGreen));
+    }
   }
 
   // ── 효과음 (MethodChannel로 Kotlin 재생) ──────────────────
@@ -414,7 +451,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }).toList();
 
     final body = jsonEncode({
-      'system_instruction': {'parts': [{'text': '$_scholarPrompt\n\nAlways respond in the same language the user speaks. Default: Korean. Keep under 150 words.'}]},
+      'system_instruction': {'parts': [{'text': '$_scholarPrompt\nRULES: Respond in user language (default Korean). Under 50 words. Core terms only from your own works. Your era diction. No markdown. No modern slang.'}]},
       'contents': history,
       'generationConfig': {'maxOutputTokens': 1024},
     });
@@ -679,9 +716,10 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(icon: Icon(Icons.translate,
               color: Colors.white.withOpacity(0.7), size: 22),
             onPressed: _messages.isEmpty ? null : _showLangPicker),
-          IconButton(icon: Icon(Icons.bookmark_border,
+          IconButton(icon: Icon(Icons.save,
               color: Colors.white.withOpacity(0.7), size: 22),
-            onPressed: _saveConversation),
+            onPressed: () => _saveCallData(null),
+            tooltip: '중간 저장'),
           IconButton(icon: Icon(Icons.record_voice_over,
               color: Colors.white.withOpacity(0.7), size: 22),
             onPressed: _showVoiceSettings),

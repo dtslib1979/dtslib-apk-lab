@@ -650,14 +650,24 @@ class _LandingScreenState extends State<LandingScreen>
 
   // ── 녹취록 ──────────────────────────────────────────────────
   List<FileSystemEntity> _recordings = [];
+  List<Map<String, dynamic>> _groupedRecordings = [];
 
   Future<void> _loadRecordings() async {
     final dir = Directory('/sdcard/Download/ChronoCall');
-    if (await dir.exists()) {
-      final files = dir.listSync()
-          ..sort((a, b) => b.path.compareTo(a.path));
-      setState(() => _recordings = files);
+    if (!await dir.exists()) return;
+    final files = dir.listSync()..sort((a, b) => b.path.compareTo(a.path));
+    setState(() => _recordings = files);
+
+    // .md와 .m4a를 call_XXXXXX 기준으로 그룹핑
+    final groups = <String, Map<String, dynamic>>{};
+    for (final f in files) {
+      final name = f.path.split('/').last;
+      final base = name.replaceAll('.md', '').replaceAll('.m4a', '').replaceAll('.mp3', '');
+      groups.putIfAbsent(base, () => {'name': base, 'date': f.statSync().modified});
+      if (name.endsWith('.md')) groups[base]!['md'] = f.path;
+      if (name.endsWith('.m4a') || name.endsWith('.mp3')) groups[base]!['audio'] = f.path;
     }
+    setState(() => _groupedRecordings = groups.values.toList());
   }
 
   Widget _buildRecents() {
@@ -695,49 +705,76 @@ class _LandingScreenState extends State<LandingScreen>
                 ))
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _recordings.length,
+                  itemCount: _groupedRecordings.length,
                   itemBuilder: (_, i) {
-                    final file = _recordings[i];
-                    final name = file.path.split('/').last;
-                    final stat = file.statSync();
-                    final date = stat.modified;
-                    final isMd = name.endsWith('.md');
-                    final isAudio = name.endsWith('.m4a') || name.endsWith('.mp3');
+                    final group = _groupedRecordings[i];
+                    final mdPath = group['md'];
+                    final audioPath = group['audio'];
+                    final name = group['name'] ?? 'unknown';
+                    final date = group['date'] as DateTime;
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
+                      margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
                         color: _kCard,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: _kSep.withOpacity(0.3)),
                       ),
-                      child: ListTile(
-                        leading: Icon(
-                          isMd ? Icons.description : isAudio ? Icons.audiotrack : Icons.insert_drive_file,
-                          color: isMd ? _kCyan : isAudio ? _kGold : _kTextSec, size: 24),
-                        title: Text(name,
-                            style: const TextStyle(color: _kText, fontSize: 13),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: Text(
-                            '${date.month}/${date.day} ${date.hour}:${date.minute.toString().padLeft(2, '0')}  ·  ${(stat.size / 1024).toStringAsFixed(0)} KB',
-                            style: TextStyle(color: _kTextDim, fontSize: 10)),
-                        trailing: isAudio
-                            ? GestureDetector(
-                                onTap: () => _playRecording(file.path),
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 날짜 + 이름
+                          Text(name,
+                              style: const TextStyle(color: _kText, fontSize: 14,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text('${date.month}/${date.day} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                              style: TextStyle(color: _kTextDim, fontSize: 11)),
+                          const SizedBox(height: 10),
+                          // 버튼 행: 텍스트 보기 + 음성 재생
+                          Row(children: [
+                            if (mdPath != null)
+                              Expanded(child: GestureDetector(
+                                onTap: () => _showTranscript(mdPath),
                                 child: Container(
-                                  width: 34, height: 34,
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
                                   decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _kGold.withOpacity(0.15)),
-                                  child: const Icon(Icons.play_arrow, color: _kGold, size: 20)),
-                              )
-                            : Icon(Icons.chevron_right, color: _kTextDim, size: 18),
-                        onTap: () {
-                          if (isMd) {
-                            _showTranscript(file.path);
-                          } else if (isAudio) {
-                            _playRecording(file.path);
-                          }
-                        },
+                                    color: _kCyan.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10)),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.description, color: _kCyan, size: 16),
+                                      SizedBox(width: 6),
+                                      Text('텍스트 보기', style: TextStyle(color: _kCyan, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              )),
+                            if (mdPath != null && audioPath != null)
+                              const SizedBox(width: 8),
+                            if (audioPath != null)
+                              Expanded(child: GestureDetector(
+                                onTap: () => _playRecording(audioPath),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _kGold.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10)),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.play_arrow, color: _kGold, size: 16),
+                                      SizedBox(width: 6),
+                                      Text('음성 재생', style: TextStyle(color: _kGold, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              )),
+                            if (mdPath == null && audioPath == null)
+                              const Text('파일 없음', style: TextStyle(color: _kTextDim)),
+                          ]),
+                        ],
                       ),
                     );
                   },
