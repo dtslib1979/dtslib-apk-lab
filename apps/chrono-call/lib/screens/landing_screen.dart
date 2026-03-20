@@ -32,12 +32,8 @@ class _LandingScreenState extends State<LandingScreen>
     with TickerProviderStateMixin {
   int _tabIndex = 1; // 기본 = 연락처
   List<Map<String, dynamic>> _scholars = [];
-  // 멀티키 관리 (하드코딩 — 개인 방송 키트)
-  List<Map<String, String>> _apiKeys = [
-    {'name': 'C-Cloud', 'key': 'AIzaSyCNdo8wSKEBcKJINEdNOk7Fk7g_YUANZII', 'status': ''},
-    {'name': 'B-dtslib', 'key': 'AIzaSyBicw-8lT30xZfVoR9TvYajItXujyKX_Ws', 'status': ''},
-    {'name': 'A-dimas', 'key': 'AIzaSyDxyBoqpgtok-jHQu2FvPZzzmHtrU510lw', 'status': ''},
-  ];
+  // 멀티키 관리 (앱에서 수동 입력, SharedPreferences 저장)
+  List<Map<String, String>> _apiKeys = [];
   int _activeKeyIndex = 0;
   String? get _apiKey => _apiKeys.isNotEmpty ? _apiKeys[_activeKeyIndex]['key'] : null;
   String get _apiStatus => _apiKeys.isNotEmpty ? (_apiKeys[_activeKeyIndex]['status'] ?? '') : '';
