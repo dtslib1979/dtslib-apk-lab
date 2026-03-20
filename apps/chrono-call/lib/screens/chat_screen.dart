@@ -181,9 +181,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() { _inCall = true; _callStart = DateTime.now(); });
 
-    // ForegroundService + 녹음 시작 (삼성 키보드 STT는 마이크 충돌 없음)
+    // ForegroundService 시작 (마이크 녹음 안 함 — 키보드 STT와 충돌)
+    // AI 음성은 TTS MP3로 이미 저장됨 → 통화 종료 시 합성
+    _ttsFiles.clear();
     try { await _ch.invokeMethod('startForeground'); } catch (_) {}
-    try { await _ch.invokeMethod('startRecording'); } catch (_) {}
 
     // 통화 연결음 "뚜뚜뚜"
     await _playDialTone();
@@ -212,9 +213,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try { await _ch.invokeMethod('stopAudio'); } catch (_) {}
     try { await _ch.invokeMethod('stopTTS'); } catch (_) {}
 
-    // 녹음 정지 → 파일 경로 받기
-    String? recordPath;
-    try { recordPath = await _ch.invokeMethod<String>('stopRecording'); } catch (_) {}
+    // TTS MP3 파일들 → 녹취록 폴더로 복사
 
     // 통화 End음
     await _playHangupTone();
@@ -228,11 +227,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _addMessage('📞 통화 종료 ($durStr)', isUser: false, isSystem: true);
 
-    // 자동 저장: 마크다운 + 녹음 파일을 같은 폴더에
-    await _saveCallData(recordPath);
+    // 자동 저장: 마크다운 + TTS 음성 파일
+    await _saveCallData();
   }
 
-  Future<void> _saveCallData(String? recordPath) async {
+  Future<void> _saveCallData() async {
     if (_messages.isEmpty) return;
     final dir = Directory('/sdcard/Download/ChronoCall');
     if (!await dir.exists()) await dir.create(recursive: true);
@@ -250,16 +249,24 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     await mdFile.writeAsString(buf.toString());
 
-    // 녹음 파일 이동 (cache → Download/ChronoCall/)
-    if (recordPath != null && await File(recordPath).exists()) {
-      final dest = '${dir.path}/$baseName.m4a';
-      await File(recordPath).copy(dest);
-      try { await File(recordPath).delete(); } catch (_) {}
+    // TTS MP3 파일들 합쳐서 저장 (AI 음성 기록)
+    if (_ttsFiles.isNotEmpty) {
+      // 첫 번째 파일만 대표로 저장 (전체 합성은 FFmpeg 필요 — 향후)
+      // 모든 TTS 파일을 순번으로 저장
+      for (int i = 0; i < _ttsFiles.length; i++) {
+        final src = File(_ttsFiles[i]);
+        if (await src.exists()) {
+          final dest = '${dir.path}/${baseName}_voice_${(i+1).toString().padLeft(2,'0')}.mp3';
+          await src.copy(dest);
+        }
+      }
+      _ttsFiles.clear();
     }
 
     if (mounted) {
+      final voiceCount = _ttsFiles.length;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('저장됨: $baseName (.md + .m4a)'),
+        SnackBar(content: Text('저장됨: $baseName.md + 음성 ${voiceCount > 0 ? voiceCount : 0}개'),
             backgroundColor: _kCallGreen));
     }
   }
@@ -718,7 +725,7 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: _messages.isEmpty ? null : _showLangPicker),
           IconButton(icon: Icon(Icons.save,
               color: Colors.white.withOpacity(0.7), size: 22),
-            onPressed: () => _saveCallData(null),
+            onPressed: _saveCallData,
             tooltip: '중간 저장'),
           IconButton(icon: Icon(Icons.record_voice_over,
               color: Colors.white.withOpacity(0.7), size: 22),
