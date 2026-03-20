@@ -367,8 +367,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ── Gemini API (무료, 429 재시도) ──────────────────────────────
   static const _models = [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
-    'gemini-1.5-flash',
   ];
 
   Future<void> _sendToLLM(String userText) async {
