@@ -15,7 +15,7 @@
   {
     "id": "chrono-call",
     "name": "Parksy ChronoCall",
-    "version": "v5.0.0",
+    "version": "v5.1.0",
     "registryStatus": "store-registered",
     "category": "utility",
     "description": "통화 녹음 STT 변환기 (Whisper)",
