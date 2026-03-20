@@ -256,24 +256,54 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() => _listening = false);
   }
 
-  // ── Edge TTS (성별 매칭) ─────────────────────────────────────
-  String get _voiceGender => widget.scholar?['voiceGender'] ?? 'male';
-  String get _edgeVoiceKo => _voiceGender == 'female' ? 'ko-KR-SunHiNeural' : 'ko-KR-InJoonNeural';
-  String get _edgeVoiceEn => _voiceGender == 'female' ? 'en-US-AriaNeural' : 'en-US-GuyNeural';
+  // ── Edge TTS 설정 ─────────────────────────────────────────
+  static const _voiceOptions = [
+    ('ko-KR-SunHiNeural', '선희 (여)'),
+    ('ko-KR-InJoonNeural', '인준 (남)'),
+    ('ko-KR-BongJinNeural', '봉진 (남)'),
+    ('ko-KR-SeoHyeonNeural', '서현 (여)'),
+    ('ko-KR-YuJinNeural', '유진 (여)'),
+  ];
+  static const _voiceOptionsEn = [
+    ('en-US-AriaNeural', 'Aria (F)'),
+    ('en-US-GuyNeural', 'Guy (M)'),
+    ('en-US-JennyNeural', 'Jenny (F)'),
+    ('en-US-DavisNeural', 'Davis (M)'),
+  ];
+  String _selectedVoiceKo = 'ko-KR-InJoonNeural';
+  String _selectedVoiceEn = 'en-US-GuyNeural';
+  double _speechRate = 1.0; // 0.5 ~ 2.0
+
+  String get _edgeVoiceKo => _selectedVoiceKo;
+  String get _edgeVoiceEn => _selectedVoiceEn;
+
+  // 마크다운 기호 제거 (TTS용)
+  String _stripMarkdown(String text) {
+    return text
+        .replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'$1')  // **bold**
+        .replaceAll(RegExp(r'\*([^*]+)\*'), r'$1')       // *italic*
+        .replaceAll(RegExp(r'#+\s*'), '')                 // ### heading
+        .replaceAll(RegExp(r'[-•]\s'), '')                // - bullet
+        .replaceAll(RegExp(r'\[([^\]]+)\]\([^)]+\)'), r'$1') // [link](url)
+        .replaceAll(RegExp(r'`([^`]+)`'), r'$1')         // `code`
+        .trim();
+  }
 
   Future<void> _speak(String text) async {
     if (!mounted) return;
     setState(() => _speaking = true);
     try {
-      final voice = RegExp(r'[가-힣]').hasMatch(text) ? _edgeVoiceKo : _edgeVoiceEn;
-      final escaped = text
+      final cleanText = _stripMarkdown(text);
+      final voice = RegExp(r'[가-힣]').hasMatch(cleanText) ? _edgeVoiceKo : _edgeVoiceEn;
+      final escaped = cleanText
           .replaceAll('&', '&amp;')
           .replaceAll('<', '&lt;')
           .replaceAll('>', '&gt;')
           .replaceAll('"', '&quot;')
           .replaceAll("'", '&apos;');
+      final rateStr = '${(_speechRate * 100).round()}%';
       final ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ko-KR">'
-          '<voice name="$voice">$escaped</voice></speak>';
+          '<voice name="$voice"><prosody rate="$rateStr">$escaped</prosody></voice></speak>';
 
       final res = await http.post(
         Uri.parse('https://eastus.tts.speech.microsoft.com/cognitiveservices/v1'),
@@ -469,6 +499,93 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // ── 음성 설정 ──────────────────────────────────────────────
+  void _showVoiceSettings() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C1E),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('음성 설정', style: TextStyle(color: Colors.white,
+                  fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              // 한국어 성우
+              const Text('한국어 성우', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8,
+                children: _voiceOptions.map((v) {
+                  final sel = _selectedVoiceKo == v.$1;
+                  return GestureDetector(
+                    onTap: () { setState(() => _selectedVoiceKo = v.$1); setSheet(() {}); },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: sel ? _kAccent.withOpacity(0.2) : const Color(0xFF2C2C2E),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: sel ? _kAccent : Colors.transparent)),
+                      child: Text(v.$2, style: TextStyle(
+                          color: sel ? _kAccent : Colors.white, fontSize: 13)),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              // 영어 성우
+              const Text('English Voice', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8,
+                children: _voiceOptionsEn.map((v) {
+                  final sel = _selectedVoiceEn == v.$1;
+                  return GestureDetector(
+                    onTap: () { setState(() => _selectedVoiceEn = v.$1); setSheet(() {}); },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: sel ? _kAccent.withOpacity(0.2) : const Color(0xFF2C2C2E),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: sel ? _kAccent : Colors.transparent)),
+                      child: Text(v.$2, style: TextStyle(
+                          color: sel ? _kAccent : Colors.white, fontSize: 13)),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+              // 속도
+              Row(children: [
+                const Text('속도', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const Spacer(),
+                Text('${_speechRate.toStringAsFixed(1)}x',
+                    style: TextStyle(color: _kAccent, fontSize: 13, fontWeight: FontWeight.w600)),
+              ]),
+              Slider(
+                value: _speechRate,
+                min: 0.5, max: 2.0, divisions: 6,
+                activeColor: _kAccent,
+                inactiveColor: const Color(0xFF2C2C2E),
+                onChanged: (v) { setState(() => _speechRate = v); setSheet(() {}); },
+              ),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('0.5x', style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+                  Text('1.0x', style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+                  Text('2.0x', style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+                ]),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── API 키 설정 ─────────────────────────────────────────────
   void _showSettings() {
     final ctrl = TextEditingController(text: _apiKey ?? '');
@@ -565,6 +682,9 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(icon: Icon(Icons.bookmark_border,
               color: Colors.white.withOpacity(0.7), size: 22),
             onPressed: _saveConversation),
+          IconButton(icon: Icon(Icons.record_voice_over,
+              color: Colors.white.withOpacity(0.7), size: 22),
+            onPressed: _showVoiceSettings),
           IconButton(icon: Icon(Icons.more_vert,
               color: Colors.white.withOpacity(0.7), size: 22),
             onPressed: _showSettings),

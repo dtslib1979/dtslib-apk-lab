@@ -30,7 +30,8 @@ class LandingScreen extends StatefulWidget {
 
 class _LandingScreenState extends State<LandingScreen>
     with TickerProviderStateMixin {
-  int _tabIndex = 1; // 기본 = 연락처
+  int _tabIndex = 1; // 0=키패드, 1=연락처, 2=통화, 3=녹취록
+  Widget? _activeCallWidget; // 활성 통화 화면 보관
   List<Map<String, dynamic>> _scholars = [];
   // 멀티키 관리 (앱에서 수동 입력, SharedPreferences 저장)
   List<Map<String, String>> _apiKeys = [];
@@ -111,12 +112,10 @@ class _LandingScreenState extends State<LandingScreen>
 
   void _call(Map<String, dynamic> scholar) {
     if (_apiKey == null || _apiKey!.isEmpty) { _showApiKeyDialog(); return; }
-    Navigator.push(context, PageRouteBuilder(
-      pageBuilder: (_, __, ___) => ChatScreen(scholar: scholar),
-      transitionsBuilder: (_, a, __, child) =>
-          FadeTransition(opacity: a, child: child),
-      transitionDuration: const Duration(milliseconds: 300),
-    ));
+    setState(() {
+      _activeCallWidget = ChatScreen(scholar: scholar);
+      _tabIndex = 2;
+    });
   }
 
   void _startConference() {
@@ -126,15 +125,13 @@ class _LandingScreenState extends State<LandingScreen>
       return;
     }
     if (_apiKey == null || _apiKey!.isEmpty) { _showApiKeyDialog(); return; }
-    Navigator.push(context, PageRouteBuilder(
-      pageBuilder: (_, __, ___) => ChatScreen(
+    setState(() {
+      _activeCallWidget = ChatScreen(
         scholar: _selectedScholars.first,
         conferenceScholars: _selectedScholars.toList(),
-      ),
-      transitionsBuilder: (_, a, __, child) =>
-          FadeTransition(opacity: a, child: child),
-      transitionDuration: const Duration(milliseconds: 300),
-    ));
+      );
+      _tabIndex = 2;
+    });
   }
 
   void _callRandom() {
@@ -271,6 +268,7 @@ class _LandingScreenState extends State<LandingScreen>
             Expanded(
               child: _tabIndex == 0 ? _buildKeypad() :
                      _tabIndex == 1 ? _buildContacts() :
+                     _tabIndex == 2 ? _buildCallTab() :
                      _buildRecents(),
             ),
             if (_conferenceMode && _selectedScholars.isNotEmpty)
@@ -539,19 +537,17 @@ class _LandingScreenState extends State<LandingScreen>
                                     style: const TextStyle(fontSize: 20))),
                               ),
                               const SizedBox(width: 12),
-                              // 이름
+                              // 이름 (overflow 방지)
                               Expanded(child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(children: [
-                                    Text(s['nameKr'] ?? s['name'],
-                                        style: TextStyle(fontSize: 15, color: _kText,
-                                            fontWeight: FontWeight.w600)),
-                                    const SizedBox(width: 6),
-                                    Text(s['name'],
-                                        style: TextStyle(fontSize: 10, color: _kTextDim)),
-                                  ]),
-                                  const SizedBox(height: 2),
+                                  Text(s['nameKr'] ?? s['name'],
+                                      style: TextStyle(fontSize: 15, color: _kText,
+                                          fontWeight: FontWeight.w600),
+                                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  Text(s['name'],
+                                      style: TextStyle(fontSize: 10, color: _kTextDim),
+                                      maxLines: 1, overflow: TextOverflow.ellipsis),
                                   Text(s['tagline'],
                                       style: TextStyle(color: _kTextSec, fontSize: 11),
                                       maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -634,6 +630,22 @@ class _LandingScreenState extends State<LandingScreen>
         ),
       ]),
     );
+  }
+
+  // ── 통화 탭 ─────────────────────────────────────────────────
+  Widget _buildCallTab() {
+    if (_activeCallWidget != null) return _activeCallWidget!;
+    return Center(child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.call, size: 48, color: _kTextDim.withOpacity(0.3)),
+        const SizedBox(height: 12),
+        Text('활성 통화 없음', style: TextStyle(color: _kTextSec, fontSize: 15)),
+        const SizedBox(height: 4),
+        Text('연락처에서 학자를 선택하세요',
+            style: TextStyle(color: _kTextDim, fontSize: 12)),
+      ],
+    ));
   }
 
   // ── 녹취록 ──────────────────────────────────────────────────
@@ -793,7 +805,8 @@ class _LandingScreenState extends State<LandingScreen>
         children: [
           _buildTab(0, Icons.dialpad, '키패드'),
           _buildTab(1, Icons.contacts, '연락처'),
-          _buildTab(2, Icons.description, '녹취록'),
+          _buildTab(2, Icons.call, '통화'),
+          _buildTab(3, Icons.description, '녹취록'),
         ],
       ),
     );
