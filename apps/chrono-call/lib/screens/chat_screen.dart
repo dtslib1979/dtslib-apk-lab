@@ -81,6 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _initVoiceFromScholar();
     _loadApiKey();
     _setupNativeCallbacks();
     _requestPermissions();
@@ -314,9 +315,15 @@ class _ChatScreenState extends State<ChatScreen> {
     ('en-US-JennyNeural', 'Jenny (F)'),
     ('en-US-DavisNeural', 'Davis (M)'),
   ];
-  String _selectedVoiceKo = 'ko-KR-InJoonNeural';
-  String _selectedVoiceEn = 'en-US-GuyNeural';
+  late String _selectedVoiceKo;
+  late String _selectedVoiceEn;
   double _speechRate = 1.0; // 0.5 ~ 2.0
+
+  void _initVoiceFromScholar() {
+    final gender = widget.scholar?['voiceGender'] ?? 'male';
+    _selectedVoiceKo = gender == 'female' ? 'ko-KR-SunHiNeural' : 'ko-KR-InJoonNeural';
+    _selectedVoiceEn = gender == 'female' ? 'en-US-AriaNeural' : 'en-US-GuyNeural';
+  }
 
   String get _edgeVoiceKo => _selectedVoiceKo;
   String get _edgeVoiceEn => _selectedVoiceEn;
