@@ -49,7 +49,7 @@ class WhisperService {
     final uri = Uri.parse('$_baseUrl/transcriptions');
 
     final request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer ${AppConfig.apiKey}'
+      ..headers['Authorization'] = 'Bearer ${AppConfig.whisperKey}'
       ..fields['model'] = 'whisper-1'
       ..fields['response_format'] = 'verbose_json';
 

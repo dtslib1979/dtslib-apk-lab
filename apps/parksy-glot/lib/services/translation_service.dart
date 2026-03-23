@@ -7,7 +7,7 @@ import '../utils/error_handler.dart';
 import 'translation_cache.dart';
 
 class TranslationService {
-  static const String _baseUrl = 'https://api.openai.com/v1/chat/completions';
+  static const String _baseUrl = 'https://api.anthropic.com/v1/messages';
   static const Duration _timeout = Duration(seconds: 30);
 
   // 싱글톤 캐시
@@ -21,7 +21,7 @@ class TranslationService {
   String get cacheStats =>
       'API: $_apiCalls, Cached: $_cachedResults, ${_cache.toString()}';
 
-  /// Translate text to Korean and English using GPT-4o
+  /// Translate text to Korean and English using Claude API
   Future<TranslationResult> translate(
     String text, {
     Language sourceLanguage = Language.auto,
@@ -76,15 +76,14 @@ class TranslationService {
         .post(
           Uri.parse(_baseUrl),
           headers: {
-            'Authorization': 'Bearer ${AppConfig.apiKey}',
+            'x-api-key': AppConfig.apiKey,
+            'anthropic-version': '2023-06-01',
             'Content-Type': 'application/json',
           },
           body: jsonEncode({
-            'model': 'gpt-4o',
-            'messages': [
-              {
-                'role': 'system',
-                'content': '''You are an expert polyglot translator specializing in natural, native-sounding translations.
+            'model': 'claude-haiku-4-5-20251001',
+            'max_tokens': 500,
+            'system': '''You are an expert polyglot translator specializing in natural, native-sounding translations.
 Your task is to translate spoken language into Korean and English.
 - Preserve the original tone, nuance, and colloquial expressions
 - Use natural conversational language, not formal/written style
@@ -92,14 +91,12 @@ Your task is to translate spoken language into Korean and English.
 - Keep translations concise for subtitle display
 
 IMPORTANT: Respond ONLY in valid JSON format, no markdown.''',
-              },
+            'messages': [
               {
                 'role': 'user',
                 'content': prompt,
               },
             ],
-            'temperature': 0.3,
-            'max_tokens': 500,
           }),
         )
         .timeout(_timeout);
@@ -113,7 +110,7 @@ IMPORTANT: Respond ONLY in valid JSON format, no markdown.''',
     }
 
     final json = jsonDecode(response.body);
-    final content = json['choices'][0]['message']['content'] as String;
+    final content = json['content'][0]['text'] as String;
 
     return _parseResponse(content);
   }

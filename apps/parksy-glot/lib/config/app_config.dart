@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AppConfig {
   static late SharedPreferences _prefs;
 
-  static const String _keyApiKey = 'openai_api_key';
+  static const String _keyApiKey = 'claude_api_key';
+  static const String _keyWhisperKey = 'openai_api_key';
   static const String _keySourceLang = 'source_language';
   static const String _keyAutoDetect = 'auto_detect';
   static const String _keyShowOriginal = 'show_original';
@@ -14,9 +15,13 @@ class AppConfig {
     _prefs = await SharedPreferences.getInstance();
   }
 
-  // OpenAI API Key
+  // Claude API Key (번역용)
   static String get apiKey => _prefs.getString(_keyApiKey) ?? '';
   static set apiKey(String value) => _prefs.setString(_keyApiKey, value);
+
+  // OpenAI API Key (Whisper STT 전용 — Claude 대체 불가)
+  static String get whisperKey => _prefs.getString(_keyWhisperKey) ?? '';
+  static set whisperKey(String value) => _prefs.setString(_keyWhisperKey, value);
 
   // Source Language (auto, en, ja, es, fr, de, zh, ko)
   static String get sourceLanguage => _prefs.getString(_keySourceLang) ?? 'auto';

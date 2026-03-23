@@ -76,7 +76,7 @@ class ApiException implements Exception {
       case 500:
       case 502:
       case 503:
-        return 'OpenAI 서버에 문제가 있습니다';
+        return 'Claude 서버에 문제가 있습니다';
       default:
         return message;
     }
