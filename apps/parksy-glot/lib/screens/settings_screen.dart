@@ -11,24 +11,29 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _apiKeyController;
+  late TextEditingController _whisperKeyController;
   late double _subtitleSize;
   bool _obscureApiKey = true;
+  bool _obscureWhisperKey = true;
 
   @override
   void initState() {
     super.initState();
     _apiKeyController = TextEditingController(text: AppConfig.apiKey);
+    _whisperKeyController = TextEditingController(text: AppConfig.whisperKey);
     _subtitleSize = AppConfig.subtitleSize;
   }
 
   @override
   void dispose() {
     _apiKeyController.dispose();
+    _whisperKeyController.dispose();
     super.dispose();
   }
 
   void _saveApiKey() {
     AppConfig.apiKey = _apiKeyController.text.trim();
+    AppConfig.whisperKey = _whisperKeyController.text.trim();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('API 키가 저장되었습니다'),
@@ -54,7 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           _buildSection(
-            title: 'OpenAI API',
+            title: 'Claude API',
             children: [
               _buildApiKeyField(),
             ],
@@ -136,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     fontFamily: 'monospace',
                   ),
                   decoration: InputDecoration(
-                    hintText: 'sk-...',
+                    hintText: 'sk-ant-...',
                     hintStyle: TextStyle(
                       color: Colors.white.withOpacity(0.3),
                     ),
@@ -183,9 +188,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Whisper API Key (OpenAI — STT 전용)',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _whisperKeyController,
+                  obscureText: _obscureWhisperKey,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: 'monospace',
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'sk-proj-...',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                    ),
+                    filled: true,
+                    fillColor: Colors.black.withOpacity(0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureWhisperKey
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: Colors.white.withOpacity(0.5),
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscureWhisperKey = !_obscureWhisperKey);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           Text(
-            'OpenAI API 키는 Whisper (음성인식)와 GPT-4o (번역)에 사용됩니다',
+            'Claude API → 번역  /  OpenAI API → Whisper 음성인식 (대체 불가)',
             style: TextStyle(
               color: Colors.white.withOpacity(0.5),
               fontSize: 12,

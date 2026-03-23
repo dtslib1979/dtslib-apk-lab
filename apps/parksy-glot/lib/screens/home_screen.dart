@@ -210,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'OpenAI API 키를 설정하면\n음성 인식과 번역을 시작할 수 있습니다',
+              'Claude API 키를 설정하면\n음성 인식과 번역을 시작할 수 있습니다',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.7),

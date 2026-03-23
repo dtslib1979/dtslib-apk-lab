@@ -79,18 +79,18 @@ class _LandingScreenState extends State<LandingScreen>
 
   Future<void> _loadApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    final keysJson = prefs.getString('gemini_api_keys');
+    final keysJson = prefs.getString('claude_api_keys');
     if (keysJson != null) {
       final list = jsonDecode(keysJson) as List;
       setState(() => _apiKeys = list.map((e) => Map<String, String>.from(e)).toList());
     } else {
-      final old = prefs.getString('gemini_api_key');
+      final old = prefs.getString('claude_api_key');
       if (old != null && old.isNotEmpty) {
         setState(() => _apiKeys = [{'name': 'Default', 'key': old, 'status': ''}]);
         _saveKeys();
       }
     }
-    _activeKeyIndex = prefs.getInt('gemini_active_key') ?? 0;
+    _activeKeyIndex = prefs.getInt('claude_active_key') ?? 0;
     if (_activeKeyIndex >= _apiKeys.length) _activeKeyIndex = 0;
     for (int i = 0; i < _apiKeys.length; i++) {
       _verifyKey(i);
@@ -99,8 +99,8 @@ class _LandingScreenState extends State<LandingScreen>
 
   Future<void> _saveKeys() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('gemini_api_keys', jsonEncode(_apiKeys));
-    await prefs.setInt('gemini_active_key', _activeKeyIndex);
+    await prefs.setString('claude_api_keys', jsonEncode(_apiKeys));
+    await prefs.setInt('claude_active_key', _activeKeyIndex);
   }
 
   Future<void> _verifyKey(int index) async {
@@ -108,7 +108,11 @@ class _LandingScreenState extends State<LandingScreen>
     setState(() => _apiKeys[index]['status'] = 'checking');
     try {
       final res = await http.get(
-        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=${_apiKeys[index]['key']}'),
+        Uri.parse('https://api.anthropic.com/v1/models'),
+        headers: {
+          'x-api-key': _apiKeys[index]['key']!,
+          'anthropic-version': '2023-06-01',
+        },
       ).timeout(const Duration(seconds: 10));
       setState(() => _apiKeys[index]['status'] = res.statusCode == 200 ? 'valid' : 'error:${res.statusCode}');
     } catch (_) {

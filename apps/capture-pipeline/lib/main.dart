@@ -85,18 +85,22 @@ class ParksyCaptureApp extends StatelessWidget {
 
 class ApiConfig {
   static const String _keyOpenAI = 'openai_api_key';
+  static const String _keyClaude = 'claude_api_key';
   static const String _keySupabaseUrl = 'supabase_url';
   static const String _keySupabaseKey = 'supabase_key';
   static const String _keyGitHubRepo = 'github_repo';
   static const String _keyGitHubToken = 'github_token';
 
-  static String? openaiKey;
+  static String? openaiKey;   // 임베딩 전용 (OpenAI — 대체 불가)
+  static String? claudeKey;   // RAG 답변 생성 (Claude API)
   static String? supabaseUrl;
   static String? supabaseKey;
   static String? githubRepo;
   static String? githubToken;
 
   static bool get isAiConfigured =>
+      claudeKey != null &&
+      claudeKey!.isNotEmpty &&
       openaiKey != null &&
       openaiKey!.isNotEmpty &&
       supabaseUrl != null &&
@@ -117,6 +121,7 @@ class ApiConfig {
 
     // SharedPreferences에서만 읽기 (환경변수 하드코딩 문제 해결)
     openaiKey = prefs.getString(_keyOpenAI)?.trim();
+    claudeKey = prefs.getString(_keyClaude)?.trim();
     githubToken = prefs.getString(_keyGitHubToken)?.trim();
 
     debugPrint('DEBUG load - final githubToken length: ${githubToken?.length}');
@@ -130,6 +135,7 @@ class ApiConfig {
 
   static Future<void> save({
     String? openai,
+    String? claude,
     String? supabaseUrlVal,
     String? supabaseKeyVal,
     String? githubRepoVal,
@@ -140,6 +146,11 @@ class ApiConfig {
       final trimmed = openai.trim();
       await prefs.setString(_keyOpenAI, trimmed);
       openaiKey = trimmed;
+    }
+    if (claude != null) {
+      final trimmed = claude.trim();
+      await prefs.setString(_keyClaude, trimmed);
+      claudeKey = trimmed;
     }
     if (supabaseUrlVal != null) {
       final trimmed = supabaseUrlVal.trim();
@@ -603,11 +614,13 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _claudeController = TextEditingController();
   final _openaiController = TextEditingController();
   final _supabaseUrlController = TextEditingController();
   final _supabaseKeyController = TextEditingController();
   final _githubRepoController = TextEditingController();
   final _githubTokenController = TextEditingController();
+  bool _obscureClaude = true;
   bool _obscureOpenAI = true;
   bool _obscureGitHub = true;
   bool _isSaving = false;
@@ -617,6 +630,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _claudeController.text = ApiConfig.claudeKey ?? '';
     _openaiController.text = ApiConfig.openaiKey ?? '';
     _supabaseUrlController.text = ApiConfig.supabaseUrl ?? '';
     _supabaseKeyController.text = ApiConfig.supabaseKey ?? '';
@@ -626,6 +640,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    _claudeController.dispose();
     _openaiController.dispose();
     _supabaseUrlController.dispose();
     _supabaseKeyController.dispose();
@@ -637,6 +652,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     setState(() => _isSaving = true);
     await ApiConfig.save(
+      claude: _claudeController.text.trim(),
       openai: _openaiController.text.trim(),
       supabaseUrlVal: _supabaseUrlController.text.trim(),
       supabaseKeyVal: _supabaseKeyController.text.trim(),
@@ -824,8 +840,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSectionHeader('AI Search (RAG)', Icons.psychology),
           const SizedBox(height: 12),
           _buildTextField(
+            controller: _claudeController,
+            label: 'Claude API Key (답변 생성)',
+            hint: 'sk-ant-...',
+            obscure: _obscureClaude,
+            onToggleObscure: () => setState(() => _obscureClaude = !_obscureClaude),
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
             controller: _openaiController,
-            label: 'OpenAI API Key',
+            label: 'OpenAI API Key (임베딩 전용)',
             hint: 'sk-proj-...',
             obscure: _obscureOpenAI,
             onToggleObscure: () => setState(() => _obscureOpenAI = !_obscureOpenAI),
@@ -1945,16 +1969,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         : '다음은 내 과거 기록입니다:\n\n$context\n\n---\n\n주제: $query\n\n위 기록들을 종합하여 이 주제에 대한 새로운 글을 작성해줘. 내 생각과 경험을 바탕으로 인사이트 있는 글을 만들어줘.';
 
     final res = await http.post(
-      Uri.parse('https://api.openai.com/v1/chat/completions'),
+      Uri.parse('https://api.anthropic.com/v1/messages'),
       headers: {
-        'Authorization': 'Bearer ${ApiConfig.openaiKey}',
+        'x-api-key': ApiConfig.claudeKey!,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'model': 'gpt-4o-mini',
+        'model': 'claude-sonnet-4-20250514',
         'max_tokens': _searchMode == 'search' ? 1024 : 2048,
+        'system': systemPrompt,
         'messages': [
-          {'role': 'system', 'content': systemPrompt},
           {'role': 'user', 'content': userPrompt},
         ],
       }),
@@ -1965,7 +1990,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
 
     final data = jsonDecode(res.body);
-    return data['choices'][0]['message']['content'];
+    return data['content'][0]['text'];
   }
 
   // ============================================================

@@ -33,7 +33,7 @@ class AppStrings {
   static const stopCapture = '중지';
   static const settings = '설정';
   static const sourceLanguage = '소스 언어';
-  static const apiKeyHint = 'OpenAI API 키 입력';
+  static const apiKeyHint = 'Claude API 키 입력';
   static const waitingForAudio = '음성을 기다리는 중...';
   static const showOriginal = '원문 표시';
   static const subtitleSize = '자막 크기';

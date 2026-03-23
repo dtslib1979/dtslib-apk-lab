@@ -119,12 +119,12 @@ class _ChatScreenState extends State<ChatScreen>
 
   Future<void> _loadApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    final keysJson = prefs.getString('gemini_api_keys');
+    final keysJson = prefs.getString('claude_api_keys');
     if (keysJson != null) {
       final list = jsonDecode(keysJson) as List;
       _apiKeys = list.map((e) => Map<String, String>.from(e)).toList();
     }
-    _activeKeyIndex = prefs.getInt('gemini_active_key') ?? 0;
+    _activeKeyIndex = prefs.getInt('claude_active_key') ?? 0;
     if (_activeKeyIndex >= _apiKeys.length) _activeKeyIndex = 0;
     setState(() => _apiKey = _apiKeys.isNotEmpty ? _apiKeys[_activeKeyIndex]['key'] : null);
   }
@@ -476,10 +476,10 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  // ── Gemini API ──────────────────────────────────────────────
+  // ── Claude API ──────────────────────────────────────────────
   static const _models = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
+    'claude-haiku-4-5-20251001',
+    'claude-sonnet-4-20250514',
   ];
 
   Future<void> _sendToLLM(String userText) async {
@@ -490,31 +490,33 @@ class _ChatScreenState extends State<ChatScreen>
         .where((m) => !m.isTranslation && !m.isSystem)
         .toList().reversed.take(20).toList().reversed
         .map((m) => {
-          'role': m.isUser ? 'user' : 'model',
-          'parts': [{'text': m.text}],
+          'role': m.isUser ? 'user' : 'assistant',
+          'content': m.text,
         }).toList();
-
-    final body = jsonEncode({
-      'system_instruction': {'parts': [{'text': '$_scholarPrompt\nRULES: Respond in user language (default Korean). Under 50 words. Core terms only from your own works. Your era diction. No markdown. No modern slang.'}]},
-      'contents': history,
-      'generationConfig': {'maxOutputTokens': 1024},
-    });
 
     for (final model in _models) {
       for (int retry = 0; retry < 3; retry++) {
         try {
           final res = await http.post(
-            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/'
-                '$model:generateContent?key=$_apiKey'),
-            headers: {'Content-Type': 'application/json'},
-            body: body,
+            Uri.parse('https://api.anthropic.com/v1/messages'),
+            headers: {
+              'x-api-key': _apiKey!,
+              'anthropic-version': '2023-06-01',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'model': model,
+              'max_tokens': 1024,
+              'system': '$_scholarPrompt\nRULES: Respond in user language (default Korean). Under 50 words. Core terms only from your own works. Your era diction. No markdown. No modern slang.',
+              'messages': history,
+            }),
           ).timeout(const Duration(seconds: 30));
 
           if (res.statusCode == 200) {
             final data = jsonDecode(res.body);
-            final candidates = data['candidates'] as List?;
-            if (candidates != null && candidates.isNotEmpty) {
-              final reply = candidates[0]['content']['parts'][0]['text'] as String;
+            final content = data['content'] as List?;
+            if (content != null && content.isNotEmpty) {
+              final reply = content[0]['text'] as String;
               _addMessage(reply, isUser: false);
               await _speak(reply);
               if (mounted) setState(() => _thinking = false);
@@ -711,13 +713,13 @@ class _ChatScreenState extends State<ChatScreen>
       builder: (_) => AlertDialog(
         backgroundColor: _kCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Gemini API Key',
+        title: const Text('Claude API Key',
             style: TextStyle(color: _kText, fontWeight: FontWeight.w700, fontSize: 17)),
         content: TextField(
           controller: ctrl,
           style: const TextStyle(color: _kText, fontSize: 13, fontFamily: 'monospace'),
           decoration: InputDecoration(
-            hintText: 'AIzaSy...',
+            hintText: 'sk-ant-...',
             hintStyle: TextStyle(color: _kTextDim),
             filled: true, fillColor: _kSurface,
             border: OutlineInputBorder(
@@ -737,7 +739,7 @@ class _ChatScreenState extends State<ChatScreen>
           TextButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('gemini_api_key', ctrl.text.trim());
+              await prefs.setString('claude_api_key', ctrl.text.trim());
               setState(() => _apiKey = ctrl.text.trim());
               Navigator.pop(context);
             },
