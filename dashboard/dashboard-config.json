@@ -36,8 +36,19 @@
     "timeline": true,
     "pipeline": true,
     "warning": true,
-    "warningText": "Debug builds — Internal & partner use only"
+    "warningText": "Debug builds — Internal & partner use only",
+    "pages": true
   },
+  "pages": [
+    {
+      "id": "targeting",
+      "title": "타겟팅 프로그램 26",
+      "subtitle": "PC전용 × Android공백 — 인터랙티브 노드맵",
+      "icon": "🎯",
+      "url": "/targeting.html",
+      "color": "#D4AF37"
+    }
+  ],
   "stats": {
     "total_apps": 12,
     "store_apps": 8,
