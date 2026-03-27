@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0D0D0D">
+  <title>타겟팅 프로그램 26 — 말이 실행이 된다</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cinzel:wght@600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0A0A0A;
+      --surface: #141414;
+      --surface2: #1E1E1E;
+      --gold: #D4AF37;
+      --gold-dim: rgba(212,175,55,0.15);
+      --gold-glow: rgba(212,175,55,0.35);
+      --t1: #FF6B6B;
+      --t1-dim: rgba(255,107,107,0.15);
+      --t2: #FFD93D;
+      --t2-dim: rgba(255,217,61,0.15);
+      --t3: #A78BFA;
+      --t3-dim: rgba(167,139,250,0.15);
+      --center: #D4AF37;
+      --text: #F5F0E8;
+      --text-dim: rgba(245,240,232,0.5);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    #header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 16px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: linear-gradient(to bottom, rgba(10,10,10,0.95), transparent);
+    }
+    #header h1 {
+      font-family: 'Cinzel', serif;
+      font-size: 14px; letter-spacing: 2px;
+      color: var(--gold);
+    }
+    #header .subtitle {
+      font-size: 11px; color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+    #back-btn {
+      padding: 6px 14px; border-radius: 20px;
+      border: 1px solid var(--gold-glow);
+      background: transparent;
+      color: var(--gold); font-size: 12px; cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    #back-btn:hover { background: var(--gold-dim); }
+
+    /* ── Legend ── */
+    #legend {
+      position: fixed; bottom: 24px; left: 24px; z-index: 100;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; color: var(--text-dim);
+    }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+
+    /* ── Canvas ── */
+    #canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #canvas:active { cursor: grabbing; }
+
+    /* ── Info Panel ── */
+    #info-panel {
+      position: fixed; right: 0; top: 0; bottom: 0;
+      width: 320px;
+      background: var(--surface);
+      border-left: 1px solid var(--gold-dim);
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      padding: 80px 24px 24px;
+      overflow-y: auto;
+      z-index: 50;
+    }
+    #info-panel.open { transform: translateX(0); }
+
+    .panel-tier {
+      font-size: 10px; letter-spacing: 2px; font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .panel-title {
+      font-size: 20px; font-weight: 700;
+      margin-bottom: 4px; line-height: 1.3;
+    }
+    .panel-pc {
+      font-size: 12px; color: var(--gold);
+      margin-bottom: 16px;
+    }
+    .panel-divider {
+      height: 1px; background: var(--gold-dim); margin: 16px 0;
+    }
+    .panel-label {
+      font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .panel-reason {
+      font-size: 13px; line-height: 1.7; color: var(--text);
+    }
+    .panel-badge {
+      display: inline-block;
+      padding: 4px 10px; border-radius: 12px;
+      font-size: 11px; font-weight: 600;
+      margin-top: 16px;
+    }
+    .panel-close {
+      position: absolute; top: 60px; right: 16px;
+      background: none; border: none; color: var(--text-dim);
+      font-size: 20px; cursor: pointer; line-height: 1;
+    }
+    .panel-close:hover { color: var(--text); }
+
+    /* ── Tooltip ── */
+    #tooltip {
+      position: fixed; pointer-events: none;
+      background: var(--surface2);
+      border: 1px solid var(--gold-dim);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      opacity: 0; transition: opacity 0.15s;
+      max-width: 200px; z-index: 200;
+    }
+    #tooltip.show { opacity: 1; }
+    #tooltip .tt-name { font-weight: 600; color: var(--text); margin-bottom: 2px; }
+    #tooltip .tt-pc { color: var(--gold); font-size: 11px; }
+
+    /* ── Counter ── */
+    #counter {
+      position: fixed; bottom: 24px; right: 24px; z-index: 100;
+      text-align: right;
+    }
+    #counter .count-big {
+      font-family: 'Cinzel', serif;
+      font-size: 48px; font-weight: 600;
+      color: var(--gold); line-height: 1;
+    }
+    #counter .count-label {
+      font-size: 11px; color: var(--text-dim); letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div>
+    <h1>TARGETING PROGRAMS</h1>
+    <div class="subtitle">PC전용 × Android공백 — 말이 실행이 된다</div>
+  </div>
+  <a href="/" id="back-btn">← APK Store</a>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="legend">
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--t1)"></div>
+    <span>TIER 1 — 완전 공백 (10)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--t2)"></div>
+    <span>TIER 2 — 심각 부족 (10)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:var(--t3)"></div>
+    <span>TIER 3 — 장르 불가 (6)</span>
+  </div>
+</div>
+
+<div id="counter">
+  <div class="count-big">26</div>
+  <div class="count-label">EPISODE TARGETS</div>
+</div>
+
+<div id="info-panel">
+  <button class="panel-close" id="panel-close">✕</button>
+  <div class="panel-tier" id="p-tier"></div>
+  <div class="panel-title" id="p-title"></div>
+  <div class="panel-pc" id="p-pc"></div>
+  <div class="panel-divider"></div>
+  <div class="panel-label">ANDROID에 없는 이유</div>
+  <div class="panel-reason" id="p-reason"></div>
+  <div class="panel-badge" id="p-badge"></div>
+</div>
+
+<div id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-pc" id="tt-pc"></div>
+</div>
+
+<script>
+const DATA = {
+  center: { id: 'center', label: '말 + Claude\n= 실행', r: 52 },
+  nodes: [
+    // TIER 1 — 완전 공백
+    { id: 1, tier: 1, name: 'DAW', pc: 'Ableton / FL Studio / REAPER', reason: 'ASIO 드라이버 + VSTi 플러그인 생태계가 Android 오디오 API와 근본 비호환', priority: 1 },
+    { id: 2, tier: 1, name: '전문 영상편집', pc: 'DaVinci Resolve / Premiere Pro', reason: 'GPU 가속 렌더링 + 멀티트랙 비선형편집 API 부재', priority: 2 },
+    { id: 3, tier: 1, name: '2D CAD', pc: 'AutoCAD / DraftSight', reason: '수만 개 벡터 오브젝트 + DWG/DXF 파일 생태계 / 터치로 정밀 도면 불가', priority: 0 },
+    { id: 4, tier: 1, name: '3D CAD', pc: 'SolidWorks / Fusion 360', reason: '파라메트릭 연산 + 물리 시뮬레이션이 모바일 GPU로 불가', priority: 0 },
+    { id: 5, tier: 1, name: '3D 애니메이션', pc: 'Blender / Maya / 3ds Max', reason: '렌더 연산 / 수천 폴리곤 리깅·스키닝 워크플로 자체가 없음', priority: 0 },
+    { id: 6, tier: 1, name: 'IDE', pc: 'Visual Studio / IntelliJ', reason: '컴파일러·디버거·빌드 시스템 전체가 데스크톱 OS 전제', priority: 3 },
+    { id: 7, tier: 1, name: '악보 편집', pc: 'Sibelius / Finale / MuseScore', reason: 'MIDI 실시간 입력 + 대형 악보 레이아웃 엔진 / 모바일은 뷰어 수준', priority: 0 },
+    { id: 8, tier: 1, name: '3D 스컬프팅', pc: 'ZBrush / Mudbox', reason: '수억 폴리곤 다이나믹 메시 → 모바일 GPU 메모리 구조로 처리 불가', priority: 0 },
+    { id: 9, tier: 1, name: 'VFX 합성', pc: 'Nuke / After Effects', reason: '멀티레이어 EXR + GPU 가속 합성 엔진이 데스크톱 전용', priority: 0 },
+    { id: 10, tier: 1, name: '게임 엔진', pc: 'Unity / Unreal Engine', reason: '에셋 빌드·셰이더 컴파일·씬 편집기가 Win/Mac 전용', priority: 4 },
+    // TIER 2 — 심각 부족
+    { id: 11, tier: 2, name: 'RAW 워크플로', pc: 'Lightroom Classic / Capture One', reason: 'Lightroom Classic Android 버전 없음 / RAW 파이프라인이 파일시스템 의존', priority: 0 },
+    { id: 12, tier: 2, name: 'DTP 출판', pc: 'InDesign / QuarkXPress', reason: 'CMYK + 인쇄소 연동 PDF/X 처리 불가', priority: 5 },
+    { id: 13, tier: 2, name: '벡터 일러스트', pc: 'Illustrator / CorelDRAW', reason: '수천 패스 + CMY/Pantone 정밀 색상 / Android 앱은 기본 도형 수준', priority: 0 },
+    { id: 14, tier: 2, name: '데이터 BI', pc: 'Excel 풀기능 / Power BI / Tableau', reason: '100만 행 피벗·매크로·VBA / Power BI Desktop Android 없음', priority: 7 },
+    { id: 15, tier: 2, name: '오디오 마스터링', pc: 'iZotope RX / Ozone / Audacity', reason: '고해상도 FFT 처리 / 리얼타임 플러그인 체인이 Android 레이턴시와 충돌', priority: 0 },
+    { id: 16, tier: 2, name: '악보 출판', pc: 'Sibelius Ultimate / Dorico Pro', reason: 'MIDI→악보 + 인쇄용 PDF 렌더링 / 모바일은 뷰어 이상 불가', priority: 0 },
+    { id: 17, tier: 2, name: 'PCB 설계', pc: 'KiCad / Altium / LTspice', reason: '회로 시뮬레이션 + Gerber 파일 생성 / Android에 등가 앱 전무', priority: 0 },
+    { id: 18, tier: 2, name: 'BIM 건축', pc: 'Revit / ArchiCAD', reason: '수GB BIM 프로젝트 + IFC 포맷 / 모바일은 뷰어만 존재', priority: 0 },
+    { id: 19, tier: 2, name: '컬러 그레이딩', pc: 'DaVinci Color / Baselight', reason: 'LUT 관리 + 하드웨어 컬러 패널 연동 / Android 버전은 기능 30%', priority: 0 },
+    { id: 20, tier: 2, name: '네트워크 모니터링', pc: 'Wireshark / SolarWinds', reason: '패킷 캡처 → 루트+커널 드라이버 접근 / Android 샌드박스로 불가', priority: 6 },
+    // TIER 3 — 장르 불가
+    { id: 21, tier: 3, name: '가상화 VM', pc: 'VMware / VirtualBox', reason: '하이퍼바이저가 Intel VT-x/AMD-V 접근 필요 / Android 커널 샌드박스 차단', priority: 0 },
+    { id: 22, tier: 3, name: '악성코드 분석', pc: 'Ghidra / IDA Pro / Autopsy', reason: '리버스엔지니어링 + 파일시스템 직접 접근 / 법적·기술적 불가', priority: 0 },
+    { id: 23, tier: 3, name: '오케스트라 VSTi', pc: 'Kontakt + 샘플 라이브러리', reason: '수십 GB 샘플 스트리밍 / VSTi 포맷이 Android 오디오 HAL과 미호환', priority: 0 },
+    { id: 24, tier: 3, name: 'OBS급 방송', pc: 'OBS Studio / vMix', reason: '다중 소스 믹싱 + RTMP + 씬 전환 / Android는 단일 화면 캡처 수준', priority: 2 },
+    { id: 25, tier: 3, name: '게임 모딩', pc: 'Skyrim Creation Kit / Hammer', reason: '게임 내부 에셋 직접 수정 / Android 게임 구조가 모딩 접근 차단', priority: 0 },
+    { id: 26, tier: 3, name: 'SCADA/PLC', pc: 'Siemens TIA Portal / Wonderware', reason: '산업 제어 프로토콜(Modbus, Profibus) + 인증 규격 / Android 산업 인증 없음', priority: 0 },
+  ]
+};
+
+const TIER_COLOR = { 1: '#FF6B6B', 2: '#FFD93D', 3: '#A78BFA' };
+const TIER_LABEL = { 1: 'TIER 1 — 완전 공백', 2: 'TIER 2 — 심각 부족', 3: 'TIER 3 — 장르 불가' };
+const PRIORITY_LABEL = { 1: '🥇 EP.01 파일럿', 2: '🥈 EP.02', 3: '🥉 EP.03', 4: '4순위', 5: '5순위', 6: '6순위', 7: '7순위' };
+const CENTER_COLOR = '#D4AF37';
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H, cx, cy;
+let nodes = [];
+let selectedNode = null;
+let hoveredNode = null;
+let animFrame = 0;
+
+// pan/zoom
+let panX = 0, panY = 0, scale = 1;
+let isPanning = false, lastMX = 0, lastMY = 0;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  cx = W / 2; cy = H / 2;
+  initPositions();
+}
+
+function initPositions() {
+  const centerNode = {
+    ...DATA.center,
+    x: cx, y: cy, vx: 0, vy: 0,
+    isCenter: true, color: CENTER_COLOR
+  };
+
+  // Arrange by tier in arcs
+  const tierAngles = { 1: { start: -Math.PI * 0.8, end: Math.PI * 0.2 },
+                        2: { start: Math.PI * 0.2, end: Math.PI * 0.9 },
+                        3: { start: Math.PI * 0.9, end: Math.PI * 1.6 } };
+  const tierR = { 1: 220, 2: 220, 3: 220 };
+  const tierNodes = { 1: [], 2: [], 3: [] };
+
+  DATA.nodes.forEach(n => tierNodes[n.tier].push(n));
+
+  const positioned = DATA.nodes.map(n => {
+    const list = tierNodes[n.tier];
+    const idx = list.indexOf(n);
+    const { start, end } = tierAngles[n.tier];
+    const angle = start + (end - start) * (idx + 0.5) / list.length;
+    const r = tierR[n.tier] + (Math.random() - 0.5) * 30;
+    const baseR = Math.min(W, H) * 0.32;
+    return {
+      ...n,
+      x: cx + Math.cos(angle) * baseR,
+      y: cy + Math.sin(angle) * baseR,
+      vx: 0, vy: 0,
+      color: TIER_COLOR[n.tier],
+      r: n.priority && n.priority <= 3 ? 22 : 16
+    };
+  });
+
+  nodes = [centerNode, ...positioned];
+}
+
+// Force simulation
+function simulate() {
+  const repulsion = 1800;
+  const linkStrength = 0.04;
+  const centerPull = 0.015;
+  const damping = 0.85;
+
+  for (let i = 1; i < nodes.length; i++) {
+    const a = nodes[i];
+    // Pull toward center
+    const dx = cx - a.x, dy = cy - a.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const targetR = 160 + (a.tier - 1) * 80;
+    const forceMag = (dist - targetR) * centerPull;
+    a.vx += (dx / dist) * forceMag;
+    a.vy += (dy / dist) * forceMag;
+
+    // Repulsion from other nodes
+    for (let j = 1; j < nodes.length; j++) {
+      if (i === j) continue;
+      const b = nodes[j];
+      const dx2 = a.x - b.x, dy2 = a.y - b.y;
+      const d2 = dx2 * dx2 + dy2 * dy2 + 1;
+      const f = repulsion / d2;
+      a.vx += (dx2 / Math.sqrt(d2)) * f;
+      a.vy += (dy2 / Math.sqrt(d2)) * f;
+    }
+
+    a.vx *= damping;
+    a.vy *= damping;
+    a.x += a.vx;
+    a.y += a.vy;
+  }
+}
+
+function draw() {
+  animFrame++;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(scale, scale);
+
+  // Draw links
+  nodes.slice(1).forEach(n => {
+    ctx.beginPath();
+    ctx.moveTo(nodes[0].x, nodes[0].y);
+    ctx.lineTo(n.x, n.y);
+    const alpha = hoveredNode === n ? 0.4 : 0.08;
+    ctx.strokeStyle = `rgba(212,175,55,${alpha})`;
+    ctx.lineWidth = hoveredNode === n ? 1.5 : 0.8;
+    ctx.stroke();
+  });
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const isHovered = hoveredNode === n;
+    const isSelected = selectedNode === n;
+    const pulse = isSelected ? Math.sin(animFrame * 0.05) * 3 : 0;
+
+    // Glow
+    if (isHovered || isSelected || n.isCenter) {
+      const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, (n.r || 16) * 3);
+      grd.addColorStop(0, n.color.replace(')', ',0.25)').replace('rgb', 'rgba').replace('#', 'rgba(').replace(',0.25)', ''));
+      const c = n.isCenter ? CENTER_COLOR : n.color;
+      grd.addColorStop(0, hexAlpha(c, 0.25));
+      grd.addColorStop(1, hexAlpha(c, 0));
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, (n.r || 16) * 3, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+
+    // Circle
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, (n.r || 16) + pulse, 0, Math.PI * 2);
+    if (n.isCenter) {
+      const grd2 = ctx.createRadialGradient(n.x, n.y - 10, 5, n.x, n.y, n.r + 10);
+      grd2.addColorStop(0, '#F5DC6A');
+      grd2.addColorStop(1, '#9A7800');
+      ctx.fillStyle = grd2;
+    } else {
+      ctx.fillStyle = isSelected ? n.color : hexAlpha(n.color, 0.85);
+    }
+    ctx.fill();
+
+    if (isSelected || isHovered) {
+      ctx.strokeStyle = n.isCenter ? '#FFE566' : n.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Label
+    ctx.font = n.isCenter ? 'bold 11px Inter' : isHovered || isSelected ? '600 10px Inter' : '500 9px Inter';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    if (n.isCenter) {
+      const lines = n.label.split('\n');
+      ctx.fillStyle = '#0A0A0A';
+      lines.forEach((l, i) => ctx.fillText(l, n.x, n.y + (i - (lines.length - 1) / 2) * 13));
+    } else {
+      ctx.fillStyle = isHovered || isSelected ? '#FFF' : '#F5F0E8';
+      const maxW = 70;
+      const words = n.name.split(' ');
+      if (words.length > 1 && ctx.measureText(n.name).width > maxW) {
+        ctx.fillText(words[0], n.x, n.y - 5);
+        ctx.fillText(words.slice(1).join(' '), n.x, n.y + 6);
+      } else {
+        ctx.fillText(n.name, n.x, n.y);
+      }
+
+      // Priority star
+      if (n.priority && n.priority <= 3) {
+        ctx.font = '13px sans-serif';
+        ctx.fillText(['🥇','🥈','🥉'][n.priority - 1], n.x + (n.r || 16) - 2, n.y - (n.r || 16) + 2);
+      }
+    }
+  });
+
+  ctx.restore();
+  requestAnimationFrame(draw);
+}
+
+function hexAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function getNodeAt(mx, my) {
+  const wx = (mx - panX) / scale;
+  const wy = (my - panY) / scale;
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    const dx = wx - n.x, dy = wy - n.y;
+    if (dx * dx + dy * dy < (n.r || 16) * (n.r || 16) * 1.5) return n;
+  }
+  return null;
+}
+
+// Events
+canvas.addEventListener('mousemove', e => {
+  const n = getNodeAt(e.clientX, e.clientY);
+  hoveredNode = n;
+  canvas.style.cursor = n ? 'pointer' : isPanning ? 'grabbing' : 'grab';
+
+  if (n && !n.isCenter) {
+    const tt = document.getElementById('tooltip');
+    document.getElementById('tt-name').textContent = n.name;
+    document.getElementById('tt-pc').textContent = n.pc;
+    tt.style.left = (e.clientX + 12) + 'px';
+    tt.style.top = (e.clientY - 10) + 'px';
+    tt.classList.add('show');
+  } else {
+    document.getElementById('tooltip').classList.remove('show');
+  }
+
+  if (isPanning) {
+    panX += e.clientX - lastMX;
+    panY += e.clientY - lastMY;
+    lastMX = e.clientX;
+    lastMY = e.clientY;
+  }
+});
+
+canvas.addEventListener('mousedown', e => {
+  const n = getNodeAt(e.clientX, e.clientY);
+  if (!n) { isPanning = true; lastMX = e.clientX; lastMY = e.clientY; }
+});
+
+canvas.addEventListener('mouseup', () => { isPanning = false; });
+canvas.addEventListener('mouseleave', () => {
+  isPanning = false;
+  document.getElementById('tooltip').classList.remove('show');
+});
+
+canvas.addEventListener('click', e => {
+  const n = getNodeAt(e.clientX, e.clientY);
+  if (n && !n.isCenter) {
+    selectedNode = n;
+    openPanel(n);
+  } else if (!n) {
+    selectedNode = null;
+    closePanel();
+  }
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  const wx = (e.clientX - panX) / scale;
+  const wy = (e.clientY - panY) / scale;
+  scale = Math.max(0.4, Math.min(2.5, scale * factor));
+  panX = e.clientX - wx * scale;
+  panY = e.clientY - wy * scale;
+}, { passive: false });
+
+// Touch
+let lastTouchDist = 0;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isPanning = true;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    isPanning = false;
+    lastTouchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && isPanning) {
+    panX += e.touches[0].clientX - lastMX;
+    panY += e.touches[0].clientY - lastMY;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    scale = Math.max(0.4, Math.min(2.5, scale * (dist / lastTouchDist)));
+    lastTouchDist = dist;
+  }
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length === 0) {
+    isPanning = false;
+    // tap detection
+    if (e.changedTouches.length === 1) {
+      const n = getNodeAt(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+      if (n && !n.isCenter) { selectedNode = n; openPanel(n); }
+    }
+  }
+});
+
+function openPanel(n) {
+  const color = TIER_COLOR[n.tier];
+  document.getElementById('p-tier').textContent = TIER_LABEL[n.tier];
+  document.getElementById('p-tier').style.color = color;
+  document.getElementById('p-title').textContent = n.name;
+  document.getElementById('p-pc').textContent = n.pc;
+  document.getElementById('p-reason').textContent = n.reason;
+  const badge = document.getElementById('p-badge');
+  if (n.priority) {
+    badge.textContent = PRIORITY_LABEL[n.priority] || '';
+    badge.style.background = hexAlpha(color, 0.15);
+    badge.style.color = color;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+  document.getElementById('info-panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('info-panel').classList.remove('open');
+}
+
+document.getElementById('panel-close').addEventListener('click', () => {
+  selectedNode = null;
+  closePanel();
+});
+
+// Simulation loop
+let simRunning = true;
+function simLoop() {
+  if (simRunning) { simulate(); simulate(); }
+  setTimeout(simLoop, 16);
+}
+setTimeout(() => { simRunning = false; }, 5000); // stop after 5s
+
+window.addEventListener('resize', resize);
+resize();
+simLoop();
+draw();
+</script>
+</body>
+</html>
