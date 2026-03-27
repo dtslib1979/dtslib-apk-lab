@@ -81,14 +81,15 @@
     "id": "parksy-glot",
     "name": "Parksy Glot",
     "version": "v1.0.0",
-    "registryStatus": "store-registered",
+    "registryStatus": "migrated-to-pc",
     "category": "subtitle",
-    "description": "Real-time multilingual subtitle overlay (OpenAI Whisper + GPT-4o)",
+    "description": "PC 환경으로 이전 (2026-03-27). STT 처리는 PC glot.py (Web Speech API, 무료)가 담당. 자막 표시는 Axis 패턴 얇은 APK 껍데기 + WebView로 재설계. 드래그·핀치 가능, 과금 없음.",
     "icon": "🌐",
     "downloadUrl": null,
-    "workflow": "build-parksy-glot.yml",
+    "workflow": null,
     "releaseTag": "parksy-glot-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27",
+    "migratedTo": "glot.py (WSL2) + Web Speech API + WebSocket → Axis-shell WebView APK"
   },
   {
     "id": "parksy-studio",
