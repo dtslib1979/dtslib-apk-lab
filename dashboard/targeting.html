@@ -365,7 +365,6 @@ function draw() {
     // Glow
     if (isHovered || isSelected || n.isCenter) {
       const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, (n.r || 16) * 3);
-      grd.addColorStop(0, n.color.replace(')', ',0.25)').replace('rgb', 'rgba').replace('#', 'rgba(').replace(',0.25)', ''));
       const c = n.isCenter ? CENTER_COLOR : n.color;
       grd.addColorStop(0, hexAlpha(c, 0.25));
       grd.addColorStop(1, hexAlpha(c, 0));
