@@ -36,9 +36,16 @@ VIDEO_BITRATE   = "4M"
 AUDIO_BITRATE   = "192k"
 
 # 태블릿 크롭 설정 (status bar / nav bar 제거)
-# scrcpy 미러 해상도에 맞게 조정 필요 (기본값: 2000x1200 미러)
+# frame.png 콘텐츠 영역: x=42, y=58, w=1836, h=922
 CROP_TOP        = 60    # status bar 높이 (px)
 CROP_BOTTOM     = 60    # nav bar 높이 (px)
+
+# frame.png 오버레이 파라미터 (1920×1080 칠판 액자)
+# 콘텐츠 영역: x=42 y=58 w=1836 h=922 → 태블릿 크롭 후 이 영역에 스케일
+FRAME_CONTENT_X = 42
+FRAME_CONTENT_Y = 58
+FRAME_CONTENT_W = 1836
+FRAME_CONTENT_H = 922
 
 # ─── 유틸 ────────────────────────────────────────────────────────────────────
 
