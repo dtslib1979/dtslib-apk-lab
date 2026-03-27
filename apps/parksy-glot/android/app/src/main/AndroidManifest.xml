@@ -1,20 +1,16 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.parksy.glot">
 
-    <!-- Audio capture permissions -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
-    <!-- Overlay permission -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
-    <!-- Internet for API calls -->
-    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:label="Parksy Glot"
         android:name="${applicationName}"
-        android:icon="@drawable/ic_launcher">
+        android:icon="@mipmap/ic_launcher">
 
         <activity
             android:name=".MainActivity"
@@ -24,21 +20,27 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <meta-data
-                android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme"/>
         </activity>
 
-        <!-- Subtitle Overlay Service -->
+        <!-- flutter_overlay_window 오버레이 서비스 -->
         <service
-            android:name=".SubtitleOverlayService"
-            android:enabled="true"
+            android:name="flutter.overlay.window.flutter_overlay_window.OverlayService"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="overlay_window"/>
+            <meta-data
+                android:name="io.flutter.embedding.android.OverlayEntryPoint"
+                android:value="overlayMain"/>
+        </service>
 
         <meta-data
             android:name="flutterEmbedding"

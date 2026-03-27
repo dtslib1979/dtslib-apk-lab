@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.dtslib.parksy_glot"
+    namespace "com.parksy.glot"
     compileSdk 35
     ndkVersion flutter.ndkVersion
 
@@ -41,8 +41,8 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.dtslib.parksy_glot"
-        minSdk 29  // Android 10+ required for AudioPlaybackCapture
+        applicationId "com.parksy.glot"
+        minSdk 21
         targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

@@ -1,9 +1,9 @@
 {
   "name": "Parksy Glot",
-  "package": "com.dtslib.parksy_glot",
-  "version": "1.0.0",
+  "package": "com.parksy.glot",
+  "version": "2.0.0",
   "versionCode": 1,
-  "minSdk": 29,
-  "targetSdk": 34,
-  "description": "Real-time multilingual subtitle overlay powered by OpenAI Whisper + GPT-4o"
+  "minSdk": 21,
+  "targetSdk": 35,
+  "description": "Axis-shell 패턴 자막 오버레이 — PC glot.py (Web Speech API) + WebSocket → WebView 표시. 드래그/핀치 지원, 과금 없음."
 }
