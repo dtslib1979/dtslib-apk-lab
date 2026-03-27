@@ -94,14 +94,15 @@
     "id": "parksy-studio",
     "name": "Parksy Studio",
     "version": "v1.0.0",
-    "registryStatus": "store-registered",
+    "registryStatus": "migrated-to-pc",
     "category": "broadcast",
-    "description": "방송 파이프라인 APK — 화면녹화 + 동시통역 + BGM + 트리머 + 카메라 오버레이",
+    "description": "APK 역할 종료 — PC 환경으로 이전 (2026-03-27). 화면녹화·업로드는 broadcast.py (WSL2 Python)가 대체. 태블릿은 입력 단말기로 재정의되어 Parksy Pen·Axis만 유지.",
     "icon": "🎬",
     "downloadUrl": null,
-    "workflow": "build-parksy-studio.yml",
+    "workflow": null,
     "releaseTag": "parksy-studio-v1.0.0",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27",
+    "migratedTo": "broadcast.py (WSL2) + FFmpeg + youtube-studio.js"
   },
   {
     "id": "parksy-liner",
