@@ -217,3 +217,90 @@ XLR 마이크 ───┘
 ---
 
 *회의록 작성: Claude Code / 2026-03-27*
+
+---
+
+## 세션 로그 — 2026-03-27 오후 | Parksy Studio v2.0 구현 완료
+
+> 형식: CLAUDE.md 세션 로그 포맷
+
+---
+
+### 2026-03-27 | Parksy Studio v2.0 전체 구현 + Glot APK v2 재설계 + MCP 연동 완성
+
+**작업:**
+
+1. **broadcast.py v1.0** (`apps/parksy-studio/broadcast.py`, 285줄)
+   - Phase 1: ADB intent → 태블릿 웹페이지 오픈
+   - Phase 2: FFmpeg DirectShow(scrcpy window + VB-Cable) + frame.png overlay → H.264/AAC 1920×1080 녹화
+   - Phase 3: SIGINT flush → 정상 종료
+   - Phase 4: youtube-studio.js → YouTube 업로드
+   - Ctrl+C 핸들러로 자동 종료+업로드 연결
+
+2. **glot.py v2.0** (`apps/parksy-glot/glot.py`, 370줄)
+   - WebSocket 서버(포트 8765) + HTTP 서버(포트 8766)
+   - CONTROL_HTML: Web Speech API 컨트롤 페이지 (Chrome/Edge 무료 STT)
+   - SUBTITLE_HTML: 드래그+핀치줌 자막 표시 페이지
+   - Google Translate 무료 endpoint (ko/en 번역)
+
+3. **frame.png 생성기** (`/tmp/make_frame.py`)
+   - 1920×1080 칠판 다크그린 액자 PNG
+   - 중앙 투명 영역 (x=42, y=58, w=1836, h=922) — scrcpy 화면이 들어갈 자리
+   - 상단 58px: PARKSY STUDIO v2.0(골드) + 강의주제 + HH:MM + 🔴REC
+   - 하단 100px: 원어/한국어/영어 자막 3줄
+   - 분필 텍스처 노이즈 + 골드 코너 장식
+
+4. **바탕화면 런처** (`C:\Users\dtsli\Desktop\🎬 PARKSY STUDIO.bat`)
+   - 실행 순서: REAPER → scrcpy → Glot서버(WSL2) → Chrome 컨트롤 페이지
+   - scrcpy 미설치 시 안내 메시지 출력
+
+5. **APK 스토어 업데이트** (`dashboard/apps.json`, `dashboard/index.html`)
+   - parksy-studio: registryStatus → "migrated-to-pc"
+   - parksy-glot: registryStatus → "migrated-to-pc"
+   - migrated-to-pc 상태 카드 렌더링 추가 (주황색 배지)
+
+6. **Glot APK v2.0 재설계** (`apps/parksy-glot/`)
+   - v1(온디바이스 Whisper/STT 4334줄) 전부 제거, Axis-shell 패턴으로 교체
+   - `flutter_overlay_window` + `webview_flutter` 의존성으로 교체
+   - `overlayMain()`: WebView → `http://PC_IP:8766/subtitle` 로드
+   - `main()`: PC IP 설정 UI + 오버레이 ON/OFF 토글
+   - 패키지명: `com.dtslib.parksy_glot` → `com.parksy.glot`
+   - minSdk: 29 → 21
+
+7. **scrcpy 설치 완료** — winget 3.3.4, PATH 등록됨
+
+8. **WSL MCP 설정 정비** (`~/.claude/settings.json`)
+   - filesystem: `/home/dtsli`, `/mnt/c/Users/dtsli`, `/mnt/d` 전체로 확장
+   - playwright MCP 추가 (@playwright/mcp 0.0.68, Windows 직접 경로)
+   - windows-cli MCP 추가 (@simonb97/server-win-cli)
+   - chrome-mcp 추가 (mcp-chrome-bridge)
+
+**결정:**
+
+- OBS 완전 폐기 → FFmpeg DirectShow 직접 녹화로 확정 (이전 세션에서 결정)
+- Glot STT 처리: 온디바이스 Whisper(유료) → PC Web Speech API(무료) 로 전환
+- 자막 오버레이: 전용 APK → Axis-shell 패턴(얇은 WebView 껍데기)으로 재설계
+- 태블릿 = 입력 단말기, PC = 두뇌 아키텍처 확정
+
+**결과:**
+
+- 커밋 7개: a99688f → 1e0924b
+- Vercel 자동 배포 완료
+- win-gui MCP 14개 도구 정상 응답 확인 (screenshot/click/type/powershell 등)
+- playwright/windows-cli MCP 정상 응답 확인
+
+**교훈:**
+
+- OBS 재언급 실수 (이전 세션 결정 기억 필수)
+- GPU 작업 오인 실수 (이 파이프라인은 전부 CPU)
+- 원격 환경(mosh + Tailscale + ADB)에서 Claude Code 구동 중 — Claude Desktop 건드리지 말 것
+- DAW 세션 분리 운영 중 — broadcast.py 관련 작업 시 DAW 세션 충돌 주의
+
+**재구축 힌트:**
+
+- `broadcast.py --url [URL] --title "제목"` 실행하면 4단계 자동 진행
+- scrcpy 먼저 실행 후 Enter → FFmpeg 녹화 시작
+- VB-Cable 미설치 시 녹화 불가 (수동 설치 필요: https://vb-audio.com/Cable/)
+- Glot APK 빌드: `cd apps/parksy-glot && flutter pub get && flutter build apk --debug`
+
+---
