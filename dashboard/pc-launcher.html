@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PC 런처 — 박씨 태블릿</title>
+<style>
+  :root {
+    --bg: #0D0D0D;
+    --card: #1A1A1A;
+    --card-hover: #252525;
+    --accent: #D4AF37;
+    --accent-glow: rgba(212,175,55,0.35);
+    --text: #F5F5DC;
+    --text-dim: rgba(245,245,220,0.55);
+    --border: rgba(212,175,55,0.18);
+    --green: #4CAF50;
+    --red: #F44336;
+    --cat-daw: #FF6B6B;
+    --cat-office: #4ECDC4;
+    --cat-browser: #45B7D1;
+    --cat-remote: #DDA0DD;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── 헤더 ── */
+  header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 900; color: #000;
+  }
+
+  .brand-text { font-size: 15px; font-weight: 700; color: var(--accent); }
+  .brand-sub { font-size: 11px; color: var(--text-dim); }
+
+  /* ── 상태 표시 ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background 0.3s;
+  }
+
+  .status-dot.connected { background: var(--green); }
+  .status-dot.connecting { background: #FF9800; animation: pulse 1s infinite; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── 카테고리 탭 ── */
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+
+  /* ── 앱 그리드 ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 16px 16px 100px;
+  }
+
+  @media (min-width: 600px) {
+    .grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .app-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 12px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .app-btn:active {
+    transform: scale(0.94);
+    background: var(--card-hover);
+  }
+
+  .app-btn.launching {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+
+  .app-btn.success {
+    border-color: var(--green);
+    box-shadow: 0 0 16px rgba(76,175,80,0.4);
+  }
+
+  .app-btn.error {
+    border-color: var(--red);
+    box-shadow: 0 0 16px rgba(244,67,54,0.3);
+  }
+
+  .app-btn.unavailable {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .cat-stripe {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .app-icon { font-size: 32px; line-height: 1; }
+  .app-name { font-size: 12px; font-weight: 600; text-align: center; color: var(--text); }
+  .app-cat { font-size: 10px; color: var(--text-dim); }
+
+  .app-status-badge {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  .app-status-badge.unavailable { background: var(--red); }
+
+  /* ── 토스트 알림 ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1E1E1E;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 13px;
+    white-space: nowrap;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 999;
+    max-width: 90vw;
+    text-align: center;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.ok { border-color: var(--green); color: var(--green); }
+  .toast.err { border-color: var(--red); color: var(--red); }
+
+  /* ── 서버 끊김 오버레이 ── */
+  .offline-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+    padding: 32px;
+  }
+
+  .offline-overlay.show { display: flex; }
+
+  .offline-icon { font-size: 48px; }
+
+  .offline-title {
+    font-size: 18px; font-weight: 700;
+    color: var(--accent);
+  }
+
+  .offline-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .retry-btn {
+    margin-top: 8px;
+    padding: 10px 24px;
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* ── 하단 안내 ── */
+  .footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(13,13,13,0.95);
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header>
+  <div class="brand">
+    <div class="brand-icon">PC</div>
+    <div>
+      <div class="brand-text">PC 런처</div>
+      <div class="brand-sub">박씨 태블릿 → 집 PC</div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot connecting" id="statusDot"></div>
+    <span id="statusText">연결 중...</span>
+  </div>
+</header>
+
+<!-- 카테고리 탭 -->
+<div class="tabs" id="tabs">
+  <button class="tab active" data-cat="all" onclick="filterCat('all')">전체</button>
+  <button class="tab" data-cat="daw" onclick="filterCat('daw')">🎛️ DAW</button>
+  <button class="tab" data-cat="office" onclick="filterCat('office')">📋 Office</button>
+  <button class="tab" data-cat="browser" onclick="filterCat('browser')">🌐 브라우저</button>
+  <button class="tab" data-cat="remote" onclick="filterCat('remote')">🖥️ 원격</button>
+</div>
+
+<!-- 앱 그리드 -->
+<div class="grid" id="grid"></div>
+
+<!-- 서버 오프라인 오버레이 -->
+<div class="offline-overlay" id="offlineOverlay">
+  <div class="offline-icon">🔌</div>
+  <div class="offline-title">PC 서버 연결 실패</div>
+  <div class="offline-desc">
+    PC에서 <strong>start.bat</strong>를 실행했나요?<br><br>
+    WSL에서 ADB 터널 설정:<br>
+    <code style="color:var(--accent)">adb reverse tcp:7777 tcp:7777</code>
+  </div>
+  <button class="retry-btn" onclick="checkServer()">다시 연결</button>
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<!-- 하단 -->
+<div class="footer">
+  PC Launch Server · localhost:7777 · ADB reverse tunnel
+</div>
+
+<script>
+const SERVER = 'http://localhost:7777';
+const CAT_COLORS = {
+  daw:     '#FF6B6B',
+  office:  '#4ECDC4',
+  browser: '#45B7D1',
+  remote:  '#DDA0DD',
+};
+
+let allApps = [];
+let currentCat = 'all';
+
+// ── 서버 상태 확인 ────────────────────────────────────────────────────
+async function checkServer() {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  const overlay = document.getElementById('offlineOverlay');
+
+  dot.className = 'status-dot connecting';
+  txt.textContent = '연결 중...';
+
+  try {
+    const res = await fetch(`${SERVER}/apps`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    allApps = data.apps || [];
+
+    dot.className = 'status-dot connected';
+    txt.textContent = `연결됨 · ${allApps.length}개`;
+    overlay.classList.remove('show');
+    renderGrid();
+  } catch {
+    dot.className = 'status-dot';
+    txt.textContent = '서버 오프라인';
+    overlay.classList.add('show');
+  }
+}
+
+// ── 그리드 렌더링 ─────────────────────────────────────────────────────
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const filtered = currentCat === 'all'
+    ? allApps
+    : allApps.filter(a => a.category === currentCat);
+
+  grid.innerHTML = filtered.map(app => `
+    <div class="app-btn ${app.available ? '' : 'unavailable'}"
+         id="btn-${app.id}"
+         onclick="${app.available ? `launchApp('${app.id}','${app.name}')` : ''}">
+      <div class="cat-stripe" style="background:${CAT_COLORS[app.category] || '#888'}"></div>
+      <div class="app-status-badge ${app.available ? '' : 'unavailable'}"></div>
+      <div class="app-icon">${app.icon}</div>
+      <div class="app-name">${app.name}</div>
+      <div class="app-cat">${catLabel(app.category)}</div>
+    </div>
+  `).join('');
+}
+
+function catLabel(cat) {
+  const labels = { daw:'DAW·음악', office:'Office', browser:'브라우저', remote:'원격' };
+  return labels[cat] || cat;
+}
+
+// ── 앱 실행 ───────────────────────────────────────────────────────────
+async function launchApp(id, name) {
+  const btn = document.getElementById(`btn-${id}`);
+  btn.classList.add('launching');
+
+  try {
+    const res = await fetch(`${SERVER}/launch?app=${id}`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      btn.classList.remove('launching');
+      btn.classList.add('success');
+      showToast(`✅ ${name} 실행됨`, 'ok');
+      setTimeout(() => btn.classList.remove('success'), 2000);
+    } else {
+      throw new Error(data.error || 'failed');
+    }
+  } catch (e) {
+    btn.classList.remove('launching');
+    btn.classList.add('error');
+    showToast(`❌ ${name} 실행 실패`, 'err');
+    setTimeout(() => btn.classList.remove('error'), 2000);
+
+    if (e.name === 'TimeoutError' || e.name === 'TypeError') {
+      // 서버 끊김
+      document.getElementById('offlineOverlay').classList.add('show');
+    }
+  }
+}
+
+// ── 카테고리 필터 ─────────────────────────────────────────────────────
+function filterCat(cat) {
+  currentCat = cat;
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.cat === cat);
+  });
+  renderGrid();
+}
+
+// ── 토스트 ────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── 초기 실행 ─────────────────────────────────────────────────────────
+checkServer();
+// 30초마다 상태 갱신
+setInterval(checkServer, 30000);
+</script>
+</body>
+</html>

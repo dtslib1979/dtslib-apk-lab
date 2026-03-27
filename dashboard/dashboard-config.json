@@ -47,6 +47,14 @@
       "icon": "🎯",
       "url": "targeting.html",
       "color": "#D4AF37"
+    },
+    {
+      "id": "pc-launcher",
+      "title": "PC 런처",
+      "subtitle": "태블릿 탭 → PC 프로그램 실행 (ADB 터널)",
+      "icon": "🖥️",
+      "url": "pc-launcher.html",
+      "color": "#4ECDC4"
     }
   ],
   "stats": {
