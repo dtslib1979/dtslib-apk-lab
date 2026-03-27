@@ -10,7 +10,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-capture-latest/app-debug.apk",
     "workflow": "build-capture-pipeline.yml",
     "releaseTag": "parksy-capture-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "chrono-call",
@@ -23,7 +23,7 @@
     "downloadUrl": null,
     "workflow": "build-chrono-call.yml",
     "releaseTag": "chrono-call-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-pen",
@@ -36,7 +36,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-pen-latest/app-debug.apk",
     "workflow": "build-laser-pen.yml",
     "releaseTag": "parksy-pen-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "midi-converter",
@@ -49,7 +49,7 @@
     "downloadUrl": null,
     "workflow": "build-midi-converter.yml",
     "releaseTag": "midi-converter-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-audio-tools",
@@ -62,7 +62,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-audio-tools.yml",
     "releaseTag": "parksy-audio-tools-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-axis",
@@ -75,35 +75,33 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-axis-latest/app-debug.apk",
     "workflow": "build-parksy-axis.yml",
     "releaseTag": "parksy-axis-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-glot",
     "name": "Parksy Glot",
-    "version": "v1.0.0",
-    "registryStatus": "migrated-to-pc",
+    "version": "v2.0.0",
+    "registryStatus": "store-registered",
     "category": "subtitle",
-    "description": "PC 환경으로 이전 (2026-03-27). STT 처리는 PC glot.py (Web Speech API, 무료)가 담당. 자막 표시는 Axis 패턴 얇은 APK 껍데기 + WebView로 재설계. 드래그·핀치 가능, 과금 없음.",
+    "description": "Real-time multilingual subtitle overlay (OpenAI Whisper + GPT-4o)",
     "icon": "🌐",
     "downloadUrl": null,
-    "workflow": null,
+    "workflow": "build-parksy-glot.yml",
     "releaseTag": "parksy-glot-latest",
-    "lastUpdated": "2026-03-27",
-    "migratedTo": "glot.py (WSL2) + Web Speech API + WebSocket → Axis-shell WebView APK"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-studio",
     "name": "Parksy Studio",
     "version": "v1.0.0",
-    "registryStatus": "migrated-to-pc",
+    "registryStatus": "store-registered",
     "category": "broadcast",
-    "description": "APK 역할 종료 — PC 환경으로 이전 (2026-03-27). 화면녹화·업로드는 broadcast.py (WSL2 Python)가 대체. 태블릿은 입력 단말기로 재정의되어 Parksy Pen·Axis만 유지.",
+    "description": "방송 파이프라인 APK — 화면녹화 + 동시통역 + BGM + 트리머 + 카메라 오버레이",
     "icon": "🎬",
     "downloadUrl": null,
-    "workflow": null,
+    "workflow": "build-parksy-studio.yml",
     "releaseTag": "parksy-studio-v1.0.0",
-    "lastUpdated": "2026-03-27",
-    "migratedTo": "broadcast.py (WSL2) + FFmpeg + youtube-studio.js"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-liner",
@@ -116,7 +114,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-liner.yml",
     "releaseTag": "parksy-liner-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-wavesy",
@@ -129,7 +127,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-wavesy.yml",
     "releaseTag": "parksy-wavesy-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-melody",
@@ -142,7 +140,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-melody-v1.1.0/app-debug.apk",
     "workflow": "build-parksy-melody.yml",
     "releaseTag": "parksy-melody-v1.1.0",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-printer",
@@ -155,7 +153,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-printer.yml",
     "releaseTag": "parksy-printer-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   },
   {
     "id": "parksy-tts",
@@ -168,6 +166,6 @@
     "downloadUrl": null,
     "workflow": "build-tts-factory.yml",
     "releaseTag": "tts-factory-latest",
-    "lastUpdated": "2026-03-20"
+    "lastUpdated": "2026-03-27"
   }
 ]
