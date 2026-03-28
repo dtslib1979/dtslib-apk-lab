@@ -64,15 +64,20 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: blackhole-v1.0.0
-          name: Blackhole v1.0.0 — PC 연결 런처
+          tag_name: blackhole-v1.1.0
+          name: Blackhole v1.1.0 — PC 연결 런처 + 화면 뷰어
           files: apps/blackhole/build/app/outputs/flutter-apk/app-debug.apk
           body: |
-            ## 🕳️ Blackhole v1.0.0
+            ## 🕳️ Blackhole v1.1.0
 
             **모든 디바이스를 PC로 연결한다.**
 
-            태블릿/폰에서 버튼 하나로 PC 프로그램 실행.
+            태블릿/폰에서 버튼 하나로 PC 프로그램 실행 + PC 화면 실시간 보기.
+
+            ### 신규 기능 (v1.1.0)
+            - 🖥️ **PC 화면 실시간 보기** — RustDesk 뷰어 버튼 추가
+              - Claude가 Excel 작업하는 화면을 태블릿에서 그대로 봄
+              - 런처 상단 고정 버튼 → RustDesk 앱 바로 실행
 
             ### 포함 앱
             - 💼 Office: Excel, Word, PowerPoint, Outlook, OneNote
@@ -83,6 +88,7 @@ jobs:
             ### 사전 조건
             - PC에서 `start.bat` 실행 (port 7777)
             - WSL: `adb reverse tcp:7777 tcp:7777`
+            - 태블릿에 RustDesk 앱 설치 필요 (뷰어 기능)
 
             ### 요구사항
             - Android 10+ (minSdk 29)

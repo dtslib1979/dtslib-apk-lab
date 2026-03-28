@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 void main() {
@@ -65,6 +66,14 @@ class _BlackholeScreenState extends State<BlackholeScreen> {
           _loading = false;
           _error = true;
         }),
+        onNavigationRequest: (request) {
+          final url = request.url;
+          if (!url.startsWith('http') && !url.startsWith('about:')) {
+            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
+        },
       ))
       ..loadHtmlString(html, baseUrl: 'http://localhost:7777');
   }

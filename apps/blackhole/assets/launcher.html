@@ -160,6 +160,28 @@
   .toast.ok { border-color: var(--green); color: var(--green); }
   .toast.err { border-color: var(--red); color: var(--red); }
 
+  /* 뷰어 섹션 */
+  .viewer-section {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .viewer-btn {
+    width: 100%;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(212,175,55,0.12), rgba(221,160,221,0.12));
+    border: 1px solid rgba(212,175,55,0.4);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .viewer-btn:active { transform: scale(0.97); background: linear-gradient(135deg, rgba(212,175,55,0.2), rgba(221,160,221,0.2)); }
+  .viewer-left { display: flex; align-items: center; gap: 12px; }
+  .viewer-icon { font-size: 26px; }
+  .viewer-label { font-size: 14px; font-weight: 700; color: var(--accent); }
+  .viewer-sub { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+  .viewer-arrow { font-size: 18px; color: var(--text-dim); }
+
   /* 푸터 */
   .footer {
     position: fixed; bottom: 0; left: 0; right: 0;
@@ -183,6 +205,21 @@
     <span id="statusTxt">연결 중...</span>
   </div>
 </header>
+
+<!-- 뷰어 -->
+<div class="viewer-section">
+  <div class="section-label">PC 화면 보기</div>
+  <div class="viewer-btn" onclick="openViewer()">
+    <div class="viewer-left">
+      <div class="viewer-icon">🖥️</div>
+      <div>
+        <div class="viewer-label">PC 화면 실시간 보기</div>
+        <div class="viewer-sub">RustDesk 원격 뷰어 · Claude 작업 화면 그대로</div>
+      </div>
+    </div>
+    <div class="viewer-arrow">›</div>
+  </div>
+</div>
 
 <!-- 히스토리 -->
 <div class="history-section">
@@ -354,6 +391,12 @@ function showToast(msg, type='') {
   el.textContent = msg; el.className = `toast ${type} show`;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── RustDesk 뷰어 실행 ─────────────────────────────────────
+function openViewer() {
+  // RustDesk 앱 URL scheme으로 실행
+  window.location = 'rustdesk://';
 }
 
 checkServer();
