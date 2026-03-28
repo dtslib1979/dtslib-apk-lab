@@ -61,6 +61,18 @@ APPS = {
         "icon": "📽️",
         "category": "office",
     },
+    "outlook": {
+        "name": "Outlook",
+        "exe": r"C:\Program Files\Microsoft Office\root\Office16\OUTLOOK.EXE",
+        "icon": "📧",
+        "category": "office",
+    },
+    "onenote": {
+        "name": "OneNote",
+        "exe": r"C:\Program Files\Microsoft Office\root\Office16\ONENOTE.EXE",
+        "icon": "📓",
+        "category": "office",
+    },
     # ── 브라우저 / 네트워크 ───────────────────────────────────────────────
     "chrome": {
         "name": "Chrome",
