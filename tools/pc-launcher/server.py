@@ -1,15 +1,22 @@
 """
 PC Launch Server — 태블릿 ADB 런처 백엔드
-태블릿에서 HTTP 요청 → Windows PC 프로그램 실행
+태블릿에서 HTTP 요청 → Windows PC 프로그램 실행 / Excel win32com 작업
 
 포트: 7777
 실행: python server.py  (Windows PowerShell / cmd에서)
 ADB: adb reverse tcp:7777 tcp:7777 (WSL에서 먼저 실행)
+
+엔드포인트:
+  GET /apps               → 앱 목록 + 설치 여부
+  GET /launch?app=ID      → 프로그램 실행 (Popen)
+  GET /task?id=TASK_ID    → Excel win32com 작업 실행 (화면에 그대로 보임)
+  GET /tasks              → 사용 가능한 작업 목록
 """
 
 import subprocess
 import json
 import os
+import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -95,6 +102,48 @@ APPS = {
     },
 }
 
+# ─── win32com Excel 작업 목록 ──────────────────────────────────────────────
+EXCEL_TASKS = {
+    "pivot_demo": {
+        "name": "매출 피벗 테이블",
+        "desc": "12행 매출 데이터 입력 → 피벗 테이블 생성",
+        "icon": "📊",
+        "duration": "약 30초",
+    },
+    "chart_demo": {
+        "name": "월별 매출 차트",
+        "desc": "월별 데이터 입력 → 막대+꺾은선 혼합 차트",
+        "icon": "📈",
+        "duration": "약 20초",
+    },
+    "formula_demo": {
+        "name": "성과 분석 + 조건부 서식",
+        "desc": "담당자별 실적 → 달성률 수식 → 컬러스케일",
+        "icon": "🎨",
+        "duration": "약 25초",
+    },
+}
+
+# 실행 중인 작업 상태 추적
+_running_task = {"id": None, "status": "idle"}
+
+
+def _run_excel_task_bg(task_id):
+    """백그라운드에서 Excel 작업 실행 (서버 블로킹 방지)"""
+    _running_task["id"] = task_id
+    _running_task["status"] = "running"
+    try:
+        from tasks.excel_tasks import run_task
+        result = run_task(task_id)
+        _running_task["status"] = "done"
+        _running_task["result"] = result
+    except ImportError:
+        _running_task["status"] = "error"
+        _running_task["result"] = {"ok": False, "error": "win32com not available (Windows only)"}
+    except Exception as e:
+        _running_task["status"] = "error"
+        _running_task["result"] = {"ok": False, "error": str(e)}
+
 
 class LaunchHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
@@ -134,7 +183,7 @@ class LaunchHandler(BaseHTTPRequestHandler):
             self.send_json(200, {"apps": result})
             return
 
-        # ── GET /launch?app=ID → 실행 ────────────────────────────────────
+        # ── GET /launch?app=ID → 프로그램 실행 ───────────────────────────
         if parsed.path == "/launch":
             app_id = qs.get("app", [None])[0]
             if not app_id or app_id not in APPS:
@@ -161,6 +210,46 @@ class LaunchHandler(BaseHTTPRequestHandler):
                 self.send_json(500, {"error": str(e)})
             return
 
+        # ── GET /tasks → Excel 작업 목록 ─────────────────────────────────
+        if parsed.path == "/tasks":
+            result = [
+                {"id": tid, **info}
+                for tid, info in EXCEL_TASKS.items()
+            ]
+            self.send_json(200, {"tasks": result, "running": _running_task})
+            return
+
+        # ── GET /task?id=TASK_ID → Excel win32com 작업 실행 ──────────────
+        if parsed.path == "/task":
+            task_id = qs.get("id", [None])[0]
+            if not task_id or task_id not in EXCEL_TASKS:
+                self.send_json(404, {"error": f"Unknown task: {task_id}"})
+                return
+
+            if _running_task["status"] == "running":
+                self.send_json(409, {"error": "이미 작업 실행 중", "running": _running_task["id"]})
+                return
+
+            # 백그라운드 실행 (HTTP 응답 먼저 보내고 Excel 작업)
+            t = threading.Thread(target=_run_excel_task_bg, args=(task_id,), daemon=True)
+            t.start()
+
+            task_info = EXCEL_TASKS[task_id]
+            print(f"  ▶ Task started: {task_info['name']}")
+            self.send_json(200, {
+                "ok": True,
+                "task": task_id,
+                "name": task_info["name"],
+                "status": "started",
+                "duration": task_info["duration"],
+            })
+            return
+
+        # ── GET /task-status → 작업 상태 확인 ────────────────────────────
+        if parsed.path == "/task-status":
+            self.send_json(200, _running_task)
+            return
+
         # ── GET / → 헬스체크 ─────────────────────────────────────────────
         if parsed.path == "/":
             self.send_json(200, {"status": "PC Launch Server running", "port": PORT})
@@ -171,9 +260,12 @@ class LaunchHandler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"🚀 PC Launch Server — port {PORT}")
-    print(f"   태블릿에서: http://localhost:{PORT}/launch?app=reaper")
-    print(f"   앱 목록:    http://localhost:{PORT}/apps")
-    print(f"   ADB 셋업:   adb reverse tcp:{PORT} tcp:{PORT}")
+    print(f"   앱 목록:     http://localhost:{PORT}/apps")
+    print(f"   앱 실행:     http://localhost:{PORT}/launch?app=reaper")
+    print(f"   작업 목록:   http://localhost:{PORT}/tasks")
+    print(f"   작업 실행:   http://localhost:{PORT}/task?id=pivot_demo")
+    print(f"   작업 상태:   http://localhost:{PORT}/task-status")
+    print(f"   ADB 셋업:    adb reverse tcp:{PORT} tcp:{PORT}")
     print()
     server = HTTPServer(("0.0.0.0", PORT), LaunchHandler)
     try:

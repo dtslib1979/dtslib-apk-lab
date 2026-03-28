@@ -231,15 +231,22 @@
 
 <!-- 탭 -->
 <div class="tabs" id="tabs">
-  <button class="tab active" data-cat="all" onclick="filterCat('all')">전체</button>
-  <button class="tab" data-cat="office" onclick="filterCat('office')">💼 Office</button>
-  <button class="tab" data-cat="daw" onclick="filterCat('daw')">🎛️ DAW</button>
-  <button class="tab" data-cat="browser" onclick="filterCat('browser')">🌐 브라우저</button>
-  <button class="tab" data-cat="remote" onclick="filterCat('remote')">🖥️ 원격</button>
+  <button class="tab active" data-cat="all" onclick="switchView('apps'); filterCat('all')">전체</button>
+  <button class="tab" data-cat="office" onclick="switchView('apps'); filterCat('office')">💼 Office</button>
+  <button class="tab" data-cat="daw" onclick="switchView('apps'); filterCat('daw')">🎛️ DAW</button>
+  <button class="tab" data-cat="browser" onclick="switchView('apps'); filterCat('browser')">🌐 브라우저</button>
+  <button class="tab" data-cat="remote" onclick="switchView('apps'); filterCat('remote')">🖥️ 원격</button>
+  <button class="tab" data-cat="task" onclick="switchView('tasks')">⚡ 작업</button>
 </div>
 
-<!-- 그리드 -->
+<!-- 앱 그리드 -->
 <div class="grid" id="grid"></div>
+
+<!-- 작업 목록 (숨김) -->
+<div id="taskView" style="display:none; padding:14px 14px 120px;">
+  <div id="taskList"></div>
+  <div id="taskStatus" style="display:none; margin-top:12px; padding:14px 16px; background:#1A1A1A; border:1px solid rgba(212,175,55,0.3); border-radius:14px; font-size:12px; color:#F5F5DC;"></div>
+</div>
 
 <!-- 오프라인 -->
 <div class="overlay" id="overlay">
@@ -395,8 +402,84 @@ function showToast(msg, type='') {
 
 // ── RustDesk 뷰어 실행 ─────────────────────────────────────
 function openViewer() {
-  // RustDesk 앱 URL scheme으로 실행
   window.location = 'rustdesk://';
+}
+
+// ── 뷰 전환 ────────────────────────────────────────────────
+function switchView(view) {
+  document.getElementById('grid').style.display = view === 'apps' ? '' : 'none';
+  document.getElementById('taskView').style.display = view === 'tasks' ? '' : 'none';
+  if (view === 'tasks') loadTasks();
+}
+
+// ── 작업 목록 로드 ─────────────────────────────────────────
+async function loadTasks() {
+  try {
+    const res = await fetch(`${SERVER}/tasks`, { signal: AbortSignal.timeout(3000) });
+    const data = await res.json();
+    renderTasks(data.tasks || [], data.running);
+  } catch {
+    document.getElementById('taskList').innerHTML =
+      '<div style="color:rgba(245,245,220,0.4);font-size:12px;padding:20px 0;">서버 연결 필요</div>';
+  }
+}
+
+function renderTasks(tasks, running) {
+  document.getElementById('taskList').innerHTML = tasks.map(t => `
+    <div style="background:#1A1A1A;border:1px solid rgba(212,175,55,0.2);border-radius:14px;padding:16px;margin-bottom:10px;cursor:pointer;transition:all 0.15s;"
+         onclick="runTask('${t.id}','${t.name}')"
+         ontouchstart="this.style.background='#252525'" ontouchend="this.style.background='#1A1A1A'">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:28px">${t.icon}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#D4AF37">${t.name}</div>
+            <div style="font-size:11px;color:rgba(245,245,220,0.55);margin-top:3px">${t.desc}</div>
+            <div style="font-size:10px;color:rgba(245,245,220,0.35);margin-top:2px">⏱ ${t.duration}</div>
+          </div>
+        </div>
+        <div style="font-size:20px;color:rgba(245,245,220,0.3)">›</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── 작업 실행 ──────────────────────────────────────────────
+let taskPollTimer;
+async function runTask(id, name) {
+  try {
+    const res = await fetch(`${SERVER}/task?id=${id}`, { signal: AbortSignal.timeout(5000) });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`▶ ${name} 시작됨`, 'ok');
+      startTaskPoll();
+    } else {
+      showToast(`⚠ ${data.error}`, 'err');
+    }
+  } catch {
+    showToast('❌ 서버 연결 실패', 'err');
+  }
+}
+
+function startTaskPoll() {
+  const el = document.getElementById('taskStatus');
+  el.style.display = 'block';
+  el.textContent = '⚡ 작업 실행 중 — RustDesk에서 화면을 확인하세요';
+  clearInterval(taskPollTimer);
+  taskPollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${SERVER}/task-status`, { signal: AbortSignal.timeout(2000) });
+      const data = await res.json();
+      if (data.status === 'done') {
+        clearInterval(taskPollTimer);
+        el.textContent = '✅ 작업 완료 — Excel에서 결과를 확인하세요';
+        setTimeout(() => { el.style.display = 'none'; }, 5000);
+      } else if (data.status === 'error') {
+        clearInterval(taskPollTimer);
+        el.textContent = `❌ 오류: ${data.result?.error || '알 수 없는 오류'}`;
+      }
+    } catch {}
+  }, 1500);
 }
 
 checkServer();
