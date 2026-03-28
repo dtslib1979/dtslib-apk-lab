@@ -1,0 +1,90 @@
+name: Build Blackhole
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/blackhole/**'
+      - '.github/workflows/build-blackhole.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/blackhole
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter create (보일러플레이트)
+        run: flutter create . --org com.dtslib --project-name blackhole
+
+      - name: Patch Kotlin version
+        run: |
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "1.9.10"/' android/settings.gradle
+          echo "✅ Kotlin patched"
+
+      - name: Patch AndroidManifest — cleartext + INTERNET
+        run: |
+          sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml || true
+          echo "✅ Manifest patched"
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackhole-debug
+          path: apps/blackhole/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Release APK
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: blackhole-v1.0.0
+          name: Blackhole v1.0.0 — PC 연결 런처
+          files: apps/blackhole/build/app/outputs/flutter-apk/app-debug.apk
+          body: |
+            ## 🕳️ Blackhole v1.0.0
+
+            **모든 디바이스를 PC로 연결한다.**
+
+            태블릿/폰에서 버튼 하나로 PC 프로그램 실행.
+
+            ### 포함 앱
+            - 💼 Office: Excel, Word, PowerPoint, Outlook, OneNote
+            - 🎛️ DAW: REAPER, Pianoteq, Focusrite, Spitfire
+            - 🌐 브라우저: Chrome, FileZilla
+            - 🖥️ 원격: RustDesk
+
+            ### 사전 조건
+            - PC에서 `start.bat` 실행 (port 7777)
+            - WSL: `adb reverse tcp:7777 tcp:7777`
+
+            ### 요구사항
+            - Android 10+ (minSdk 29)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

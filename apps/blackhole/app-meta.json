@@ -1,0 +1,13 @@
+{
+  "id": "blackhole",
+  "name": "Blackhole",
+  "tagline": "모든 디바이스를 PC로 연결한다",
+  "version": "v1.0.0",
+  "package": "com.dtslib.blackhole",
+  "category": "utility",
+  "status": "production",
+  "icon": "🕳️",
+  "color": "#D4AF37",
+  "minSdk": 29,
+  "series": "Blackhole"
+}

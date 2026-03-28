@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PC 런처</title>
+<link rel="manifest" href="launcher-manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PC 런처">
+<meta name="theme-color" content="#D4AF37">
+<style>
+  :root {
+    --bg: #0D0D0D;
+    --card: #1A1A1A;
+    --card-hover: #252525;
+    --accent: #D4AF37;
+    --accent-glow: rgba(212,175,55,0.3);
+    --text: #F5F5DC;
+    --text-dim: rgba(245,245,220,0.55);
+    --text-muted: rgba(245,245,220,0.3);
+    --border: rgba(212,175,55,0.15);
+    --green: #4CAF50;
+    --red: #F44336;
+    --cat-daw: #FF6B6B;
+    --cat-office: #4ECDC4;
+    --cat-browser: #45B7D1;
+    --cat-remote: #DDA0DD;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* 헤더 */
+  header {
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--bg); z-index: 100;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon { width: 34px; height: 34px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #000; }
+  .brand-name { font-size: 14px; font-weight: 700; color: var(--accent); }
+  .brand-sub { font-size: 10px; color: var(--text-dim); }
+  .status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); transition: background 0.3s; }
+  .dot.on { background: var(--green); }
+  .dot.wait { background: #FF9800; animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.2} }
+
+  /* 히스토리 섹션 */
+  .history-section {
+    padding: 12px 16px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-label {
+    font-size: 10px; font-weight: 700; color: var(--text-muted);
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .history-list {
+    display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+  }
+  .history-list::-webkit-scrollbar { display: none; }
+  .history-item {
+    flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 60px;
+  }
+  .history-item:active { transform: scale(0.92); background: var(--card-hover); }
+  .history-icon { font-size: 22px; }
+  .history-name { font-size: 9px; color: var(--text-dim); text-align: center; }
+  .history-time { font-size: 8px; color: var(--text-muted); }
+  .history-empty { font-size: 11px; color: var(--text-muted); padding: 8px 0; }
+
+  /* 카테고리 탭 */
+  .tabs {
+    display: flex; gap: 6px; padding: 10px 16px;
+    overflow-x: auto; scrollbar-width: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0; padding: 5px 12px; border-radius: 20px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-dim); font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* 앱 그리드 */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 14px 14px 120px;
+  }
+  @media (min-width: 540px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (min-width: 720px) { .grid { grid-template-columns: repeat(5, 1fr); } }
+
+  .app-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 10px 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    cursor: pointer; transition: all 0.15s;
+    position: relative; overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+  }
+  .app-btn:active { transform: scale(0.93); background: var(--card-hover); }
+  .app-btn.launching { border-color: var(--accent); box-shadow: 0 0 14px var(--accent-glow); }
+  .app-btn.success { border-color: var(--green); box-shadow: 0 0 14px rgba(76,175,80,0.35); }
+  .app-btn.error { border-color: var(--red); }
+  .app-btn.unavailable { opacity: 0.3; cursor: not-allowed; }
+
+  .cat-bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 16px 16px 0 0; }
+  .avail-dot { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .avail-dot.no { background: var(--red); }
+
+  /* Office 앱 특별 아이콘 */
+  .office-icon {
+    width: 40px; height: 40px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 900;
+  }
+  .app-icon { font-size: 30px; line-height: 1; }
+  .app-name { font-size: 11px; font-weight: 600; text-align: center; color: var(--text); }
+
+  /* 오프라인 오버레이 */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.88); z-index: 200;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 14px; text-align: center; padding: 32px;
+  }
+  .overlay.show { display: flex; }
+  .overlay-icon { font-size: 44px; }
+  .overlay-title { font-size: 17px; font-weight: 700; color: var(--accent); }
+  .overlay-desc { font-size: 12px; color: var(--text-dim); line-height: 1.7; }
+  .overlay-desc code { color: var(--accent); font-size: 11px; }
+  .retry-btn { margin-top: 6px; padding: 10px 24px; background: var(--accent); color: #000; font-weight: 700; border: none; border-radius: 10px; font-size: 13px; cursor: pointer; }
+
+  /* 토스트 */
+  .toast {
+    position: fixed; bottom: 72px; left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: #1E1E1E; border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 18px;
+    font-size: 13px; white-space: nowrap;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 300; max-width: 90vw; text-align: center;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.ok { border-color: var(--green); color: var(--green); }
+  .toast.err { border-color: var(--red); color: var(--red); }
+
+  /* 푸터 */
+  .footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(13,13,13,0.96); border-top: 1px solid var(--border);
+    padding: 9px 16px; font-size: 10px; color: var(--text-muted); text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-icon">PC</div>
+    <div>
+      <div class="brand-name">PC 런처</div>
+      <div class="brand-sub">태블릿 → 집 PC</div>
+    </div>
+  </div>
+  <div class="status">
+    <div class="dot wait" id="dot"></div>
+    <span id="statusTxt">연결 중...</span>
+  </div>
+</header>
+
+<!-- 히스토리 -->
+<div class="history-section">
+  <div class="section-label">최근 실행</div>
+  <div class="history-list" id="historyList">
+    <div class="history-empty">실행 기록 없음</div>
+  </div>
+</div>
+
+<!-- 탭 -->
+<div class="tabs" id="tabs">
+  <button class="tab active" data-cat="all" onclick="filterCat('all')">전체</button>
+  <button class="tab" data-cat="office" onclick="filterCat('office')">💼 Office</button>
+  <button class="tab" data-cat="daw" onclick="filterCat('daw')">🎛️ DAW</button>
+  <button class="tab" data-cat="browser" onclick="filterCat('browser')">🌐 브라우저</button>
+  <button class="tab" data-cat="remote" onclick="filterCat('remote')">🖥️ 원격</button>
+</div>
+
+<!-- 그리드 -->
+<div class="grid" id="grid"></div>
+
+<!-- 오프라인 -->
+<div class="overlay" id="overlay">
+  <div class="overlay-icon">🔌</div>
+  <div class="overlay-title">PC 서버 연결 안 됨</div>
+  <div class="overlay-desc">
+    PC에서 <strong>start.bat</strong> 실행했나요?<br><br>
+    WSL에서:<br>
+    <code>adb reverse tcp:7777 tcp:7777</code>
+  </div>
+  <button class="retry-btn" onclick="checkServer()">다시 연결</button>
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<!-- 푸터 -->
+<div class="footer">PC Launch Server · localhost:7777 · ADB reverse tunnel</div>
+
+<script>
+const SERVER = 'http://localhost:7777';
+const CAT_COLOR = { daw:'#FF6B6B', office:'#4ECDC4', browser:'#45B7D1', remote:'#DDA0DD' };
+const OFFICE_STYLE = {
+  excel:      { bg:'#217346', label:'X', color:'#fff' },
+  word:       { bg:'#2B579A', label:'W', color:'#fff' },
+  powerpoint: { bg:'#D24726', label:'P', color:'#fff' },
+  outlook:    { bg:'#0078D4', label:'O', color:'#fff' },
+  onenote:    { bg:'#7719AA', label:'N', color:'#fff' },
+};
+
+let allApps = [];
+let currentCat = 'all';
+let history = JSON.parse(localStorage.getItem('launch_history') || '[]');
+
+// ── 서버 확인 ──────────────────────────────────────────────
+async function checkServer() {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('statusTxt');
+  dot.className = 'dot wait'; txt.textContent = '연결 중...';
+  try {
+    const res = await fetch(`${SERVER}/apps`, { signal: AbortSignal.timeout(3000) });
+    const data = await res.json();
+    allApps = data.apps || [];
+    dot.className = 'dot on';
+    txt.textContent = `연결됨 · ${allApps.length}개`;
+    document.getElementById('overlay').classList.remove('show');
+    renderGrid();
+    renderHistory();
+  } catch {
+    dot.className = 'dot';
+    txt.textContent = '서버 오프라인';
+    document.getElementById('overlay').classList.add('show');
+  }
+}
+
+// ── 히스토리 렌더 ──────────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (!history.length) {
+    el.innerHTML = '<div class="history-empty">실행 기록 없음</div>';
+    return;
+  }
+  el.innerHTML = history.slice(0, 8).map(h => {
+    const icon = renderIconHTML(h.id, h.icon, 22, 32);
+    const ago = timeAgo(h.ts);
+    return `<div class="history-item" onclick="launchApp('${h.id}','${h.name}')">
+      ${icon}
+      <div class="history-name">${h.name}</div>
+      <div class="history-time">${ago}</div>
+    </div>`;
+  }).join('');
+}
+
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return '방금';
+  if (diff < 3600) return `${Math.floor(diff/60)}분 전`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}시간 전`;
+  return `${Math.floor(diff/86400)}일 전`;
+}
+
+function addHistory(id, name, icon) {
+  history = history.filter(h => h.id !== id);
+  history.unshift({ id, name, icon, ts: Date.now() });
+  if (history.length > 20) history = history.slice(0, 20);
+  localStorage.setItem('launch_history', JSON.stringify(history));
+  renderHistory();
+}
+
+// ── 아이콘 렌더 (Office는 컬러박스, 나머지는 이모지) ────────
+function renderIconHTML(id, emoji, officeSize, emojiSize) {
+  if (OFFICE_STYLE[id]) {
+    const s = OFFICE_STYLE[id];
+    return `<div class="office-icon" style="background:${s.bg};width:${officeSize+18}px;height:${officeSize+18}px;font-size:${officeSize}px;color:${s.color}">${s.label}</div>`;
+  }
+  return `<div style="font-size:${emojiSize}px;line-height:1">${emoji}</div>`;
+}
+
+// ── 그리드 렌더 ────────────────────────────────────────────
+function renderGrid() {
+  const grid = document.getElementById('grid');
+  const list = currentCat === 'all' ? allApps : allApps.filter(a => a.category === currentCat);
+  grid.innerHTML = list.map(app => `
+    <div class="app-btn ${app.available?'':'unavailable'}" id="btn-${app.id}"
+         onclick="${app.available ? `launchApp('${app.id}','${app.name}')` : ''}">
+      <div class="cat-bar" style="background:${CAT_COLOR[app.category]||'#666'}"></div>
+      <div class="avail-dot ${app.available?'':'no'}"></div>
+      ${renderIconHTML(app.id, app.icon, 22, 30)}
+      <div class="app-name">${app.name}</div>
+    </div>
+  `).join('');
+}
+
+// ── 카테고리 필터 ──────────────────────────────────────────
+function filterCat(cat) {
+  currentCat = cat;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.cat === cat));
+  renderGrid();
+}
+
+// ── 앱 실행 ────────────────────────────────────────────────
+async function launchApp(id, name) {
+  const btn = document.getElementById(`btn-${id}`);
+  if (!btn || btn.classList.contains('unavailable')) return;
+  btn.classList.add('launching');
+  try {
+    const res = await fetch(`${SERVER}/launch?app=${id}`, { signal: AbortSignal.timeout(5000) });
+    const data = await res.json();
+    if (data.ok) {
+      btn.classList.remove('launching'); btn.classList.add('success');
+      const app = allApps.find(a => a.id === id);
+      addHistory(id, name, app?.icon || '📦');
+      showToast(`✅ ${name} 실행됨`, 'ok');
+      setTimeout(() => btn.classList.remove('success'), 2000);
+    } else throw new Error(data.error);
+  } catch(e) {
+    btn.classList.remove('launching'); btn.classList.add('error');
+    showToast(`❌ ${name} 실패`, 'err');
+    setTimeout(() => btn.classList.remove('error'), 2000);
+    if (e.name === 'TimeoutError' || e.name === 'TypeError')
+      document.getElementById('overlay').classList.add('show');
+  }
+}
+
+// ── 토스트 ─────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+checkServer();
+setInterval(checkServer, 30000);
+
+// PWA Service Worker 등록
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./launcher-sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

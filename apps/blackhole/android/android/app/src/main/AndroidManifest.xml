@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 네트워크 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- 화면녹화 (Phase 3) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+
+    <!-- 마이크 (화면녹화 오디오, 동시통역 STT) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <!-- 미디어 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"/>
+
+    <!-- 알림 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- 카메라/마이크 (WebRTC) -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <application
+        android:label="Parksy Studio"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:hardwareAccelerated="true"
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme"/>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- 화면녹화 서비스 -->
+        <service
+            android:name=".RecordingService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false"/>
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2"/>
+    </application>
+</manifest>
