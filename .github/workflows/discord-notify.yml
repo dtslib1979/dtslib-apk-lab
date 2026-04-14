@@ -1,0 +1,51 @@
+name: Discord Notify
+
+on:
+  push:
+    branches: ["main", "master"]
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          REPO="${{ github.repository }}"
+          BRANCH="${{ github.ref_name }}"
+          ACTOR="${{ github.actor }}"
+          SHA="${{ github.sha }}"
+          SHORT_SHA="${SHA:0:7}"
+
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TITLE="🚀 릴리즈: ${{ github.event.release.tag_name }}"
+            DESCRIPTION="${{ github.event.release.name }}"
+            COLOR=5763719
+          else
+            COMMIT_MSG=$(echo "${{ github.event.head_commit.message }}" | head -1)
+            TITLE="📦 새 커밋: ${SHORT_SHA}"
+            DESCRIPTION="${COMMIT_MSG}"
+            COLOR=3447003
+          fi
+
+          URL="https://github.com/${REPO}/commit/${SHA}"
+
+          curl -s -X POST "$DISCORD_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"${TITLE}\",
+                \"description\": \"${DESCRIPTION}\",
+                \"color\": ${COLOR},
+                \"fields\": [
+                  {\"name\": \"레포\", \"value\": \"[\`${REPO}\`](https://github.com/${REPO})\", \"inline\": true},
+                  {\"name\": \"브랜치\", \"value\": \"${BRANCH}\", \"inline\": true},
+                  {\"name\": \"작성자\", \"value\": \"${ACTOR}\", \"inline\": true}
+                ],
+                \"url\": \"${URL}\",
+                \"footer\": {\"text\": \"DTSLIB Discord Bridge\"}
+              }]
+            }"
