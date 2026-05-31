@@ -961,7 +961,7 @@ class MainActivity : FlutterActivity() {
 
     private fun getDeepSeekKey(): String {
         val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
-        return prefs.getString("deepseek_api_key", "") ?: ""
+        return prefs.getString("flutter.deepseek_api_key", "") ?: ""
     }
 
     // ============================================================

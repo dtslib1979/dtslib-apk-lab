@@ -1,33 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import '../core/api_config.dart';
 import '../widgets/stat_item.dart';
 import '../widgets/ai_search_tab.dart';
 import '../widgets/tools_tab.dart';
 import 'settings_screen.dart';
 import 'log_detail_screen.dart';
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
-
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   static const platform = MethodChannel('com.parksy.capture/share');
-
   String get _githubRepoUrl => ApiConfig.githubRepo != null
       ? 'https://github.com/${ApiConfig.githubRepo}/tree/main/logs'
       : '';
-
   // Logs tab state
   List<Map<String, dynamic>> _logs = [];
   List<Map<String, dynamic>> _filteredLogs = [];
@@ -37,42 +30,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   String _searchQuery = '';
   String _sortBy = 'date';
   final TextEditingController _searchController = TextEditingController();
-
   // Tab controller
   late TabController _tabController;
-
   // Tools state
   bool _isExporting = false;
   String? _exportResult;
-
   // MCP Generator state
   bool _isGeneratingMCP = false;
   String? _mcpResult;
-
   // AI Search state
-  final TextEditingController _aiQueryController = TextEditingController();
   bool _isAiSearching = false;
   String? _aiAnswer;
   List<Map<String, dynamic>> _aiReferences = [];
   String? _aiError;
-
   // Search mode: 'search' or 'generate'
-
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
-
   @override
   void dispose() {
     _tabController.dispose();
-    _aiQueryController.dispose();
     super.dispose();
   }
-
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
@@ -88,14 +70,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       setState(() => _isLoading = false);
     }
   }
-
   void _applyFilters() {
     var filtered = List<Map<String, dynamic>>.from(_logs);
-
     if (_showStarredOnly) {
       filtered = filtered.where((log) => log['starred'] == true).toList();
     }
-
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       filtered = filtered.where((log) {
@@ -104,7 +83,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         return name.contains(query) || preview.contains(query);
       }).toList();
     }
-
     switch (_sortBy) {
       case 'size':
         filtered.sort((a, b) => (b['size'] as int).compareTo(a['size'] as int));
@@ -115,10 +93,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       default:
         filtered.sort((a, b) => (b['modified'] as int).compareTo(a['modified'] as int));
     }
-
     _filteredLogs = filtered;
   }
-
   Future<void> _search(String query) async {
     if (query.isEmpty) {
       _searchQuery = '';
@@ -126,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       setState(() {});
       return;
     }
-
     try {
       final results = await platform.invokeMethod<List>('searchLogs', {'query': query});
       setState(() {
@@ -137,7 +112,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       debugPrint('Search error: $e');
     }
   }
-
   Future<void> _toggleStar(String filename, bool currentValue) async {
     await platform.invokeMethod('updateLogMeta', {
       'filename': filename,
@@ -145,7 +119,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
     _loadData();
   }
-
   Future<void> _deleteLog(String filename) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -166,7 +139,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ],
       ),
     );
-
     if (confirm == true) {
       await platform.invokeMethod('deleteLogFile', {'filename': filename});
       _loadData();
@@ -177,7 +149,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       }
     }
   }
-
   Future<void> _openGitHub() async {
     if (_githubRepoUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -190,7 +161,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
-
   Future<void> _openSettings() async {
     final result = await Navigator.push<bool>(
       context,
@@ -200,24 +170,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       setState(() {}); // Refresh to reflect new settings
     }
   }
-
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
-
   String _formatDate(int timestamp) {
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final now = DateTime.now();
     final diff = now.difference(date);
-
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return DateFormat('MM/dd').format(date);
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -270,7 +236,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           : null,
     );
   }
-
   Widget _buildTabBar() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -325,7 +290,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
   Widget _buildLogsTab() {
     return Column(
       children: [
@@ -335,19 +299,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ],
     );
   }
-
-
-
   // ============================================================
   // TOOLS FUNCTIONS
   // ============================================================
-
   Future<void> _exportAllJsonl() async {
     setState(() {
       _isExporting = true;
       _exportResult = null;
     });
-
     try {
       final results = await platform.invokeMethod<List>('convertAllToJsonl');
       if (results == null || results.isEmpty) {
@@ -357,7 +316,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         });
         return;
       }
-
       final sb = StringBuffer();
       int totalLines = 0;
       for (final r in results) {
@@ -368,7 +326,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         sb.writeln('✅ $name  (${count}개 메시지 쌍)');
       }
       sb.writeln('\n총 ${results.length}개 파일, $totalLines개 메시지 쌍');
-
       setState(() {
         _isExporting = false;
         _exportResult = sb.toString();
@@ -380,16 +337,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       });
     }
   }
-
   Future<void> _generateProfile() async {
     setState(() {
       _isExporting = true;
       _exportResult = null;
     });
-
     try {
       final result = await platform.invokeMethod<Map>('generateProfile');
-
       if (result == null || result.containsKey('error')) {
         setState(() {
           _isExporting = false;
@@ -397,17 +351,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         });
         return;
       }
-
       final profile = Map<String, dynamic>.from(result);
       final sb = StringBuffer();
-
       final isAI = profile['ai_analyzed'] == true;
-
       sb.writeln('📊 박씨 워딩 프로파일');
       sb.writeln('═══════════════════════');
       if (isAI) sb.writeln('🤖 AI 분석 (DeepSeek)');
       sb.writeln();
-
       if (isAI) {
         // === AI 기반 프로파일 포맷 ===
         final raw = profile['raw_profile'] as String?;
@@ -424,7 +374,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
             sb.writeln();
           }
-
           // 판단 표현
           final judgments = profile['judgment_expressions'] as List<dynamic>? ?? [];
           if (judgments.isNotEmpty) {
@@ -435,7 +384,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
             sb.writeln();
           }
-
           // 의사결정 패턴
           final decisions = profile['decision_patterns'] as List<dynamic>? ?? [];
           if (decisions.isNotEmpty) {
@@ -447,7 +395,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
             sb.writeln();
           }
-
           // 도메인 용어
           final terms = profile['domain_terminology'] as List<dynamic>? ?? [];
           if (terms.isNotEmpty) {
@@ -458,7 +405,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
             sb.writeln();
           }
-
           // 말투 스펙트럼
           final tone = profile['tone_spectrum'] as Map<String, dynamic>? ?? {};
           if (tone.isNotEmpty) {
@@ -477,7 +423,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
             sb.writeln();
           }
-
           // 커뮤니케이션 스타일
           final style = profile['communication_style'] as Map<String, dynamic>? ?? {};
           if (style.isNotEmpty) {
@@ -492,7 +437,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
             sb.writeln();
           }
-
           // 액션 트리거
           final triggers = profile['action_triggers'] as List<dynamic>? ?? [];
           if (triggers.isNotEmpty) {
@@ -503,7 +447,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             }
             sb.writeln();
           }
-
           // 추천 MCP 도구
           final tools = profile['recommended_mcp_tools'] as List<dynamic>? ?? [];
           if (tools.isNotEmpty) {
@@ -515,7 +458,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             sb.writeln();
           }
         }
-
         // 날짜 범위 (공통)
         final dates = profile['date_range'] as Map<String, dynamic>? ?? {};
         if (dates.isNotEmpty) {
@@ -530,7 +472,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         for (final word in freqTerms.take(15)) {
           sb.writeln('  • $word');
         }
-
         final patterns = (vocab['sentence_patterns'] as List<dynamic>?) ?? [];
         if (patterns.isNotEmpty) {
           sb.writeln();
@@ -539,7 +480,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             sb.writeln('  • $p');
           }
         }
-
         final domains = profile['domain_weights'] as Map<String, dynamic>? ?? {};
         if (domains.isNotEmpty) {
           sb.writeln();
@@ -551,18 +491,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             sb.writeln('  • ${entry.key}: $pct%');
           }
         }
-
         final stats = profile['conversation_stats'] as Map<String, dynamic>? ?? {};
         sb.writeln();
         sb.writeln('📐 대화 통계:');
         sb.writeln('  • 총 턴: ${profile['total_turns']}');
         sb.writeln('  • User 길이: ${(stats['avg_user_tokens'] as num?)?.toStringAsFixed(0) ?? "?"}자');
         sb.writeln('  • Assistant 길이: ${(stats['avg_assistant_tokens'] as num?)?.toStringAsFixed(0) ?? "?"}자');
-
         final dates = profile['date_range'] as Map<String, dynamic>? ?? {};
         sb.writeln('  • 기간: ${dates['earliest']} ~ ${dates['latest']}');
       }
-
       setState(() {
         _isExporting = false;
         _exportResult = sb.toString();
@@ -574,14 +511,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       });
     }
   }
-
   /// MCP 서버 코드 생성 (DeepSeek API 경유)
   Future<void> _generateMCP() async {
     setState(() {
       _isGeneratingMCP = true;
       _mcpResult = null;
     });
-
     try {
       // 먼저 프로파일 추출
       final profile = await platform.invokeMethod<Map>('generateProfile');
@@ -592,15 +527,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         });
         return;
       }
-
       // 프로파일을 JSON 문자열로 변환
       final profileJson = jsonEncode(profile);
-
       // MCP 생성 요청
       final code = await platform.invokeMethod<String>('generateMCP', {
         'profile': profileJson,
       }).timeout(const Duration(seconds: 35));
-
       setState(() {
         _isGeneratingMCP = false;
         _mcpResult = code ?? '생성 실패';
@@ -612,36 +544,29 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       });
     }
   }
-
   Future<void> _askAi(String query, String mode) async {
     if (query.isEmpty) return;
-
     setState(() {
       _isAiSearching = true;
       _aiError = null;
       _aiAnswer = null;
       _aiReferences = [];
     });
-
     try {
       // 1. 로컬 텍스트 검색 (키워드)
       final searchResults = await platform.invokeMethod<List>('searchLogs', {'query': query});
       final refs = searchResults?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
-
       // 2. DeepSeek API 직접 호출
       if (ApiConfig.isDeepSeekConfigured) {
         final contextText = refs.take(5).map((r) =>
           '--- ${r['name']} ---\n${r['preview'] ?? ''}'
         ).join('\n');
-
         final systemPrompt = mode == 'generate'
             ? '당신은 박씨의 개인 지식 비서입니다. 주어진 대화 로그를 분석하고 종합하여 명확하게 답변하세요. 한국어로 응답하세요.'
             : '당신은 박씨의 개인 지식 비서입니다. 주어진 대화 로그에서 질문과 관련된 내용을 찾아 인용하여 답변하세요. 한국어로 응답하세요.';
-
         final userPrompt = contextText.isNotEmpty
             ? '참고 대화 로그:\n$contextText\n\n질문: $query'
             : query;
-
         final res = await http.post(
           Uri.parse('https://api.deepseek.com/v1/chat/completions'),
           headers: {
@@ -657,7 +582,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           }),
         ).timeout(const Duration(seconds: 30));
-
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           setState(() {
@@ -668,7 +592,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           return;
         }
       }
-
       // 3. DeepSeek 없으면 로컬 검색 결과만 표시
       setState(() {
         _isAiSearching = false;
@@ -684,11 +607,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       });
     }
   }
-
   // ============================================================
   // LOGS TAB UI
   // ============================================================
-
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -713,12 +634,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
   Widget _buildStats() {
     final total = _stats['totalLogs'] ?? 0;
     final starred = _stats['starredCount'] ?? 0;
     final size = _formatSize(_stats['totalSize'] ?? 0);
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -737,7 +656,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -815,7 +733,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
   PopupMenuItem<String> _buildSortItem(String value, String label, IconData icon) {
     final isSelected = _sortBy == value;
     return PopupMenuItem(
@@ -833,12 +750,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
   Widget _buildList() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-
     if (_filteredLogs.isEmpty) {
       return Center(
         child: Column(
@@ -865,7 +780,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       );
     }
-
     return RefreshIndicator(
       onRefresh: _loadData,
       color: const Color(0xFF58A6FF),
@@ -876,16 +790,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
   Widget _buildLogCard(Map<String, dynamic> log) {
     final name = log['name'] as String;
     final size = log['size'] as int;
     final modified = log['modified'] as int;
     final preview = log['preview'] as String? ?? '';
     final starred = log['starred'] as bool? ?? false;
-
     final displayName = name.replaceAll('ParksyLog_', '').replaceAll('.md', '');
-
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -965,7 +876,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
     );
   }
-
   void _showAbout() {
     showDialog(
       context: context,
@@ -1001,4 +911,3 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 }
-
