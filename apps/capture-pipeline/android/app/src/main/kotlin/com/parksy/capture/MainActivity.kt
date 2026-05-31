@@ -182,10 +182,10 @@ class MainActivity : FlutterActivity() {
                         val mode = call.argument<String>("mode") ?: "search"
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
-                                val searchResult = onDeviceSearch(query, mode)
+                                val searchResult = localTextSearch(query, mode)
                                 result.success(searchResult)
                             } catch (e: Exception) {
-                                Log.e(TAG, "onDeviceSearch failed", e)
+                                Log.e(TAG, "localTextSearch failed", e)
                                 result.error("SEARCH_ERROR", e.message, null)
                             }
                         }
@@ -243,6 +243,8 @@ class MainActivity : FlutterActivity() {
 
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
+    private var ttsChunkIndex = 0
+    private val ttsChunkSize = 4000
 
     private fun initTTS() {
         if (tts == null) {
@@ -250,7 +252,7 @@ class MainActivity : FlutterActivity() {
                 isTtsReady = (status == TextToSpeech.SUCCESS)
                 if (isTtsReady) {
                     tts?.language = Locale.KOREAN
-                    tts?.setSpeechRate(0.85f)  // 약간 천천히
+                    tts?.setSpeechRate(0.85f)
                     tts?.setPitch(1.0f)
                 }
             }
@@ -260,19 +262,31 @@ class MainActivity : FlutterActivity() {
     private fun speakText(text: String) {
         if (!isTtsReady) initTTS()
         if (!isTtsReady) {
-            // 1초 대기 후 재시도
             Handler(Looper.getMainLooper()).postDelayed({
                 if (isTtsReady) {
-                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+                    speakTextChunked(text)
                 }
             }, 1000)
             return
         }
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        speakTextChunked(text)
+    }
+
+    private fun speakTextChunked(text: String) {
+        ttsChunkIndex = 0
+        val chunks = text.chunked(ttsChunkSize)
+        if (chunks.isEmpty()) return
+
+        // 첫 청크는 QUEUE_FLUSH (기존 재생 중단), 나머지는 QUEUE_ADD (순차 재생)
+        chunks.forEachIndexed { index, chunk ->
+            val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            tts?.speak(chunk, queueMode, null, "tts_chunk_$index")
+        }
     }
 
     private fun stopSpeaking() {
         tts?.stop()
+        ttsChunkIndex = 0
     }
 
     override fun onDestroy() {
@@ -756,91 +770,7 @@ class MainActivity : FlutterActivity() {
     // ============================================================
 
     /**
-     * 온디바이스 검색 진입점.
-     * 1순위: Embed 서버 (localhost:8018) → AI 임베딩 검색
-     * 2순위: 로컬 텍스트 검색 (키워드 매칭)
-     */
-    private suspend fun onDeviceSearch(query: String, mode: String): Map<String, Any> {
-        // 1. MCP 서버 시도 (AI 임베딩 검색)
-        try {
-            val mcpResult = callMcpSearch(query, mode)
-            if (mcpResult != null) {
-                Log.d(TAG, "MCP search succeeded")
-                return mcpResult
-            }
-        } catch (e: Exception) {
-            Log.d(TAG, "MCP server unavailable: ${e.message}")
-        }
-
-        // 2. 로컬 텍스트 검색 (fallback)
-        Log.d(TAG, "Falling back to local text search")
-        return localTextSearch(query, mode)
-    }
-
-    /**
-     * 온디바이스 AI 서버 (localhost:8018) 호출.
-     * Termux Python onnxruntime 임베딩 + transformers MiniLM 사용.
-     */
-    private fun callMcpSearch(query: String, mode: String): Map<String, Any>? {
-        return try {
-            val url = URL("http://localhost:8018/api/tool")
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.setRequestProperty("Content-Type", "application/json")
-            conn.doOutput = true
-            conn.connectTimeout = 5000
-            conn.readTimeout = 15000
-
-            val payload = JSONObject().apply {
-                put("tool", when (mode) {
-                    "generate" -> "llm_generate"
-                    "embed" -> "embed_search"
-                    else -> "embed_search"
-                })
-                put("params", JSONObject().apply {
-                    put("query", query)
-                    put("max_tokens", 1024)
-                    put("model", "phi3:mini-q4")
-                })
-            }
-
-            conn.outputStream.write(payload.toString().toByteArray())
-
-            if (conn.responseCode == 200) {
-                val response = conn.inputStream.bufferedReader().use { it.readText() }
-                val json = JSONObject(response)
-
-                val answer = json.optString("answer", "")
-                val refsArray = json.optJSONArray("references")
-                val refs = mutableListOf<Map<String, Any>>()
-                if (refsArray != null) {
-                    for (i in 0 until refsArray.length()) {
-                        val ref = refsArray.getJSONObject(i)
-                        refs.add(mapOf(
-                            "filename" to ref.optString("filename", ""),
-                            "content" to ref.optString("content", ""),
-                            "similarity" to ref.optDouble("similarity", 0.0),
-                            "metadata" to mapOf(
-                                "date" to ref.optString("date", ""),
-                                "speaker" to ref.optString("speaker", "unknown")
-                            )
-                        ))
-                    }
-                }
-
-                mapOf("answer" to answer, "references" to refs)
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            Log.d(TAG, "MCP call failed: ${e.message}")
-            null
-        }
-    }
-
-    /**
-     * 워딩 프로파일 → MCP 서버 코드 생성 (DeepSeek API 경유)
-     * Embed Server (:8018)의 llm_generate 툴을 사용.
+     * 워딩 프로파일 → MCP 서버 코드 생성 (DeepSeek API 직접 호출)
      */
     private fun generateMCP(profileJson: String): String {
         val prompt = buildString {
@@ -867,20 +797,30 @@ class MainActivity : FlutterActivity() {
         }
 
         return try {
-            val url = URL("http://localhost:8018/api/tool")
+            val apiKey = getDeepSeekKey()
+            if (apiKey.isEmpty()) return "API 키가 설정되지 않았습니다. Settings에서 DeepSeek API 키를 입력하세요."
+
+            val url = URL("https://api.deepseek.com/v1/chat/completions")
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
             conn.doOutput = true
-            conn.connectTimeout = 5000
-            conn.readTimeout = 30000
+            conn.connectTimeout = 10000
+            conn.readTimeout = 60000
 
             val payload = JSONObject().apply {
-                put("tool", "llm_generate")
-                put("params", JSONObject().apply {
-                    put("query", prompt)
-                    put("max_tokens", 4096)
-                    put("system_prompt", "당신은 MCP 서버를 생성하는 전문가입니다. 실행 가능한 코드만 출력합니다.")
+                put("model", "deepseek-chat")
+                put("max_tokens", 4096)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", "당신은 MCP 서버를 생성하는 전문가입니다. 실행 가능한 코드만 출력합니다.")
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
                 })
             }
 
@@ -889,12 +829,12 @@ class MainActivity : FlutterActivity() {
             if (conn.responseCode == 200) {
                 val response = conn.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
-                json.optString("answer", "MCP 서버 생성 실패")
+                json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content", "생성 실패")
             } else {
-                "MCP 서버 오류: HTTP ${conn.responseCode}"
+                "API 오류: HTTP ${conn.responseCode}"
             }
         } catch (e: Exception) {
-            "MCP 생성 오류: Embed Server 필요 — Termux에서 parksy_embed_server.py 실행 중인지 확인"
+            "MCP 생성 오류: ${e.message}"
         }
     }
 
@@ -1017,6 +957,11 @@ class MainActivity : FlutterActivity() {
         }
 
         return sb.toString()
+    }
+
+    private fun getDeepSeekKey(): String {
+        val prefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
+        return prefs.getString("deepseek_api_key", "") ?: ""
     }
 
     // ============================================================
@@ -1294,29 +1239,39 @@ class MainActivity : FlutterActivity() {
             appendLine("---")
         }    
         return try {
-            val url = URL("http://localhost:8018/api/tool")
+            val apiKey = getDeepSeekKey()
+            if (apiKey.isEmpty()) return mapOf("error" to "API 키가 설정되지 않았습니다.", "ai_analyzed" to false)
+
+            val url = URL("https://api.deepseek.com/v1/chat/completions")
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
             conn.doOutput = true
             conn.connectTimeout = 10000
-            conn.readTimeout = 60000
-    
+            conn.readTimeout = 120000
+
             val payload = JSONObject().apply {
-                put("tool", "llm_generate")
-                put("params", JSONObject().apply {
-                    put("query", prompt)
-                    put("max_tokens", 4096)
-                    put("system_prompt", "당신은 언어학적 프로파일링 전문가입니다. 대화 로그에서 화자의 워딩/액션/딕션 특징을 정확히 추출하여 JSON으로 출력합니다.")
+                put("model", "deepseek-chat")
+                put("max_tokens", 4096)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", "당신은 언어학적 프로파일링 전문가입니다. 대화 로그에서 화자의 워딩/액션/딕션 특징을 정확히 추출하여 JSON으로 출력합니다.")
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
                 })
             }
-    
+
             conn.outputStream.write(payload.toString().toByteArray())
-    
+
             if (conn.responseCode == 200) {
                 val response = conn.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
-                val answer = json.optString("answer", "")
+                val answer = json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content", "")
     
                 if (answer.isNotBlank()) {
                     // DeepSeek 응답에서 JSON 블록 추출
