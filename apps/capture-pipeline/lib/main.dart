@@ -84,84 +84,32 @@ class ParksyCaptureApp extends StatelessWidget {
 // ============================================================
 
 class ApiConfig {
-  static const String _keyOpenAI = 'openai_api_key';
-  static const String _keyClaude = 'claude_api_key';
-  static const String _keySupabaseUrl = 'supabase_url';
-  static const String _keySupabaseKey = 'supabase_key';
   static const String _keyGitHubRepo = 'github_repo';
   static const String _keyGitHubToken = 'github_token';
+  static const String _keyOnDevice = 'on_device_mode';
 
-  static String? openaiKey;   // 임베딩 전용 (OpenAI — 대체 불가)
-  static String? claudeKey;   // RAG 답변 생성 (Claude API)
-  static String? supabaseUrl;
-  static String? supabaseKey;
   static String? githubRepo;
   static String? githubToken;
+  static bool onDeviceMode = true;  // 기본값: 온디바이스
 
-  static bool get isAiConfigured =>
-      claudeKey != null &&
-      claudeKey!.isNotEmpty &&
-      openaiKey != null &&
-      openaiKey!.isNotEmpty &&
-      supabaseUrl != null &&
-      supabaseUrl!.isNotEmpty &&
-      supabaseKey != null &&
-      supabaseKey!.isNotEmpty;
-
+  static bool get isAiConfigured => true;  // v11: 항상 사용 가능 (온디바이스)
   static bool get isGitHubConfigured =>
       githubToken != null && githubToken!.isNotEmpty &&
       githubRepo != null && githubRepo!.isNotEmpty;
 
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-
-    // 디버그
-    final rawToken = prefs.getString(_keyGitHubToken);
-    debugPrint('DEBUG load - raw token length: ${rawToken?.length}, first10: ${rawToken != null && rawToken.length > 10 ? rawToken.substring(0, 10) : rawToken}');
-
-    // SharedPreferences에서만 읽기 (환경변수 하드코딩 문제 해결)
-    openaiKey = prefs.getString(_keyOpenAI)?.trim();
-    claudeKey = prefs.getString(_keyClaude)?.trim();
     githubToken = prefs.getString(_keyGitHubToken)?.trim();
-
-    debugPrint('DEBUG load - final githubToken length: ${githubToken?.length}');
-
-    // githubRepo는 기본값 유지 (개인용 앱이므로)
     githubRepo = (prefs.getString(_keyGitHubRepo) ?? 'dtslib1979/parksy-logs').trim();
-
-    supabaseUrl = prefs.getString(_keySupabaseUrl)?.trim();
-    supabaseKey = prefs.getString(_keySupabaseKey)?.trim();
+    onDeviceMode = prefs.getBool(_keyOnDevice) ?? true;
   }
 
   static Future<void> save({
-    String? openai,
-    String? claude,
-    String? supabaseUrlVal,
-    String? supabaseKeyVal,
     String? githubRepoVal,
     String? githubTokenVal,
+    bool? onDeviceModeVal,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (openai != null) {
-      final trimmed = openai.trim();
-      await prefs.setString(_keyOpenAI, trimmed);
-      openaiKey = trimmed;
-    }
-    if (claude != null) {
-      final trimmed = claude.trim();
-      await prefs.setString(_keyClaude, trimmed);
-      claudeKey = trimmed;
-    }
-    if (supabaseUrlVal != null) {
-      final trimmed = supabaseUrlVal.trim();
-      await prefs.setString(_keySupabaseUrl, trimmed);
-      supabaseUrl = trimmed;
-    }
-    if (supabaseKeyVal != null) {
-      final trimmed = supabaseKeyVal.trim();
-      await prefs.setString(_keySupabaseKey, trimmed);
-      supabaseKey = trimmed;
-    }
     if (githubRepoVal != null) {
       final trimmed = githubRepoVal.trim();
       await prefs.setString(_keyGitHubRepo, trimmed);
@@ -169,9 +117,12 @@ class ApiConfig {
     }
     if (githubTokenVal != null) {
       final trimmed = githubTokenVal.trim();
-      debugPrint('DEBUG save - token length: ${trimmed.length}');
       await prefs.setString(_keyGitHubToken, trimmed);
       githubToken = trimmed;
+    }
+    if (onDeviceModeVal != null) {
+      await prefs.setBool(_keyOnDevice, onDeviceModeVal);
+      onDeviceMode = onDeviceModeVal;
     }
   }
 }
@@ -603,7 +554,7 @@ class _ShareHandlerState extends State<ShareHandler> with SingleTickerProviderSt
 }
 
 // ============================================================
-// SETTINGS SCREEN - API 키 설정
+// SETTINGS SCREEN - 온디바이스 모드 설정
 // ============================================================
 
 class SettingsScreen extends StatefulWidget {
@@ -614,14 +565,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _claudeController = TextEditingController();
-  final _openaiController = TextEditingController();
-  final _supabaseUrlController = TextEditingController();
-  final _supabaseKeyController = TextEditingController();
+  late bool _onDeviceMode;
   final _githubRepoController = TextEditingController();
   final _githubTokenController = TextEditingController();
-  bool _obscureClaude = true;
-  bool _obscureOpenAI = true;
   bool _obscureGitHub = true;
   bool _isSaving = false;
   bool _isTesting = false;
@@ -630,20 +576,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _claudeController.text = ApiConfig.claudeKey ?? '';
-    _openaiController.text = ApiConfig.openaiKey ?? '';
-    _supabaseUrlController.text = ApiConfig.supabaseUrl ?? '';
-    _supabaseKeyController.text = ApiConfig.supabaseKey ?? '';
+    _onDeviceMode = ApiConfig.onDeviceMode;
     _githubRepoController.text = ApiConfig.githubRepo ?? '';
     _githubTokenController.text = ApiConfig.githubToken ?? '';
   }
 
   @override
   void dispose() {
-    _claudeController.dispose();
-    _openaiController.dispose();
-    _supabaseUrlController.dispose();
-    _supabaseKeyController.dispose();
     _githubRepoController.dispose();
     _githubTokenController.dispose();
     super.dispose();
@@ -652,17 +591,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     setState(() => _isSaving = true);
     await ApiConfig.save(
-      claude: _claudeController.text.trim(),
-      openai: _openaiController.text.trim(),
-      supabaseUrlVal: _supabaseUrlController.text.trim(),
-      supabaseKeyVal: _supabaseKeyController.text.trim(),
       githubRepoVal: _githubRepoController.text.trim(),
       githubTokenVal: _githubTokenController.text.trim(),
+      onDeviceModeVal: _onDeviceMode,
     );
     setState(() => _isSaving = false);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings saved')),
+        const SnackBar(content: Text('저장됨')),
       );
       Navigator.pop(context, true);
     }
@@ -723,7 +659,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final hasRepo = scopes.contains('repo') || scopes.contains('public_repo');
       results.add({
         'step': '2. 권한 체크',
-        'ok': hasRepo || scopes.isEmpty, // Fine-grained token은 scopes 없음
+        'ok': hasRepo || scopes.isEmpty,
         'msg': scopes.isEmpty ? 'Fine-grained token' : scopes,
       });
     } catch (e) {
@@ -765,7 +701,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // 4. 테스트 업로드
     if (repo.isNotEmpty && results.where((r) => r['ok'] == true).length >= 2) {
       try {
-        final testPath = 'logs/2025/12/_TEST_CONNECTION.md';
+        final testPath = 'logs/_test_connection.md';
         final testContent = '# Connection Test\nTime: ${DateTime.now()}\n';
 
         final res = await http.put(
@@ -788,7 +724,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'msg': '성공! 파일 생성됨',
           });
         } else if (res.statusCode == 422) {
-          // 이미 파일 존재 - SHA 필요
           results.add({
             'step': '4. 테스트 업로드',
             'ok': true,
@@ -811,12 +746,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _testResults = results;
     });
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('설정'),
         actions: [
           _isSaving
               ? const Padding(
@@ -836,35 +770,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // AI Search Section
-          _buildSectionHeader('AI Search (RAG)', Icons.psychology),
+          // 온디바이스 RAG 모드
+          _buildSectionHeader('온디바이스 RAG', Icons.psychology),
           const SizedBox(height: 12),
-          _buildTextField(
-            controller: _claudeController,
-            label: 'Claude API Key (답변 생성)',
-            hint: 'sk-ant-...',
-            obscure: _obscureClaude,
-            onToggleObscure: () => setState(() => _obscureClaude = !_obscureClaude),
-          ),
-          const SizedBox(height: 12),
-          _buildTextField(
-            controller: _openaiController,
-            label: 'OpenAI API Key (임베딩 전용)',
-            hint: 'sk-proj-...',
-            obscure: _obscureOpenAI,
-            onToggleObscure: () => setState(() => _obscureOpenAI = !_obscureOpenAI),
-          ),
-          const SizedBox(height: 12),
-          _buildTextField(
-            controller: _supabaseUrlController,
-            label: 'Supabase URL',
-            hint: 'https://xxx.supabase.co',
-          ),
-          const SizedBox(height: 12),
-          _buildTextField(
-            controller: _supabaseKeyController,
-            label: 'Supabase Anon Key',
-            hint: 'sb_...',
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _onDeviceMode ? Icons.check_circle : Icons.cancel,
+                        size: 20,
+                        color: _onDeviceMode ? const Color(0xFF7EE787) : Colors.grey,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '온디바이스 모드',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Text(
+                              _onDeviceMode
+                                  ? '인터넷 불필요 · 0원 · NPU 가속'
+                                  : 'GitHub 동기화만 사용',
+                              style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _onDeviceMode,
+                        onChanged: (val) => setState(() => _onDeviceMode = val),
+                        activeColor: const Color(0xFF58A6FF),
+                      ),
+                    ],
+                  ),
+                  if (_onDeviceMode) ...[
+                    const SizedBox(height: 12),
+                    const Divider(color: Color(0xFF30363D)),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.memory, '엔진', '온디바이스 LLM + 임베딩'),
+                    const SizedBox(height: 4),
+                    _buildInfoRow(Icons.wifi_off, '네트워크', '오프라인 작동'),
+                    const SizedBox(height: 4),
+                    _buildInfoRow(Icons.monetization_on, '비용', '과금 0원/월'),
+                  ],
+                ],
+              ),
+            ),
           ),
 
           const SizedBox(height: 32),
@@ -1100,8 +1059,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildStatusCard() {
-    final aiOk = _openaiController.text.isNotEmpty;
-    final githubOk = _githubRepoController.text.isNotEmpty && _githubTokenController.text.isNotEmpty;
+    final gitHubOk = _githubRepoController.text.isNotEmpty && _githubTokenController.text.isNotEmpty;
 
     return Card(
       child: Padding(
@@ -1109,11 +1067,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('상태', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            _buildStatusRow('AI Search', aiOk),
+            _buildStatusRow('온디바이스 모드', _onDeviceMode),
             const SizedBox(height: 8),
-            _buildStatusRow('GitHub Sync', githubOk),
+            _buildStatusRow('GitHub Sync', gitHubOk),
           ],
         ),
       ),
@@ -1132,12 +1090,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Text(label),
         const Spacer(),
         Text(
-          ok ? 'Configured' : 'Not set',
+          ok ? 'On' : 'Off',
           style: TextStyle(
             color: ok ? const Color(0xFF7EE787) : Colors.grey,
             fontSize: 12,
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[500]),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+        const Spacer(),
+        Text(value, style: const TextStyle(fontSize: 12, color: Color(0xFF7EE787))),
       ],
     );
   }
@@ -1174,6 +1144,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   // Tab controller
   late TabController _tabController;
 
+  // Tools state
+  bool _isExporting = false;
+  String? _exportResult;
+
+  // MCP Generator state
+  bool _isGeneratingMCP = false;
+  String? _mcpResult;
+
   // AI Search state
   final TextEditingController _aiQueryController = TextEditingController();
   final SpeechToText _speech = SpeechToText();
@@ -1189,7 +1167,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
 
@@ -1359,6 +1337,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 children: [
                   _buildLogsTab(),
                   _buildAiSearchTab(),
+                  _buildToolsTab(),
                 ],
               ),
             ),
@@ -1416,6 +1395,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.build_outlined, size: 18),
+                SizedBox(width: 8),
+                Text('Tools'),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1431,9 +1420,577 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  Widget _buildToolsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // JSONL 변환 섹션
+          _buildSectionHeader('텍스트 변환기', Icons.transform),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.code, size: 20, color: Color(0xFF58A6FF)),
+                      SizedBox(width: 8),
+                      Text('로그 → JSONL 변환',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '저장된 로그를 LLAMA/GPT 파인튜닝 포맷으로 변환합니다.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: _isExporting ? null : _exportAllJsonl,
+                      icon: _isExporting
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.file_download, size: 20),
+                      label: Text(_isExporting ? '변환 중...' : '전체 JSONL 내보내기'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF238636),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF21262D),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  if (_exportResult != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D1117),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF30363D)),
+                      ),
+                      child: Text(
+                        _exportResult!,
+                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // MCP 생성기 섹션 (Phase 3)
+          _buildSectionHeader('워딩 프로파일러', Icons.person_search),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.auto_awesome, size: 20, color: Color(0xFF8B5CF6)),
+                      SizedBox(width: 8),
+                      Text('박씨 워딩 프로파일',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '대화 로그를 분석하여 말투/워딩/성향 프로파일을 추출합니다.\nMCP 서버 자동 생성에 사용됩니다.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _generateProfile,
+                      icon: const Icon(Icons.construction, size: 20),
+                      label: const Text('프로파일 추출'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF8B5CF6),
+                        side: const BorderSide(color: Color(0xFF8B5CF6)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  if (_exportResult != null && _exportResult!.contains('프로파일')) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D1117),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF30363D)),
+                      ),
+                      child: Text(
+                        _exportResult!,
+                        style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // MCP 서버 생성기 섹션 (Phase 3-B)
+          _buildSectionHeader('MCP 서버 생성기', Icons.dns),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.terminal, size: 20, color: Color(0xFFF59E0B)),
+                      SizedBox(width: 8),
+                      Text('mcp-parksy-v1.js 생성',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '워딩 프로파일을 기반으로 박씨 전용 MCP 서버 코드를 생성합니다.\n'
+                    '7번 위젯에 바로 배포 가능한 Node.js 서버입니다.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _isGeneratingMCP ? null : _generateMCP,
+                      icon: _isGeneratingMCP
+                          ? const SizedBox(
+                              width: 20, height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.dns, size: 20),
+                      label: Text(_isGeneratingMCP ? '생성 중...' : 'MCP 서버 생성'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFF59E0B),
+                        side: const BorderSide(color: Color(0xFFF59E0B)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  if (_mcpResult != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D1117),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF30363D)),
+                      ),
+                      child: SelectableText(
+                        _mcpResult!,
+                        style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // 한국어↔영어 변환 (Phase 2-B)
+          _buildSectionHeader('언어 변환기', Icons.translate),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.g_translate, size: 20, color: Color(0xFF7EE787)),
+                      SizedBox(width: 8),
+                      Text('한국어 ↔ 영어',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '저장된 로그를 영어 파인튜닝 데이터로 변환합니다.\n'
+                    'ML Kit 온디바이스 번역 또는 MCP LLM 경유.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('ML Kit 번역 — Google Play Services 필요')),
+                        );
+                      },
+                      icon: const Icon(Icons.translate, size: 20),
+                      label: const Text('영어 JSONL 변환'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF7EE787),
+                        side: const BorderSide(color: Color(0xFF7EE787)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // 온디바이스 상태
+          _buildSectionHeader('시스템 상태', Icons.memory),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoRow(Icons.psychology, 'AI 엔진', '온디바이스 (로컬 텍스트 검색)'),
+                  const SizedBox(height: 4),
+                  _buildInfoRow(Icons.transform, '포맷 변환', 'JSONL 지원'),
+                  const SizedBox(height: 4),
+                  _buildInfoRow(Icons.cloud_off, '네트워크', '오프라인 작동'),
+                  const SizedBox(height: 4),
+                  _buildInfoRow(Icons.monetization_on, '비용', '과금 0원/월'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[500]),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+        const Spacer(),
+        Text(value, style: const TextStyle(fontSize: 12, color: Color(0xFF7EE787))),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF58A6FF)),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF58A6FF),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ============================================================
-  // AI SEARCH TAB
+  // TOOLS FUNCTIONS
   // ============================================================
+
+  Future<void> _exportAllJsonl() async {
+    setState(() {
+      _isExporting = true;
+      _exportResult = null;
+    });
+
+    try {
+      final results = await platform.invokeMethod<List>('convertAllToJsonl');
+      if (results == null || results.isEmpty) {
+        setState(() {
+          _isExporting = false;
+          _exportResult = '변환할 로그가 없습니다.';
+        });
+        return;
+      }
+
+      final sb = StringBuffer();
+      int totalLines = 0;
+      for (final r in results) {
+        final map = Map<String, dynamic>.from(r);
+        final name = map['filename'] as String? ?? 'unknown';
+        final count = map['count'] as int? ?? 0;
+        totalLines += count;
+        sb.writeln('✅ $name  (${count}개 메시지 쌍)');
+      }
+      sb.writeln('\n총 ${results.length}개 파일, $totalLines개 메시지 쌍');
+
+      setState(() {
+        _isExporting = false;
+        _exportResult = sb.toString();
+      });
+    } catch (e) {
+      setState(() {
+        _isExporting = false;
+        _exportResult = '오류: $e';
+      });
+    }
+  }
+
+  Future<void> _generateProfile() async {
+    setState(() {
+      _isExporting = true;
+      _exportResult = null;
+    });
+
+    try {
+      final result = await platform.invokeMethod<Map>('generateProfile');
+
+      if (result == null || result.containsKey('error')) {
+        setState(() {
+          _isExporting = false;
+          _exportResult = result?['error'] as String? ?? '프로파일 생성 실패';
+        });
+        return;
+      }
+
+      final profile = Map<String, dynamic>.from(result);
+      final sb = StringBuffer();
+
+      final isAI = profile['ai_analyzed'] == true;
+
+      sb.writeln('📊 박씨 워딩 프로파일');
+      sb.writeln('═══════════════════════');
+      if (isAI) sb.writeln('🤖 AI 분석 (DeepSeek)');
+      sb.writeln();
+
+      if (isAI) {
+        // === AI 기반 프로파일 포맷 ===
+        final raw = profile['raw_profile'] as String?;
+        if (raw != null) {
+          sb.writeln(raw);
+        } else {
+          // 동사 패턴
+          final verbPatterns = profile['verb_patterns'] as List<dynamic>? ?? [];
+          if (verbPatterns.isNotEmpty) {
+            sb.writeln('🔤 동사 패턴 (명령/지시형):');
+            for (final v in verbPatterns) {
+              final p = v as Map<String, dynamic>;
+              sb.writeln('  • ${p['pattern']} (${p['count']}회) — ${p['context']}');
+            }
+            sb.writeln();
+          }
+
+          // 판단 표현
+          final judgments = profile['judgment_expressions'] as List<dynamic>? ?? [];
+          if (judgments.isNotEmpty) {
+            sb.writeln('⚖️  판단/확인 표현:');
+            for (final j in judgments) {
+              final jm = j as Map<String, dynamic>;
+              sb.writeln('  • ${jm['expression']} (${jm['count']}회) — ${jm['context']}');
+            }
+            sb.writeln();
+          }
+
+          // 의사결정 패턴
+          final decisions = profile['decision_patterns'] as List<dynamic>? ?? [];
+          if (decisions.isNotEmpty) {
+            sb.writeln('🧠 의사결정 패턴:');
+            for (final d in decisions) {
+              final dm = d as Map<String, dynamic>;
+              sb.writeln('  • ${dm['pattern']} (${dm['count']}회)');
+              if (dm['example'] != null) sb.writeln('    예: ${dm['example']}');
+            }
+            sb.writeln();
+          }
+
+          // 도메인 용어
+          final terms = profile['domain_terminology'] as List<dynamic>? ?? [];
+          if (terms.isNotEmpty) {
+            sb.writeln('📁 도메인 용어:');
+            for (final t in terms) {
+              final tm = t as Map<String, dynamic>;
+              sb.writeln('  • ${tm['term']} (${tm['count']}회, ${tm['category'] ?? "?"})');
+            }
+            sb.writeln();
+          }
+
+          // 말투 스펙트럼
+          final tone = profile['tone_spectrum'] as Map<String, dynamic>? ?? {};
+          if (tone.isNotEmpty) {
+            sb.writeln('🎭 말투 스펙트럼:');
+            final toneList = tone.entries.toList()
+              ..sort((a, b) => (b.value as num).compareTo(a.value as num));
+            for (final entry in toneList) {
+              final pct = ((entry.value as num) * 100).toStringAsFixed(0);
+              final label = switch (entry.key) {
+                'direct_command' => '직접 명령',
+                'casual_question' => '편한 질문',
+                'formal_statement' => '격식 진술',
+                _ => entry.key,
+              };
+              sb.writeln('  • $label: $pct%');
+            }
+            sb.writeln();
+          }
+
+          // 커뮤니케이션 스타일
+          final style = profile['communication_style'] as Map<String, dynamic>? ?? {};
+          if (style.isNotEmpty) {
+            sb.writeln('💬 커뮤니케이션 스타일:');
+            sb.writeln('  • 문장 길이: ${style['avg_sentence_length'] ?? "?"}');
+            sb.writeln('  • 이모지 사용: ${style['emoji_usage'] ?? "?"}');
+            sb.writeln('  • 타이핑 스타일: ${style['typing_style'] ?? "?"}');
+            sb.writeln('  • 격식 수준: ${style['formality'] ?? "?"}');
+            final phrases = style['key_phrases'] as List<dynamic>? ?? [];
+            if (phrases.isNotEmpty) {
+              sb.writeln('  • 핵심 구문: ${phrases.join(", ")}');
+            }
+            sb.writeln();
+          }
+
+          // 액션 트리거
+          final triggers = profile['action_triggers'] as List<dynamic>? ?? [];
+          if (triggers.isNotEmpty) {
+            sb.writeln('🚀 액션 트리거:');
+            for (final t in triggers) {
+              final tm = t as Map<String, dynamic>;
+              sb.writeln('  • "${tm['trigger']}" → ${tm['intent']} (${tm['frequency']})');
+            }
+            sb.writeln();
+          }
+
+          // 추천 MCP 도구
+          final tools = profile['recommended_mcp_tools'] as List<dynamic>? ?? [];
+          if (tools.isNotEmpty) {
+            sb.writeln('🛠️  추천 MCP 도구:');
+            for (final t in tools) {
+              final tm = t as Map<String, dynamic>;
+              sb.writeln('  • ${tm['name']}: ${tm['description']} (trigger: ${tm['trigger']})');
+            }
+            sb.writeln();
+          }
+        }
+
+        // 날짜 범위 (공통)
+        final dates = profile['date_range'] as Map<String, dynamic>? ?? {};
+        if (dates.isNotEmpty) {
+          sb.writeln('📅 분석 기간: ${dates['earliest']} ~ ${dates['latest']}');
+          sb.writeln('📁 로그 파일: ${profile['total_logs']}개');
+        }
+      } else {
+        // === 규칙 기반 프로파일 포맷 (fallback) ===
+        final vocab = profile['vocabulary'] as Map<String, dynamic>? ?? {};
+        final freqTerms = (vocab['frequent_terms'] as List<dynamic>?) ?? [];
+        sb.writeln('🔤 자주 사용하는 단어 (${vocab['total_unique_words']}개 고유 단어):');
+        for (final word in freqTerms.take(15)) {
+          sb.writeln('  • $word');
+        }
+
+        final patterns = (vocab['sentence_patterns'] as List<dynamic>?) ?? [];
+        if (patterns.isNotEmpty) {
+          sb.writeln();
+          sb.writeln('💬 문장 패턴:');
+          for (final p in patterns) {
+            sb.writeln('  • $p');
+          }
+        }
+
+        final domains = profile['domain_weights'] as Map<String, dynamic>? ?? {};
+        if (domains.isNotEmpty) {
+          sb.writeln();
+          sb.writeln('📁 기술 도메인:');
+          final domainList = domains.entries.toList()
+            ..sort((a, b) => (b.value as num).compareTo(a.value as num));
+          for (final entry in domainList) {
+            final pct = ((entry.value as num) * 100).toStringAsFixed(0);
+            sb.writeln('  • ${entry.key}: $pct%');
+          }
+        }
+
+        final stats = profile['conversation_stats'] as Map<String, dynamic>? ?? {};
+        sb.writeln();
+        sb.writeln('📐 대화 통계:');
+        sb.writeln('  • 총 턴: ${profile['total_turns']}');
+        sb.writeln('  • User 길이: ${(stats['avg_user_tokens'] as num?)?.toStringAsFixed(0) ?? "?"}자');
+        sb.writeln('  • Assistant 길이: ${(stats['avg_assistant_tokens'] as num?)?.toStringAsFixed(0) ?? "?"}자');
+
+        final dates = profile['date_range'] as Map<String, dynamic>? ?? {};
+        sb.writeln('  • 기간: ${dates['earliest']} ~ ${dates['latest']}');
+      }
+
+      setState(() {
+        _isExporting = false;
+        _exportResult = sb.toString();
+      });
+    } catch (e) {
+      setState(() {
+        _isExporting = false;
+        _exportResult = '프로파일 오류: $e';
+      });
+    }
+  }
+
+  /// MCP 서버 코드 생성 (DeepSeek API 경유)
+  Future<void> _generateMCP() async {
+    setState(() {
+      _isGeneratingMCP = true;
+      _mcpResult = null;
+    });
+
+    try {
+      // 먼저 프로파일 추출
+      final profile = await platform.invokeMethod<Map>('generateProfile');
+      if (profile == null || profile.containsKey('error')) {
+        setState(() {
+          _isGeneratingMCP = false;
+          _mcpResult = profile?['error'] as String? ?? '프로파일이 없습니다. 먼저 프로파일을 추출해주세요.';
+        });
+        return;
+      }
+
+      // 프로파일을 JSON 문자열로 변환
+      final profileJson = jsonEncode(profile);
+
+      // MCP 생성 요청
+      final code = await platform.invokeMethod<String>('generateMCP', {
+        'profile': profileJson,
+      }).timeout(const Duration(seconds: 35));
+
+      setState(() {
+        _isGeneratingMCP = false;
+        _mcpResult = code ?? '생성 실패';
+      });
+    } catch (e) {
+      setState(() {
+        _isGeneratingMCP = false;
+        _mcpResult = 'MCP 생성 오류: Embed Server(:8018)가 실행 중인지 확인하세요.\n$e';
+      });
+    }
+  }
 
   Widget _buildAiSearchTab() {
     if (!ApiConfig.isAiConfigured) {
@@ -1457,27 +2014,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.settings_outlined, size: 64, color: Colors.grey[600]),
+            Icon(Icons.psychology_outlined, size: 64, color: Colors.grey[600]),
             const SizedBox(height: 24),
             const Text(
-              'AI Search Not Configured',
+              '온디바이스 AI 검색',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Text(
-              'Set up OpenAI API key and Supabase credentials to use AI search.',
+              '인터넷 없이 로컬에서 검색합니다.\nNPU 가속 지원 · 과금 0원',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[400]),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _openSettings,
-              icon: const Icon(Icons.settings),
-              label: const Text('Open Settings'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF238636),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
             ),
           ],
         ),
@@ -1848,11 +2395,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final query = _aiQueryController.text.trim();
     if (query.isEmpty) return;
 
-    if (!ApiConfig.isAiConfigured) {
-      setState(() => _aiError = 'API 키가 설정되지 않았습니다. 설정에서 입력해주세요.');
-      return;
-    }
-
     setState(() {
       _isAiSearching = true;
       _aiError = null;
@@ -1861,136 +2403,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
 
     try {
-      // Step 1: Get embedding for query
-      final embedding = await _getEmbedding(query);
+      if (ApiConfig.onDeviceMode) {
+        // 온디바이스 검색: Kotlin MethodChannel → 로컬 검색
+        final result = await platform.invokeMethod<Map>('onDeviceSearch', {
+          'query': query,
+          'mode': _searchMode,
+        }).timeout(const Duration(seconds: 30));
 
-      // Step 2: Search documents (TOP_K = 10)
-      final documents = await _searchDocuments(embedding);
-
-      if (documents.isEmpty) {
         setState(() {
           _isAiSearching = false;
-          _aiAnswer = '관련된 기록을 찾을 수 없습니다.';
+          _aiAnswer = result?['answer'] as String? ?? '결과 없음';
+          _aiReferences = (result?['references'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e))
+              .toList() ?? [];
         });
-        return;
+      } else {
+        // GitHub 모드: 기존 파일 검색만
+        final searchResults = await platform.invokeMethod<List>('searchLogs', {'query': query});
+        final refs = searchResults?.map((e) => Map<String, dynamic>.from(e)).toList() ?? [];
+        setState(() {
+          _isAiSearching = false;
+          _aiAnswer = refs.isEmpty
+              ? '관련 기록을 찾을 수 없습니다.'
+              : '${refs.length}개의 관련 기록을 찾았습니다.';
+          _aiReferences = refs;
+        });
       }
-
-      // Step 3: Generate answer based on mode
-      final answer = await _generateAnswer(query, documents);
-
-      setState(() {
-        _isAiSearching = false;
-        _aiAnswer = answer;
-        _aiReferences = documents;
-      });
     } catch (e) {
       setState(() {
         _isAiSearching = false;
         _aiError = e.toString();
       });
     }
-  }
-
-  Future<List<double>> _getEmbedding(String text) async {
-    final res = await http.post(
-      Uri.parse('https://api.openai.com/v1/embeddings'),
-      headers: {
-        'Authorization': 'Bearer ${ApiConfig.openaiKey}',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': 'text-embedding-3-small',
-        'input': text,
-      }),
-    ).timeout(const Duration(seconds: 30));
-
-    if (res.statusCode != 200) {
-      throw Exception('임베딩 생성 실패: ${res.statusCode}');
-    }
-
-    final data = jsonDecode(res.body);
-    return List<double>.from(data['data'][0]['embedding']);
-  }
-
-  Future<List<Map<String, dynamic>>> _searchDocuments(List<double> embedding) async {
-    final res = await http.post(
-      Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/rpc/match_documents'),
-      headers: {
-        'Authorization': 'Bearer ${ApiConfig.supabaseKey}',
-        'apikey': ApiConfig.supabaseKey!,
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'query_embedding': embedding,
-        'match_count': 10,  // TOP_K = 10
-        'filter': {},
-      }),
-    ).timeout(const Duration(seconds: 30));
-
-    if (res.statusCode != 200) {
-      throw Exception('문서 검색 실패: ${res.statusCode}');
-    }
-
-    final List<dynamic> data = jsonDecode(res.body);
-    return data.map((e) => Map<String, dynamic>.from(e)).toList();
-  }
-
-  Future<String> _generateAnswer(String query, List<Map<String, dynamic>> docs) async {
-    final context = docs.map((d) {
-      final metadata = d['metadata'] as Map<String, dynamic>? ?? {};
-      final date = metadata['date']?.toString() ?? 'Unknown';
-      final speaker = metadata['speaker']?.toString() ?? 'unknown';
-      final content = d['content'] ?? '';
-      return '[$date, $speaker]\n$content';
-    }).join('\n\n---\n\n');
-
-    // Different system prompts based on mode
-    final systemPrompt = _searchMode == 'search'
-        ? '''당신은 사용자의 과거 기록을 참고해서 답변하는 AI 비서입니다.
-
-규칙:
-1. 제공된 기록을 기반으로 답변하세요
-2. 기록에 없는 내용은 추측하지 마세요
-3. 사용자의 말투와 스타일을 참고하세요
-4. 간결하고 직접적으로 답변하세요
-5. 관련 기록을 인용할 때는 날짜를 언급하세요'''
-        : '''당신은 사용자의 과거 기록을 바탕으로 새로운 글을 종합 생성하는 AI 작가입니다.
-
-규칙:
-1. 제공된 여러 기록의 내용을 종합하여 새로운 글을 작성하세요
-2. 사용자의 생각, 경험, 인사이트를 하나의 흐름으로 엮어주세요
-3. 단순 요약이 아닌, 창의적이고 통찰력 있는 글을 생성하세요
-4. 마크다운 형식으로 구조화하세요 (제목, 소제목, 불릿 등)
-5. 원본 기록의 날짜나 맥락을 자연스럽게 녹여내세요
-6. 최소 500자 이상의 충실한 글을 작성하세요''';
-
-    final userPrompt = _searchMode == 'search'
-        ? '다음은 내 과거 기록입니다:\n\n$context\n\n---\n\n질문: $query\n\n위 기록을 참고해서 답변해줘.'
-        : '다음은 내 과거 기록입니다:\n\n$context\n\n---\n\n주제: $query\n\n위 기록들을 종합하여 이 주제에 대한 새로운 글을 작성해줘. 내 생각과 경험을 바탕으로 인사이트 있는 글을 만들어줘.';
-
-    final res = await http.post(
-      Uri.parse('https://api.anthropic.com/v1/messages'),
-      headers: {
-        'x-api-key': ApiConfig.claudeKey!,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': 'claude-sonnet-4-20250514',
-        'max_tokens': _searchMode == 'search' ? 1024 : 2048,
-        'system': systemPrompt,
-        'messages': [
-          {'role': 'user', 'content': userPrompt},
-        ],
-      }),
-    ).timeout(const Duration(seconds: 60));
-
-    if (res.statusCode != 200) {
-      throw Exception('답변 생성 실패: ${res.statusCode}');
-    }
-
-    final data = jsonDecode(res.body);
-    return data['content'][0]['text'];
   }
 
   // ============================================================
@@ -2356,6 +2800,7 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
   String? _content;
   bool _isLoading = true;
   bool _starred = false;
+  bool _isPlaying = false;
 
   @override
   void initState() {
@@ -2437,6 +2882,26 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
     }
   }
 
+  Future<void> _playTts() async {
+    if (_content == null) return;
+    if (_isPlaying) {
+      await platform.invokeMethod('stopSpeaking');
+      setState(() => _isPlaying = false);
+      return;
+    }
+    final body = _extractBody(_content!);
+    // 앞부분 3000자로 제한 (Android TTS timeout 방지)
+    final text = body.length > 3000 ? body.substring(0, 3000) : body;
+    await platform.invokeMethod('speakText', {'text': text});
+    setState(() => _isPlaying = true);
+    // 30초 후 자동 리셋 (재생 완료 추정)
+    Future.delayed(const Duration(seconds: 30), () {
+      if (mounted && _isPlaying) {
+        setState(() => _isPlaying = false);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final displayName = widget.filename.replaceAll('ParksyLog_', '').replaceAll('.md', '');
@@ -2445,6 +2910,11 @@ class _LogDetailScreenState extends State<LogDetailScreen> {
       appBar: AppBar(
         title: Text(displayName, style: const TextStyle(fontSize: 16, fontFamily: 'monospace')),
         actions: [
+          IconButton(
+            icon: Icon(_isPlaying ? Icons.stop : Icons.play_arrow,
+                        color: _isPlaying ? Colors.greenAccent : null),
+            onPressed: _content != null ? _playTts : null,
+          ),
           IconButton(
             icon: Icon(_starred ? Icons.star : Icons.star_border, color: _starred ? Colors.amber : null),
             onPressed: _toggleStar,

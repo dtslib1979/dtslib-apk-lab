@@ -1,11 +1,12 @@
-# Parksy Capture v3.0.0
+# Parksy Capture v11.0.0
 
-**Lossless Conversation Capture for LLM Power Users**
+**Lossless Conversation Capture for LLM Power Users — Now with On-Device AI**
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.0.0-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-11.0.0-blue" alt="version">
   <img src="https://img.shields.io/badge/platform-Android-green" alt="platform">
   <img src="https://img.shields.io/badge/flutter-3.24-blue" alt="flutter">
+  <img src="https://img.shields.io/badge/ai-ondevice-brightgreen" alt="on-device AI">
 </p>
 
 ---
@@ -26,128 +27,130 @@ Most people give up. They screenshot, summarize, or abandon the data.
 
 ## The Solution
 
-Android **Share Intent** has no size limit.
-
-Instead of copy-paste, share the conversation directly to Parksy Capture.
+Android **Share Intent** bypasses clipboard limits entirely. Share directly → saved as `.md` instantly.
 
 ```
 Select All → Share → Parksy Capture → Done
 ```
 
-No clipboard. No truncation. No data loss.
+No clipboard. No truncation. No data loss. **And now: on-device AI search.**
 
 ---
 
-## Features (v3.0.0)
+## Features (v11.0.0)
 
 ### Core
 | Feature | Description |
 |---------|-------------|
 | 📥 **Lossless Capture** | Share Intent bypasses clipboard limits |
 | 📤 **Re-upload** | Share saved logs back to any LLM app |
-| ☁️ **Cloud Backup** | Auto-sync to GitHub (optional) |
+| ☁️ **GitHub Backup** | Auto-sync (optional, no secret required) |
 
-### Pro UI (New in v3)
+### On-Device AI (New in v11)
 | Feature | Description |
 |---------|-------------|
-| 🔍 **Search** | Full-text search across all logs |
+| 🧠 **AI Search** | Semantic search via MiniLM L6-v2 embedding (384-dim) |
+| 💬 **LLM Q&A** | DeepSeek API powered answers about your logs |
+| 🔍 **Hybrid Search** | AI embedding + keyword fallback (offline-safe) |
+| 🛠️ **Tools Tab** | JSONL converter, wording profiler, MCP generator |
+
+### UI
+| Feature | Description |
+|---------|-------------|
+| 🔎 **Full-Text Search** | Keyword search across all logs |
 | ⭐ **Favorites** | Star important conversations |
 | 📊 **Stats** | Total logs, size, starred count |
 | 👁️ **Preview** | See first 3 lines without opening |
 | 🎨 **GitHub Dark Theme** | Professional dark UI |
-| 📖 **Onboarding** | First-launch tutorial |
 | ⏱️ **Relative Time** | "2h ago" instead of timestamps |
 | 🔄 **Sort Options** | By date, size, or name |
-
----
-
-## App Modes
-
-| Mode | Trigger | Behavior |
-|------|---------|----------|
-| **Capture** | Share from browser | Auto-save, show status, exit |
-| **Browse** | Open app directly | List, search, star, share |
-| **Onboarding** | First launch | 3-page tutorial |
-
----
-
-## Screenshots
-
-```
-┌─────────────────────────┐
-│  Parksy Capture         │
-├─────────────────────────┤
-│  Logs: 24  ⭐ 5  1.2MB  │
-├─────────────────────────┤
-│ 🔍 Search logs...    ⭐ │
-├─────────────────────────┤
-│ ┌─────────────────────┐ │
-│ │ 20251217_143052   ⭐ │ │
-│ │ ChatGPT discussion  │ │
-│ │ about Flutter...    │ │
-│ │ 2h ago • 45KB    🗑️ │ │
-│ └─────────────────────┘ │
-│ ┌─────────────────────┐ │
-│ │ 20251217_120815   ☆ │ │
-│ │ Claude code review  │ │
-│ │ for the new...      │ │
-│ │ 5h ago • 12KB    🗑️ │ │
-│ └─────────────────────┘ │
-└─────────────────────────┘
-```
-
----
-
-## Workflow
-
-### Capture (from browser)
-```
-1. Open LLM web app (ChatGPT, Claude, etc.)
-2. Select entire conversation
-3. Tap Share
-4. Choose "Parksy Capture"
-5. ✓ Saved
-```
-
-### Re-upload (to continue conversation)
-```
-1. Open Parksy Capture
-2. Find the log (search or browse)
-3. Tap to open
-4. Tap "Upload to LLM"
-5. Choose target app (ChatGPT, Claude, etc.)
-6. Paste and continue
-```
 
 ---
 
 ## Technical Architecture
 
 ```
-┌──────────────────────────────────────────┐
-│                 Flutter App              │
-├──────────────────────────────────────────┤
-│  AppRouter → ShareHandler │ HomeScreen   │
-│                           │ LogDetail    │
-│                           │ Onboarding   │
-├──────────────────────────────────────────┤
-│              MethodChannel               │
-├──────────────────────────────────────────┤
-│            MainActivity.kt               │
-│  ┌────────────────────────────────────┐  │
-│  │ Share Intent Handler              │  │
-│  │ File I/O (MediaStore API)         │  │
-│  │ Search (full-text)                │  │
-│  │ Metadata (.parksy-meta.json)      │  │
-│  │ Stats aggregation                 │  │
-│  └────────────────────────────────────┘  │
-├──────────────────────────────────────────┤
-│           Downloads/parksy-logs/         │
-│  ├── ParksyLog_20251217_143052.md       │
-│  ├── ParksyLog_20251217_120815.md       │
-│  └── .parksy-meta.json                  │
-└──────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│              Parksy Capture APK                    │
+├──────────────────────────────────────────────────┤
+│                  Flutter (Dart)                    │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │
+│  │ Capture  │  │ Browse   │  │ Tools          │  │
+│  │ Tab      │  │ Tab      │  │ Tab            │  │
+│  │          │  │          │  │ ┌────────────┐ │  │
+│  │ Share    │  │ Search   │  │ │JSONL 변환  │ │  │
+│  │ 수신     │  │ 목록     │  │ │워딩 프로필 │ │  │
+│  │ 저장     │  │ 상세     │  │ │MCP 생성    │ │  │
+│  └────┬─────┘  └────┬─────┘  │ │언어 변환   │ │  │
+│       │             │        │ └────────────┘ │  │
+│       └──────┬──────┘        └────────────────┘  │
+│              │                                    │
+├──────────────┴────────────────────────────────────┤
+│              MethodChannel (Dart ↔ Kotlin)         │
+├──────────────────────────────────────────────────┤
+│              MainActivity.kt                       │
+│  ┌──────────────────────────────────────────┐     │
+│  │ Share Intent Handler                     │     │
+│  │ File I/O (MediaStore API)                │     │
+│  │ Local Text Search (키워드)               │     │
+│  │ JSONL Converter                          │     │
+│  │ Wording Profiler                         │     │
+│  │ onDeviceSearch(query, mode)              │     │
+│  │   ├─ Embed Server (8018) → 성공          │     │
+│  │   └─ 로컬 텍스트 검색 → fallback         │     │
+│  └──────────────────────────────────────────┘     │
+├──────────────────────────────────────────────────┤
+│         Termux (폰 백그라운드)                     │
+│  ┌──────────────┐  ┌────────────────────────┐    │
+│  │ Embed Server │  │ MCP Server             │    │
+│  │ :8018        │  │ :8015 (Voice TTS)      │    │
+│  │              │  │ :8016 (Audio)          │    │
+│  │ MiniLM 임베딩 │  │ :8020 (Publish)       │    │
+│  │ DeepSeek LLM │  │ :8789 (Webpage)        │    │
+│  └──────────────┘  └────────────────────────┘    │
+├──────────────────────────────────────────────────┤
+│           Downloads/parksy-logs/                  │
+│  ├── ParksyLog_YYYYMMDD_HHMMSS.md               │
+│  ├── ParksyLog_YYYYMMDD_HHMMSS.md               │
+│  └── .parksy-meta.json                           │
+└──────────────────────────────────────────────────┘
 ```
+
+### AI Search Flow
+
+```
+User Question
+  → Dart: platform.invokeMethod('onDeviceSearch')
+  → Kotlin: callMcpSearch(query, mode)
+  → HTTP POST localhost:8018/api/tool
+  → Embed Server:
+       llm_generate → DeepSeek API (클라우드, 한국어 특화)
+       embed_search → MiniLM L6-v2 (온디바이스, 384차원)
+  → Kotlin: fallback to localTextSearch() if server unavailable
+  → Dart: display answer
+```
+
+---
+
+## On-Device AI Details
+
+| Component | Model/Tech | Location | Cost |
+|-----------|-----------|----------|------|
+| **Embedding** | sentence-transformers/all-MiniLM-L6-v2 | Termux (Python) | $0 |
+| **LLM** | DeepSeek V3 (deepseek-chat) | Cloud API | ~$0.27/1M tokens |
+| **Keyword Search** | Kotlin native (frequency scoring) | APK native | $0 |
+| **Cache** | HuggingFace offline (local_files_only) | Termux | $0 |
+
+---
+
+## Tools Tab (v11)
+
+| Tool | Function |
+|------|----------|
+| **JSONL Converter** | .md → .jsonl (conversation turns → {user/assistant} pairs) |
+| **Wording Profiler** | Word frequency, sentence patterns, domain weight analysis |
+| **MCP Server Generator** | From conversation profile → custom MCP tool spec |
+| **Language Converter** | Conversation → English translation (ML Kit) |
 
 ---
 
@@ -164,14 +167,14 @@ source: android-share
 
 ---
 
-## Cloud Backup (Optional)
+## Requirements
 
-Set GitHub secrets for auto-sync:
-
-```
-PARKSY_WORKER_URL=https://your-worker.workers.dev
-PARKSY_API_KEY=your-secret-key
-```
+- Android 8.0+ (API 26)
+- Termux (for AI embedding server)
+  - Python 3.13+
+  - transformers + torch + aiohttp
+  - HuggingFace offline cache (MiniLM)
+- DeepSeek API key (for LLM Q&A)
 
 ---
 
@@ -179,6 +182,8 @@ PARKSY_API_KEY=your-secret-key
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **11.0.0** | 2026-05 | On-device AI (MiniLM+DeepSeek), Tools tab, no cloud APIs |
+| 10.0.8 | 2026-05 | MCP integration preparation |
 | 3.0.0 | 2025-12 | Pro UI, search, favorites, stats, onboarding |
 | 2.1.0 | 2025-12 | Log browser, re-share |
 | 2.0.0 | 2025-12 | Cloud backup, crash fixes |
@@ -198,7 +203,7 @@ PARKSY_API_KEY=your-secret-key
 
 ## Philosophy
 
-> When copy-paste fails, capture the entire conversation as a file — and re-upload it anytime.
+> On-device AI isn't just cheaper — it's private, permanent, and always available.
 
 Most people consume LLM output.  
-Parksy Capture is for people who **collect it**.
+Parksy Capture is for people who **own it**.
