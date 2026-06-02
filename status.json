@@ -1,7 +1,9 @@
 {
   "repo": "dtslib-apk-lab",
   "status": "active",
+  "role": "production",
   "app_count": 8,
-  "last_updated": "2026-05-30",
+  "archived_count": 4,
+  "last_updated": "2026-06-02",
   "health": "ok"
 }

@@ -3,7 +3,16 @@
   "name": "DTSlib APK Lab",
   "role": "production",
   "description": "Android APK 개발/배포 실험실 — 폰 특화 앱 8개",
+  "type": "github-pages",
+  "owner": "dtslib1979",
   "github": "https://github.com/dtslib1979/dtslib-apk-lab",
   "pages": "https://dtslib1979.github.io/dtslib-apk-lab/",
-  "updated": "2026-05-30"
+  "language": "ko",
+  "phone_primary": true,
+  "hub": false,
+  "tech_stack": ["Flutter", "Dart", "Kotlin", "Android"],
+  "app_count": 8,
+  "archived_count": 4,
+  "store": "Google Play",
+  "updated": "2026-06-02"
 }
