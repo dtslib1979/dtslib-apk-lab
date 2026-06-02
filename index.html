@@ -746,6 +746,34 @@
         </div>
     </div>
 
+    <!-- ADB+WSL Architecture -->
+    <div style="max-width:860px;margin:0 auto 2rem;padding:0 1.5rem;">
+        <div style="background:#111;border:1px solid rgba(212,175,55,0.15);border-radius:16px;padding:2rem;">
+            <p style="font-family:'Cinzel',serif;font-size:10px;font-weight:700;letter-spacing:0.18em;color:rgba(212,175,55,0.5);text-transform:uppercase;margin-bottom:1.2rem;">Lane A — APK + ADB</p>
+            <p style="font-size:1.05rem;font-weight:600;color:#F5F5DC;margin-bottom:0.5rem;">물리 입력이 필요한 것만. 나머지는 Page+MCP.</p>
+            <p style="font-size:0.85rem;color:rgba(245,245,220,0.5);margin-bottom:1.8rem;">터치, 오버레이, 센서, 카메라, 방송 키트 — 손가락이 필수인 것만 APK로 만든다.</p>
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1rem;">
+                <div style="background:#1a1a1a;border:1px solid rgba(212,175,55,0.12);border-radius:12px;padding:1.2rem;text-align:center;">
+                    <div style="font-size:1.6rem;margin-bottom:0.4rem;">📱</div>
+                    <p style="font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:#D4AF37;letter-spacing:0.1em;">PHONE</p>
+                    <p style="font-size:10px;color:rgba(245,245,220,0.4);margin-top:0.3rem;">센서 · 입력 · 오버레이</p>
+                    <p style="font-size:9px;color:rgba(245,245,220,0.25);margin-top:0.2rem;">터치 / 카메라 / 마이크 / S펜</p>
+                </div>
+                <div style="text-align:center;">
+                    <p style="font-size:10px;color:rgba(245,245,220,0.3);letter-spacing:0.1em;">ADB</p>
+                    <p style="font-size:1.4rem;color:rgba(212,175,55,0.3);">⇄</p>
+                    <p style="font-size:9px;color:rgba(245,245,220,0.2);">USB/WiFi</p>
+                </div>
+                <div style="background:#1a1a1a;border:1px solid rgba(212,175,55,0.12);border-radius:12px;padding:1.2rem;text-align:center;">
+                    <div style="font-size:1.6rem;margin-bottom:0.4rem;">🖥️</div>
+                    <p style="font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:#D4AF37;letter-spacing:0.1em;">WSL PC</p>
+                    <p style="font-size:10px;color:rgba(245,245,220,0.4);margin-top:0.3rem;">연산 노드</p>
+                    <p style="font-size:9px;color:rgba(245,245,220,0.25);margin-top:0.2rem;">빌드 / ADB 명령 / Claude Code</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Philosophy -->
     <div class="philosophy">
         <div class="philosophy-inner">
