@@ -1,0 +1,9 @@
+{
+  "id": "dtslib-apk-lab",
+  "name": "DTSlib APK Lab",
+  "role": "production",
+  "description": "Android APK 개발/배포 실험실 — 폰 특화 앱 8개",
+  "github": "https://github.com/dtslib1979/dtslib-apk-lab",
+  "pages": "https://dtslib1979.github.io/dtslib-apk-lab/",
+  "updated": "2026-05-30"
+}
