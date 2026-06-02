@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0D0D0D">
+    <title>Parksy Melody — DTSLIB APK Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0D0D0D; --bg-card: #1A1A1A; --surface: #253A2F; --surface-alt: #1a2e23;
+            --accent: #D4AF37; --border: rgba(212,175,55,0.15); --border-hover: rgba(212,175,55,0.35);
+            --text: #F5F5DC; --text-secondary: rgba(245,245,220,0.6); --text-muted: rgba(245,245,220,0.3);
+            --max-width: 540px;
+        }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+        .container { max-width: var(--max-width); margin: 0 auto; padding: 16px; }
+        .nav { display: flex; align-items: center; gap: 10px; padding: 16px 0 8px; }
+        .nav-back { color: var(--text-muted); text-decoration: none; font-size: 12px; letter-spacing: 0.05em; transition: color 0.2s; }
+        .nav-back:hover { color: var(--accent); }
+        .nav-sep { color: var(--text-muted); font-size: 12px; }
+        .nav-current { font-size: 12px; color: var(--text-secondary); }
+        .hero { text-align: center; padding: 32px 0 24px; }
+        .app-icon-lg { width: 80px; height: 80px; margin: 0 auto 20px; background: linear-gradient(145deg, var(--surface), var(--surface-alt)); border: 1px solid var(--border); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+        .app-name { font-family: 'Cinzel', serif; font-size: 24px; font-weight: 700; letter-spacing: 0.05em; color: var(--text); margin-bottom: 6px; }
+        .app-name span { color: var(--accent); }
+        .app-version-badge { display: inline-block; padding: 3px 12px; border-radius: 100px; border: 1px solid var(--border); background: color-mix(in srgb, var(--accent) 8%, transparent); font-size: 11px; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 12px; }
+        .app-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.6; max-width: 400px; margin: 0 auto 16px; }
+        .cat-pill { display: inline-block; padding: 3px 12px; border-radius: 100px; border: 1px solid rgba(212,175,55,0.3); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+        .cta-row { display: flex; gap: 10px; justify-content: center; margin: 24px 0; flex-wrap: wrap; }
+        .btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border-radius: 10px; border: none; background: var(--accent); color: #0D0D0D; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; transition: opacity 0.2s; }
+        .btn-primary:hover { opacity: 0.88; }
+        .btn-secondary { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); font-family: 'Inter', sans-serif; font-size: 13px; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .btn-secondary:hover { border-color: var(--border-hover); color: var(--text); }
+        .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 24px 0; }
+        .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .section-label { font-family: 'Cinzel', serif; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+        .section-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+        .spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .spec-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+        .spec-label { font-size: 10px; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+        .spec-value { font-size: 14px; font-weight: 600; color: var(--text); }
+        .spec-value.accent { color: var(--accent); }
+        .feature-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .feature-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+        .feature-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+        .feature-text { flex: 1; }
+        .feature-title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+        .feature-desc { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+        /* preset pills */
+        .preset-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+        .preset-pill { padding: 2px 10px; border-radius: 100px; border: 1px solid var(--border); font-size: 10px; color: var(--accent); font-weight: 600; }
+        .req-list { list-style: none; display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+        .req-list li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+        .req-list li::before { content: '—'; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+        .phone-note { background: color-mix(in srgb, var(--accent) 6%, transparent); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+        .phone-note strong { color: var(--accent); }
+        footer { text-align: center; padding: 16px 0 40px; }
+        footer p { font-size: 11px; color: var(--text-muted); letter-spacing: 0.05em; }
+        footer a { color: var(--accent); text-decoration: none; }
+        .footer-brand { font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 0.2em; color: var(--text-muted); margin-top: 8px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <nav class="nav">
+        <a href="../" class="nav-back">← Back</a>
+        <span class="nav-sep">/</span>
+        <span class="nav-current">Parksy Melody</span>
+    </nav>
+
+    <div class="hero">
+        <div class="app-icon-lg">🎵</div>
+        <h1 class="app-name">Parksy <span>Melody</span></h1>
+        <div class="app-version-badge">v1.1.0</div>
+        <p class="app-desc">YouTube 오디오 커터. 프리셋 구간(10s/20s/30s/1min/3min)으로 클립을 잘라 Telegram 브릿지로 전송한다.</p>
+        <span class="cat-pill">Audio</span>
+    </div>
+
+    <div class="cta-row">
+        <a href="https://github.com/dtslib1979/dtslib-apk-lab/releases/tag/parksy-melody-v1.1.0" class="btn-primary" target="_blank">↓ Download APK</a>
+        <a href="https://github.com/dtslib1979/dtslib-apk-lab/tree/main/apps/parksy-melody" class="btn-secondary" target="_blank">⌥ Source</a>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="phone-note">
+        <strong>Phone-led.</strong> YouTube URL을 붙여넣고 구간 프리셋을 선택하면 오디오 클립을 즉시 추출해 Telegram 채널로 전송한다. Parksy Wavesy의 후속작으로 YouTube 파이프라인에 특화.
+    </div>
+
+    <div class="section-header"><span class="section-label">Features</span><span class="section-line"></span></div>
+    <div class="feature-list">
+        <div class="feature-item">
+            <div class="feature-icon">✂️</div>
+            <div class="feature-text">
+                <div class="feature-title">프리셋 클립 커터</div>
+                <div class="feature-desc">구간 프리셋 선택 → 즉시 추출. 초 단위 조절 불필요.</div>
+                <div class="preset-row">
+                    <span class="preset-pill">10s</span>
+                    <span class="preset-pill">20s</span>
+                    <span class="preset-pill">30s</span>
+                    <span class="preset-pill">1min</span>
+                    <span class="preset-pill">3min</span>
+                </div>
+            </div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon">📱</div>
+            <div class="feature-text">
+                <div class="feature-title">YouTube 공유 인텐트 수신</div>
+                <div class="feature-desc">YouTube 앱에서 "공유 → Parksy Melody"로 즉시 URL 전달.</div>
+            </div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon">📡</div>
+            <div class="feature-text">
+                <div class="feature-title">Telegram 브릿지 전송</div>
+                <div class="feature-desc">추출된 오디오 클립을 Telegram 봇 파이프라인으로 자동 전송. 채널 배포 즉시 완결.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-header"><span class="section-label">Tech Specs</span><span class="section-line"></span></div>
+    <div class="spec-grid">
+        <div class="spec-card"><div class="spec-label">Package</div><div class="spec-value" style="font-size:10px;">com.dtslib.parksy_melody</div></div>
+        <div class="spec-card"><div class="spec-label">Version</div><div class="spec-value accent">1.1.0 (11)</div></div>
+        <div class="spec-card"><div class="spec-label">Min SDK</div><div class="spec-value">API 24 (N)</div></div>
+        <div class="spec-card"><div class="spec-label">Target SDK</div><div class="spec-value">API 34</div></div>
+        <div class="spec-card"><div class="spec-label">Dart Lines</div><div class="spec-value">380</div></div>
+        <div class="spec-card"><div class="spec-label">Kotlin Lines</div><div class="spec-value">40</div></div>
+        <div class="spec-card"><div class="spec-label">Presets</div><div class="spec-value">5</div></div>
+        <div class="spec-card"><div class="spec-label">Successor of</div><div class="spec-value" style="font-size:11px;">Parksy Wavesy</div></div>
+    </div>
+
+    <div class="section-header"><span class="section-label">Requirements</span><span class="section-line"></span></div>
+    <ul class="req-list">
+        <li>Android 7.0 (Nougat) 이상</li>
+        <li>YouTube 앱 설치 (공유 인텐트 사용 시)</li>
+        <li>Telegram 봇 토큰 (전송 기능 사용 시)</li>
+        <li>인터넷 연결</li>
+    </ul>
+
+    <div class="divider"></div>
+    <footer>
+        <p><a href="https://github.com/dtslib1979/dtslib-apk-lab" target="_blank">GitHub Repository</a></p>
+        <div class="footer-brand">DTSLIB APK LAB · Phone-led Computing</div>
+    </footer>
+</div>
+</body>
+</html>
