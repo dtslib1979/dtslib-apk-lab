@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0D0D0D">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="PARKSY APK LAB — Phone-native Android Factory. 8 apps. 0 compromise.">
+    <title>PARKSY APK LAB — Phone-native Android Factory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0D0D0D;
+            --bg-elevated: #111;
+            --bg-card: #1A1A1A;
+            --bg-card-hover: #222;
+            --border: rgba(212,175,55,0.15);
+            --border-hover: rgba(212,175,55,0.35);
+            --text: #F5F5DC;
+            --text-secondary: rgba(245,245,220,0.6);
+            --text-muted: rgba(245,245,220,0.3);
+            --text-dim: rgba(245,245,220,0.15);
+            --accent: #D4AF37;
+            --accent-glow: rgba(212,175,55,0.4);
+            --accent-dim: rgba(212,175,55,0.08);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Noise overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.015;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        a { color: inherit; text-decoration: none; }
+
+        .page-content { position: relative; z-index: 2; }
+
+        /* ── Header ── */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 1.25rem 1.5rem;
+            background: rgba(13,13,13,0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-content {
+            max-width: 960px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo { display: flex; align-items: center; gap: 0.85rem; }
+
+        .logo-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, #1a1a0a, #0d0d05);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Cinzel', serif;
+            font-size: 10px; font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.04em;
+        }
+
+        .logo-text { display: flex; flex-direction: column; }
+
+        .logo-name {
+            font-family: 'Cinzel', serif;
+            font-size: 14px; font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.12em;
+        }
+
+        .logo-sub {
+            font-size: 10px; font-weight: 400;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .header-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .header-link {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            letter-spacing: 0.06em;
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .header-link:hover {
+            color: var(--accent);
+            border-color: var(--border-hover);
+            background: var(--accent-dim);
+        }
+
+        /* ── Hero ── */
+        .hero {
+            padding: 5rem 1.5rem 4rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 600px; height: 300px;
+            background: radial-gradient(ellipse, rgba(212,175,55,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.9rem;
+            background: var(--accent-dim);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--accent);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 1.75rem;
+        }
+
+        .hero-badge::before {
+            content: '';
+            width: 6px; height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 2s ease infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .hero-title {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(2rem, 6vw, 3.5rem);
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: 0.04em;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+        }
+
+        .hero-title span {
+            color: var(--accent);
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1rem, 3vw, 1.35rem);
+            font-weight: 300;
+            color: var(--text-secondary);
+            letter-spacing: 0.15em;
+            margin-bottom: 0.75rem;
+        }
+
+        .hero-tagline {
+            font-size: 13px;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+        }
+
+        /* ── Stats bar ── */
+        .stats-bar {
+            max-width: 960px;
+            margin: 0 auto 3.5rem;
+            padding: 0 1.5rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .stat-item {
+            flex: 1;
+            min-width: 120px;
+            max-width: 200px;
+            padding: 1rem 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-family: 'Cinzel', serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent);
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-top: 0.25rem;
+        }
+
+        /* ── Section ── */
+        .section {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 1.5rem 4rem;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+        .section-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ── App Grid ── */
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .app-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+            transition: all 0.25s ease;
+            cursor: default;
+        }
+
+        .app-card:hover {
+            border-color: var(--border-hover);
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(212,175,55,0.08);
+        }
+
+        .app-card-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .app-emoji {
+            font-size: 2rem;
+            line-height: 1;
+            flex-shrink: 0;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-dim);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .app-meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .app-name {
+            font-family: 'Cinzel', serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .app-version {
+            font-size: 11px;
+            color: var(--accent);
+            letter-spacing: 0.06em;
+            margin-top: 0.2rem;
+        }
+
+        .app-category {
+            display: inline-block;
+            font-size: 10px;
+            color: var(--text-muted);
+            background: rgba(245,245,220,0.05);
+            border: 1px solid rgba(245,245,220,0.08);
+            border-radius: 4px;
+            padding: 0.15rem 0.5rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-top: 0.35rem;
+        }
+
+        .app-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.55;
+        }
+
+        .app-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: auto;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--text-dim);
+        }
+
+        .app-status {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 11px;
+            color: #4ade80;
+            letter-spacing: 0.05em;
+        }
+
+        .app-status::before {
+            content: '';
+            width: 5px; height: 5px;
+            background: #4ade80;
+            border-radius: 50%;
+        }
+
+        .app-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.45rem 0.9rem;
+            background: var(--accent-dim);
+            border: 1px solid var(--border-hover);
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--accent);
+            letter-spacing: 0.05em;
+            transition: all 0.2s ease;
+        }
+
+        .app-btn:hover {
+            background: rgba(212,175,55,0.15);
+            box-shadow: 0 0 12px rgba(212,175,55,0.2);
+        }
+
+        .app-btn svg {
+            width: 12px; height: 12px;
+        }
+
+        /* ── Philosophy block ── */
+        .philosophy {
+            margin: 2rem 0 4rem;
+            padding: 2rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            max-width: 960px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .philosophy-inner {
+            max-width: 680px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .philosophy-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .philosophy-quote {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(1rem, 3vw, 1.4rem);
+            color: var(--accent);
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            line-height: 1.4;
+        }
+
+        /* ── Footer ── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 2.5rem 1.5rem;
+            background: rgba(13,13,13,0.8);
+            backdrop-filter: blur(10px);
+        }
+
+        .footer-content {
+            max-width: 960px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.25rem;
+            text-align: center;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .footer-link {
+            font-size: 12px;
+            color: var(--text-muted);
+            letter-spacing: 0.06em;
+            transition: color 0.2s ease;
+        }
+
+        .footer-link:hover {
+            color: var(--accent);
+        }
+
+        .footer-motto {
+            font-family: 'Cinzel', serif;
+            font-size: 13px;
+            color: var(--text-muted);
+            letter-spacing: 0.12em;
+        }
+
+        .footer-motto span {
+            color: var(--accent);
+        }
+
+        .footer-copy {
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 0.05em;
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 600px) {
+            .hero { padding: 3.5rem 1rem 3rem; }
+            .stats-bar { padding: 0 1rem; }
+            .section { padding: 0 1rem 3rem; }
+            .app-grid { grid-template-columns: 1fr; }
+            .philosophy { margin-left: 1rem; margin-right: 1rem; }
+            .header-links { gap: 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="page-content">
+
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">APK<br>LAB</div>
+                <div class="logo-text">
+                    <span class="logo-name">PARKSY APK LAB</span>
+                    <span class="logo-sub">Phone-native Android Factory</span>
+                </div>
+            </div>
+            <nav class="header-links">
+                <a href="https://github.com/dtslib1979/dtslib-apk-lab" target="_blank" rel="noopener" class="header-link">GitHub</a>
+                <a href="https://phoneparis.kr" target="_blank" rel="noopener" class="header-link">phoneparis.kr</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-badge">8 Active Apps</div>
+        <h1 class="hero-title">PARKSY <span>APK</span> LAB</h1>
+        <p class="hero-subtitle">8 apps. 0 compromise.</p>
+        <p class="hero-tagline">Phone-native Android Factory — built on phone, for the phone</p>
+    </section>
+
+    <!-- Stats -->
+    <div class="stats-bar">
+        <div class="stat-item">
+            <span class="stat-number">8</span>
+            <span class="stat-label">Active Apps</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-number">3</span>
+            <span class="stat-label">Overlay Apps</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-number">Flutter</span>
+            <span class="stat-label">Core Stack</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-number">SDK 35</span>
+            <span class="stat-label">Compile Target</span>
+        </div>
+    </div>
+
+    <!-- App Grid -->
+    <div class="section">
+        <div class="section-header">
+            <span class="section-title">Active Apps</span>
+            <div class="section-line"></div>
+        </div>
+
+        <div class="app-grid">
+
+            <!-- Parksy Capture -->
+            <div class="app-card">
+                <div class="app-card-top">
+                    <div class="app-emoji">💾</div>
+                    <div class="app-meta">
+                        <div class="app-name">Parksy Capture</div>
+                        <div class="app-version">v10.0.8</div>
+                        <span class="app-category">Utility</span>
+                    </div>
+                </div>
+                <p class="app-desc">공유 텍스트 캡처 + GitHub 아카이브. 어떤 앱에서든 텍스트를 공유하면 자동으로 아카이빙.</p>
+                <div class="app-footer">
+                    <span class="app-status">Store Active</span>
+                    <a href="apps/capture-pipeline/index.html" class="app-btn">
+                        앱 보기
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 6h8M6 2l4 4-4 4"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Parksy ChronoCall -->
+            <div class="app-card">
+                <div class="app-card-top">
+                    <div class="app-emoji">📞</div>
+                    <div class="app-meta">
+                        <div class="app-name">Parksy ChronoCall</div>
+                        <div class="app-version">v1.0.0</div>
+                        <span class="app-category">Utility</span>
+                    </div>
+                </div>
+                <p class="app-desc">통화 녹음 STT 변환기. OpenAI Whisper로 통화 내용을 텍스트로 변환 + 타임스탬프 세그먼트.</p>
+                <div class="app-footer">
+                    <span class="app-status">Store Active</span>
+                    <a href="apps/chrono-call/index.html" class="app-btn">
+                        앱 보기
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 6h8M6 2l4 4-4 4"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Parksy Pen -->
+            <div class="app-card">
+                <div class="app-card-top">
+                    <div class="app-emoji">✍️</div>
+                    <div class="app-meta">
+                        <div class="app-name">Parksy Pen</div>
+                        <div class="app-version">v1.0.31</div>
+                        <span class="app-category">Overlay</span>
+                    </div>
+                </div>
+                <p class="app-desc">S Pen 그리기 + 손가락 스크롤 완전 분리. Wacom 스타일 레이저 포인터 오버레이.</p>
+                <div class="app-footer">
+                    <span class="app-status">Store Active</span>
+                    <a href="apps/laser-pen-overlay/index.html" class="app-btn">
+                        앱 보기
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 6h8M6 2l4 4-4 4"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Parksy Axis -->
+            <div class="app-card">
+                <div class="app-card-top">
+                    <div class="app-emoji">🎯</div>
+                    <div class="app-meta">
+                        <div class="app-name">Parksy Axis</div>
+                        <div class="app-version">v11.1.0</div>
+                        <span class="app-category">Broadcast / Overlay</span>
+                    </div>
+                </div>
+                <p class="app-desc">방송용 사고 단계 오버레이. shareData IPC 동기화로 실시간 방송 구조화.</p>
+                <div class="app-footer">
+                    <span class="app-status">Store Active</span>
+                    <a href="apps/parksy-axis/index.html" class="app-btn">
+                        앱 보기
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 6h8M6 2l4 4-4 4"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Parksy Glot -->
+            <div class="app-card">
+                <div class="app-card-top">
+                    <div class="app-emoji">🌐</div>
+                    <div class="app-meta">
+                        <div class="app-name">Parksy Glot</div>
+                        <div class="app-version">v1.0.0</div>
+                        <span class="app-category">Subtitle / Overlay</span>
+                    </div>
+                </div>
+                <p class="app-desc">실시간 다국어 자막 오버레이. OpenAI Whisper + GPT-4o로 화면 위에 자막을 띄운다.</p>
+                <div class="app-footer">
+                    <span class="app-status">Store Active</span>
+                    <a href="apps/parksy-glot/index.html" class="app-btn">
+                        앱 보기
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 6h8M6 2l4 4-4 4"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Parksy Studio -->
+            <div class="app-card">
+                <div class="app-card-top">
+                    <div class="app-emoji">🎬</div>
+                    <div class="app-meta">
+                        <div class="app-name">Parksy Studio</div>
+                        <div class="app-version">v1.0.0</div>
+                        <span class="app-category">Broadcast</span>
+                    </div>
+                </div>
+                <p class="app-desc">방송 파이프라인 APK. 화면녹화 + 동시통역 + BGM + 트리머 + 카메라 오버레이 전부 하나에.</p>
+                <div class="app-footer">
+                    <span class="app-status">Store Active</span>
+                    <a href="apps/parksy-studio/index.html" class="app-btn">
+                        앱 보기
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 6h8M6 2l4 4-4 4"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Parksy Liner -->
+            <div class="app-card">
+                <div class="app-card-top">
+                    <div class="app-emoji">🖌️</div>
+                    <div class="app-meta">
+                        <div class="app-name">Parksy Liner</div>
+                        <div class="app-version">v1.0.0</div>
+                        <span class="app-category">Creative</span>
+                    </div>
+                </div>
+                <p class="app-desc">Photo to sketch pipeline. XDoG 알고리즘으로 사진을 Samsung Notes용 라인 아트로 변환.</p>
+                <div class="app-footer">
+                    <span class="app-status">Store Active</span>
+                    <a href="apps/parksy-liner/index.html" class="app-btn">
+                        앱 보기
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 6h8M6 2l4 4-4 4"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Parksy Melody -->
+            <div class="app-card">
+                <div class="app-card-top">
+                    <div class="app-emoji">🎵</div>
+                    <div class="app-meta">
+                        <div class="app-name">Parksy Melody</div>
+                        <div class="app-version">v1.1.0</div>
+                        <span class="app-category">Audio</span>
+                    </div>
+                </div>
+                <p class="app-desc">YouTube 오디오 커터. 프리셋 클립(10s/20s/30s/1min/3min) + Telegram 브릿지 자동 전송.</p>
+                <div class="app-footer">
+                    <span class="app-status">Store Active</span>
+                    <a href="apps/parksy-melody/index.html" class="app-btn">
+                        앱 보기
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M2 6h8M6 2l4 4-4 4"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Philosophy -->
+    <div class="philosophy">
+        <div class="philosophy-inner">
+            <p class="philosophy-label">Lab Philosophy</p>
+            <p class="philosophy-quote">"Phone is primary. PC is the trailer."</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <nav class="footer-links">
+                <a href="https://github.com/dtslib1979/dtslib-apk-lab" target="_blank" rel="noopener" class="footer-link">GitHub Repository</a>
+                <a href="https://phoneparis.kr" target="_blank" rel="noopener" class="footer-link">phoneparis.kr</a>
+                <a href="dashboard/index.html" class="footer-link">Dashboard</a>
+            </nav>
+            <p class="footer-motto">PARKSY APK LAB <span>—</span> Phone-native Android Factory</p>
+            <p class="footer-copy">Built on phone, for the phone &nbsp;&middot;&nbsp; dtslib1979</p>
+        </div>
+    </footer>
+
+</div>
+</body>
+</html>
