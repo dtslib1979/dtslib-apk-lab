@@ -58,7 +58,7 @@
     }
   ],
   "stats": {
-    "total_apps": 14,
+    "total_apps": 15,
     "store_apps": 9,
     "total_dart_lines": 20511,
     "total_kotlin_lines": 5444,
@@ -142,6 +142,10 @@
     "wearable": {
       "label": "Wearable",
       "color": "#E8C547"
+    },
+    "hardware": {
+      "label": "Hardware",
+      "color": "#B08968"
     }
   }
 }

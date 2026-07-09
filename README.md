@@ -55,6 +55,11 @@
 |-----|--------|-------------|
 | **Parksy Glass** | planned | 1인칭 POV 라이브 퍼포먼스 방송용 스마트 글래스. [백서](apps/smart-glass/README.md) |
 
+### 🖨️ Hardware — 계획 슬롯
+| App | Status | Description |
+|-----|--------|-------------|
+| **Parksy Printer** | planned | 출판사 실물 하드카피 출력 — ESP32 + 열지 프린터, 음성→ESC/POS. [상세](apps/parksy-printer/README.md) |
+
 ### 🗄️ Archive — 폐기 (서사 보존, 코드는 archive/ 로 격리)
 | App | Discontinue Reason |
 |-----|---------|

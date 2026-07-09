@@ -233,6 +233,7 @@ APK로 만드는 최후 수단 창구다 (`~/.claude/CLAUDE.md` ADB 설계 철�
 - Parksy Liner (parksy-liner) — 창작
 - Parksy Melody (parksy-melody) — 오디오
 - Parksy Glass (smart-glass) — planned, 미빌드
+- Parksy Printer (parksy-printer) — planned, 출판사 하드카피 출력, 미빌드
 
 ## Project Structure
 ```
@@ -246,7 +247,8 @@ apps/
 ├── parksy-liner/        # 사진 → 스케치 (XDoG)
 ├── parksy-melody/       # YouTube 오디오 컷 + 텔레그램 브릿지
 ├── parksy-studio/       # 방송 제작 파이프라인 APK
-└── smart-glass/         # planned — 백서만, 코드 없음
+├── smart-glass/         # planned — 백서만, 코드 없음
+└── parksy-printer/      # planned — 출판사 하드카피 출력, 백서만, 코드 없음
 
 archive/                 # 폐기 앱 (코드 보존, 배포 중단)
 ├── midi-converter/

@@ -167,5 +167,20 @@
     "workflow": "build-blackhole.yml",
     "releaseTag": "blackhole-latest",
     "lastUpdated": "2026-03-28"
+  },
+  {
+    "id": "parksy-printer",
+    "name": "Parksy Printer",
+    "version": "v0.1.0",
+    "registryStatus": "planned",
+    "category": "hardware",
+    "description": "ESP32 + 열지 전표 프린터 — 출판사 하드카피 출력 라인",
+    "icon": "🖨️",
+    "downloadUrl": null,
+    "workflow": "build-parksy-printer.yml",
+    "releaseTag": "parksy-printer-latest",
+    "lastUpdated": "2026-07-09",
+    "hardwareTarget": "ESP32",
+    "canvasPx": "576×∞ 흑백"
   }
 ]
