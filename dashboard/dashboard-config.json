@@ -58,7 +58,7 @@
     }
   ],
   "stats": {
-    "total_apps": 15,
+    "total_apps": 17,
     "store_apps": 9,
     "total_dart_lines": 20511,
     "total_kotlin_lines": 5444,
@@ -139,8 +139,8 @@
       "label": "Creative",
       "color": "#DDA0DD"
     },
-    "wearable": {
-      "label": "Wearable",
+    "device-slot": {
+      "label": "Device Slot",
       "color": "#E8C547"
     },
     "hardware": {

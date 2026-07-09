@@ -182,5 +182,31 @@
     "lastUpdated": "2026-07-09",
     "hardwareTarget": "ESP32",
     "canvasPx": "576×∞ 흑백"
+  },
+  {
+    "id": "tablet-slot",
+    "name": "Tablet (device slot)",
+    "version": "-",
+    "registryStatus": "planned",
+    "category": "device-slot",
+    "description": "온디바이스 확장 슬롯 — 큰 화면 필요 작업. 구체적 앱 미정.",
+    "icon": "📱",
+    "downloadUrl": null,
+    "workflow": null,
+    "releaseTag": null,
+    "lastUpdated": "2026-07-09"
+  },
+  {
+    "id": "wearable-audio-slot",
+    "name": "Wearable Audio (device slot)",
+    "version": "-",
+    "registryStatus": "planned",
+    "category": "device-slot",
+    "description": "온디바이스 확장 슬롯 — 핸즈프리 오디오 입출력(이어폰). 구체적 앱 미정.",
+    "icon": "🎧",
+    "downloadUrl": null,
+    "workflow": null,
+    "releaseTag": null,
+    "lastUpdated": "2026-07-09"
   }
 ]

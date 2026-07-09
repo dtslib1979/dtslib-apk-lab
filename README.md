@@ -1,19 +1,37 @@
 # DTSLIB APK Lab
 
-박씨 전용 Android APK 개발 모노레포.
+박씨 전용 Android APK 개발 모노레포. **Android 패키지 기반 — 그래서 폰이 중심이다.**
 
-## 핵심 개념: 온디바이스 ADB APK
+## 핵심 개념: 폰 중심 온디바이스 월드
 
 이 레포가 존재하는 이유는 하나다.
 
 > **Good Lock으로 안 되고, ADB로도 안 될 때만 APK를 만든다.**
 > (`~/.claude/CLAUDE.md` — ADB 설계 철학 참조)
 
+```
+PC (WSL2)           연산 두뇌 — 무거운 작업은 전부 여기서
+  │
+  │  ADB              APK와 동급으로 중요한 브릿지 프로토콜
+  ▼
+Phone (S25 Ultra)    온디바이스 계층의 중심 — devices/phone
+  │
+  │  확장
+  ▼
+┌───────────┬──────────────┬─────────────┐
+│  Tablet   │ Wearable-    │ Smart Glass │
+│  (planned)│ Audio(이어폰) │  (planned)  │
+│           │  (planned)   │             │
+└───────────┴──────────────┴─────────────┘
+   devices/tablet  devices/wearable-audio  devices/smart-glass
+```
+
 폰은 WSL2 PC를 섬기는 SSH 클라이언트다. 대부분의 자동화는 ADB 원격 조종으로 끝나지만,
 오버레이·상시 실행·카메라/마이크 점유·백그라운드 서비스처럼 **ADB 천장 위에 있는 것만** 여기서 APK로 만든다.
 그래서 이 레포의 앱은 "일반 앱스토어 앱"이 아니라 **폰과 PC 사이의 물리적 틈을 메우는 브릿지 부품**이다.
 
 이 개념을 가장 순수하게 구현한 앱이 **[Blackhole](apps/blackhole)** — "모든 디바이스를 PC로 연결한다."
+폰 슬롯의 개념 문서는 [`devices/phone`](devices/phone), 확장 슬롯은 [`devices/`](devices) 참조.
 
 ## 📦 App 카탈로그 (개념별 분류)
 
@@ -50,10 +68,14 @@
 | **Parksy Capture** | v10.0.8 | 공유 텍스트 캡처 → GitHub 아카이브 |
 | **Parksy ChronoCall** | v1.0.0 | 통화 녹음 STT 변환 (Whisper) |
 
-### ⌚ Wearable — 구매 대기 (계획 슬롯)
-| App | Status | Description |
+### 📶 Device Slot — 폰 확장 슬롯 (전부 planned)
+> [`devices/phone`](devices/phone)의 확장. 구체적 앱이 생기기 전까지는 슬롯 문서만.
+
+| Slot | Status | Description |
 |-----|--------|-------------|
-| **Parksy Glass** | planned | 1인칭 POV 라이브 퍼포먼스 방송용 스마트 글래스. [백서](apps/smart-glass/README.md) |
+| **Tablet** | planned | 큰 화면 필요 작업. [상세](devices/tablet/README.md) |
+| **Wearable Audio (이어폰)** | planned | 핸즈프리 오디오 입출력. [상세](devices/wearable-audio/README.md) |
+| **Smart Glass** | planned | 1인칭 POV 라이브 퍼포먼스 방송. [백서](devices/smart-glass/README.md) |
 
 ### 🖨️ Hardware — 계획 슬롯
 | App | Status | Description |
