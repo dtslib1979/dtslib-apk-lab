@@ -47,6 +47,28 @@
 
         .container { max-width: var(--max-width); margin: 0 auto; padding: 16px; }
 
+        /* ── Masthead Nav (웹진 상단 메뉴) ── */
+        .mast-nav {
+            position: sticky; top: 0; z-index: 50;
+            display: flex; justify-content: center; gap: 2px;
+            padding: 10px 8px; overflow-x: auto;
+            background: color-mix(in srgb, var(--bg) 88%, transparent);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+        }
+        .mast-nav a {
+            flex: none; padding: 6px 12px; border-radius: 100px;
+            font-family: 'Cinzel', serif; font-size: 10px; font-weight: 600;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            color: var(--text-secondary); text-decoration: none;
+            border: 1px solid transparent; white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .mast-nav a:hover, .mast-nav a.active {
+            color: var(--accent); border-color: var(--border);
+            background: color-mix(in srgb, var(--accent) 8%, transparent);
+        }
+
         /* ── Header ── */
         header { text-align: center; padding: 40px 0 20px; }
 
@@ -113,6 +135,75 @@
         .fb-btn.subtle:hover {
             border-color: var(--border-hover); color: var(--text-secondary);
         }
+
+        /* ── Concept (커버 스토리) ── */
+        .concept-section { margin: 8px 0 28px; }
+        .concept-lede {
+            font-size: 12.5px; line-height: 1.7; color: var(--text-secondary);
+            margin-bottom: 18px;
+        }
+        .concept-tree {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .tree-node {
+            padding: 10px 18px; border-radius: 12px;
+            border: 1px solid var(--border); background: var(--bg-card);
+            font-size: 11px; font-weight: 600; text-align: center; letter-spacing: 0.02em;
+            width: 100%;
+        }
+        .tree-node.center {
+            border-color: var(--accent); color: var(--accent);
+            background: color-mix(in srgb, var(--accent) 8%, transparent);
+            font-family: 'Cinzel', serif; letter-spacing: 0.08em;
+        }
+        .tree-node .tn-sub { display: block; font-size: 9.5px; font-weight: 400; color: var(--text-muted); margin-top: 3px; letter-spacing: 0.02em; }
+        .tree-arrow { font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.4; }
+        .tree-branches {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 2px;
+        }
+        .tree-branch-label {
+            grid-column: 1 / -1; text-align: center; font-size: 9.5px;
+            color: var(--text-muted); letter-spacing: 0.05em; margin: 6px 0 -2px;
+        }
+        .tree-branch { display: flex; flex-direction: column; gap: 6px; }
+        .tree-branch .tree-node { font-size: 9.5px; padding: 8px 10px; font-weight: 500; }
+
+        /* ── Doc Card (Devices / Hardware — 코드 없는 슬롯) ── */
+        .doc-grid {
+            display: grid; grid-template-columns: repeat(var(--grid-cols), 1fr); gap: 12px;
+        }
+        .doc-card {
+            display: block; text-decoration: none; color: inherit;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 14px 10px; text-align: center;
+            transition: all 0.2s;
+        }
+        .doc-card:hover { background: var(--bg-card-hover); border-color: var(--border-hover); }
+        .doc-card .app-icon { font-size: 24px; }
+        .doc-card .doc-name { font-size: 11px; font-weight: 600; margin: 2px 0 3px; }
+        .doc-card .doc-desc {
+            font-size: 9.5px; color: var(--text-muted); line-height: 1.4;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .doc-card .doc-status {
+            display: inline-block; margin-top: 6px; padding: 1px 8px;
+            border-radius: 100px; font-size: 8px; font-weight: 600;
+            letter-spacing: 0.05em; text-transform: uppercase;
+            border: 1px solid var(--border); color: var(--text-muted);
+        }
+
+        /* ── Archive ── */
+        .archive-list { display: flex; flex-direction: column; gap: 8px; }
+        .archive-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 10px;
+            border: 1px solid var(--border); text-decoration: none; color: inherit;
+            opacity: 0.6; transition: opacity 0.2s;
+        }
+        .archive-item:hover { opacity: 1; }
+        .archive-item .app-icon { width: 32px; height: 32px; font-size: 16px; flex: none; }
+        .archive-item .ai-name { font-size: 11px; font-weight: 600; }
+        .archive-item .ai-desc { font-size: 9.5px; color: var(--text-muted); margin-top: 1px; }
 
         /* ── Warning ── */
         .warning {
@@ -401,22 +492,44 @@
 
         /* ── Responsive ── */
         @media (max-width: 380px) {
-            .app-grid { grid-template-columns: repeat(2, 1fr); }
+            .app-grid, .doc-grid { grid-template-columns: repeat(2, 1fr); }
             .stats-bar { gap: 6px; }
             .stat-pill { padding: 4px 10px; font-size: 10px; }
+            .mast-nav a { font-size: 9px; padding: 5px 9px; }
         }
     </style>
 </head>
 <body>
+    <nav class="mast-nav" id="mastNav">
+        <a href="#concept">Concept</a>
+        <a href="#devices">Devices</a>
+        <a href="#hardware">Hardware</a>
+        <a href="#software">Software</a>
+        <a href="#archive">Archive</a>
+    </nav>
     <div class="container">
         <header id="header"></header>
         <div id="statsBar"></div>
-        <div id="pipelineSection"></div>
-        <div id="factoryBar"></div>
-        <div id="warningBar"></div>
-        <div id="categoryFilter"></div>
-        <div id="appSection"></div>
-        <div id="timelineSection"></div>
+
+        <section id="concept" style="scroll-margin-top:56px;"></section>
+
+        <section id="devices" style="scroll-margin-top:56px;"><div id="devicesSection"></div></section>
+        <div class="divider"></div>
+        <section id="hardware" style="scroll-margin-top:56px;"><div id="hardwareSection"></div></section>
+        <div class="divider"></div>
+
+        <section id="software" style="scroll-margin-top:56px;">
+            <div id="pipelineSection"></div>
+            <div id="factoryBar"></div>
+            <div id="warningBar"></div>
+            <div id="categoryFilter"></div>
+            <div id="appSection"></div>
+            <div id="timelineSection"></div>
+        </section>
+        <div class="divider"></div>
+
+        <section id="archive" style="scroll-margin-top:56px;"><div id="archiveSection"></div></section>
+
         <div class="divider"></div>
         <footer id="footer"></footer>
     </div>
@@ -480,6 +593,9 @@
             renderHeader(config.brand);
             document.title = config.brand.name + ' ' + config.brand.highlight;
             if (config.sections.stats) renderStats(config.stats);
+            renderConcept();
+            renderDeviceSlots(apps);
+            renderHardwareSlots(apps);
             if (config.sections.pipeline && config.pipeline) renderPipeline(config.pipeline);
             renderFactoryBar();
             if (config.sections.warning) renderWarning(config.sections.warningText);
@@ -487,9 +603,11 @@
             renderApps(apps, config.categories);
             if (config.sections.timeline) renderTimeline(apps);
             if (config.sections.pages && config.pages) renderPages(config.pages);
+            renderArchive(apps);
             renderFooter(config.brand);
             revealCards();
             loadStatuses();
+            initNavSpy();
         }).catch(function(err) {
             document.querySelector('.container').innerHTML =
                 '<div style="text-align:center;padding:80px 20px;color:var(--red);font-size:14px;">' +
@@ -930,8 +1048,15 @@
                 '<div class="warning">' + txt + '</div>';
         }
 
+        // Devices/Hardware/Archive는 각자 전용 섹션이 있어서 Software 필터 pill에서 제외
+        var SLOT_CATS = ['device-slot', 'hardware'];
+
+        function ghBlobUrl(dir) {
+            return dir ? 'https://github.com/' + (GH.owner || 'dtslib1979') + '/' + (GH.repo || 'dtslib-apk-lab') + '/blob/main/' + dir + '/README.md' : '#';
+        }
+
         function renderCategoryFilter(cats) {
-            var keys = Object.keys(cats);
+            var keys = Object.keys(cats).filter(function(k) { return SLOT_CATS.indexOf(k) === -1; });
             var h = '<div class="category-filter">';
             keys.forEach(function(k) {
                 var a = k === 'all' ? ' active' : '';
@@ -954,9 +1079,13 @@
             });
         }
 
-        function renderApps(apps, cats) {
+        function renderApps(allApps, cats) {
+            // Software 섹션 = 실제 빌드되는 앱만. Devices/Hardware(slot)와 Archive(discontinued)는 전용 섹션에서.
+            var apps = allApps.filter(function(app) {
+                return SLOT_CATS.indexOf(app.category) === -1 && app.registryStatus !== 'discontinued';
+            });
             var h = '<div class="section-header">' +
-                '<span class="section-label">Apps</span><span class="section-line"></span>' +
+                '<span class="section-label">Software</span><span class="section-line"></span>' +
                 '<span class="section-count">' + apps.length + '</span></div>' +
                 '<div class="app-grid">';
 
@@ -1002,6 +1131,106 @@
             document.getElementById('appSection').innerHTML = h;
         }
 
+        // ── Concept (커버 스토리 — 폰 중심 온디바이스 위계) ──
+        function renderConcept() {
+            var h = '<div class="section-header">' +
+                '<span class="section-label">Concept</span><span class="section-line"></span></div>' +
+                '<p class="concept-lede">Android 패키지 기반 레포 — 그래서 폰이 중심이다. ' +
+                'Good Lock으로 안 되고 ADB로도 안 될 때만 APK를 만든다. ' +
+                '태블릿·이어폰·글라스는 폰이 <b style="color:var(--accent)">착용</b>하는 확장, ' +
+                'ESP32 하드웨어는 폰이 <b style="color:var(--accent)">조종</b>하는 확장이다.</p>' +
+                '<div class="concept-tree">' +
+                '<div class="tree-node">PC (WSL2)<span class="tn-sub">연산 두뇌</span></div>' +
+                '<div class="tree-arrow">│ ADB<br>▼</div>' +
+                '<div class="tree-node center">PHONE<span class="tn-sub">S25 Ultra · devices/phone · 물리적 중심</span></div>' +
+                '<div class="tree-branches">' +
+                '<div class="tree-branch-label">↓ 착용 (devices/)</div>' +
+                '<div class="tree-branch-label">↓ 조종 (hardware/)</div>' +
+                '<div class="tree-branch">' +
+                '<div class="tree-node">Tablet</div>' +
+                '<div class="tree-node">Wearable-Audio</div>' +
+                '<div class="tree-node">Smart Glass</div>' +
+                '</div>' +
+                '<div class="tree-branch">' +
+                '<div class="tree-node">Printer (ESP32)</div>' +
+                '<div class="tree-node">Toy Kit (ESP32)</div>' +
+                '</div>' +
+                '</div></div>';
+            document.getElementById('concept').innerHTML = h;
+        }
+
+        // ── Doc Card (Devices / Hardware — 코드 없는 planned 슬롯) ──
+        function renderDocCard(app) {
+            return '<a class="doc-card" href="' + ghBlobUrl(app.directory) + '" target="_blank" rel="noopener">' +
+                '<div class="app-icon">' + app.icon + '</div>' +
+                '<div class="doc-name">' + app.name.replace(' (device slot)', '') + '</div>' +
+                '<div class="doc-desc">' + app.description + '</div>' +
+                '<span class="doc-status">' + app.registryStatus + '</span>' +
+                '</a>';
+        }
+
+        function renderDeviceSlots(apps) {
+            var slots = apps.filter(function(a) { return a.category === 'device-slot'; });
+            var h = '<div class="section-header">' +
+                '<span class="section-label">Devices</span><span class="section-line"></span>' +
+                '<span class="section-count">phone의 확장</span></div>' +
+                '<div class="doc-grid">' +
+                '<a class="doc-card" href="' + ghBlobUrl('devices/phone') + '" target="_blank" rel="noopener">' +
+                '<div class="app-icon">📱</div><div class="doc-name">Phone</div>' +
+                '<div class="doc-desc">이 레포의 물리적 중심 · Blackhole이 구현체</div>' +
+                '<span class="doc-status" style="border-color:var(--accent);color:var(--accent)">center</span></a>';
+            slots.forEach(function(a) { h += renderDocCard(a); });
+            h += '</div>';
+            document.getElementById('devicesSection').innerHTML = h;
+        }
+
+        function renderHardwareSlots(apps) {
+            var slots = apps.filter(function(a) { return a.category === 'hardware'; });
+            var h = '<div class="section-header">' +
+                '<span class="section-label">Hardware</span><span class="section-line"></span>' +
+                '<span class="section-count">phone이 조종</span></div>' +
+                '<div class="doc-grid">';
+            slots.forEach(function(a) { h += renderDocCard(a); });
+            h += '</div>';
+            document.getElementById('hardwareSection').innerHTML = h;
+        }
+
+        // ── Archive (폐기 — 코드 보존, 배포 중단) ──
+        function renderArchive(apps) {
+            var dead = apps.filter(function(a) { return a.registryStatus === 'discontinued'; });
+            var h = '<div class="section-header">' +
+                '<span class="section-label">Archive</span><span class="section-line"></span>' +
+                '<span class="section-count">' + dead.length + '</span></div>' +
+                '<div class="archive-list">';
+            dead.forEach(function(a) {
+                h += '<a class="archive-item" href="' + ghBlobUrl(a.directory) + '" target="_blank" rel="noopener">' +
+                    '<div class="app-icon">' + a.icon + '</div>' +
+                    '<div><div class="ai-name">' + a.name + '</div>' +
+                    '<div class="ai-desc">' + a.description + '</div></div>' +
+                    '</a>';
+            });
+            h += '</div>';
+            document.getElementById('archiveSection').innerHTML = h;
+        }
+
+        // ── Nav scrollspy ──
+        function initNavSpy() {
+            var links = document.querySelectorAll('.mast-nav a[href^="#"]');
+            var sections = Array.prototype.slice.call(links).map(function(l) {
+                return document.querySelector(l.getAttribute('href'));
+            }).filter(Boolean);
+            var obs = new IntersectionObserver(function(entries) {
+                entries.forEach(function(e) {
+                    if (!e.isIntersecting) return;
+                    var id = '#' + e.target.id;
+                    links.forEach(function(l) {
+                        l.classList.toggle('active', l.getAttribute('href') === id);
+                    });
+                });
+            }, { rootMargin: '-56px 0px -70% 0px', threshold: 0 });
+            sections.forEach(function(s) { obs.observe(s); });
+        }
+
         function renderTimeline(apps) {
             var sorted = apps.slice().sort(function(a, b) {
                 return b.lastUpdated.localeCompare(a.lastUpdated);
@@ -1031,13 +1260,10 @@
                     + '</a>';
             });
             html += '</div>';
-            var divider = document.createElement('div');
-            divider.className = 'divider';
-            var container = document.getElementById('timelineSection').parentNode;
-            var footer = document.getElementById('footer');
             var wrapper = document.createElement('div');
             wrapper.innerHTML = html;
-            container.insertBefore(wrapper, footer);
+            // #software 섹션 바로 뒤(= archive 섹션 앞)에 페이지 링크 삽입
+            document.getElementById('software').insertAdjacentElement('afterend', wrapper);
         }
 
         function renderFooter(b) {

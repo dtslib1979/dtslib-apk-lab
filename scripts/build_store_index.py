@@ -92,6 +92,7 @@ def build_apps_json(repo_root: str, registry: list) -> list:
             "downloadUrl": download_url if (reg_status == "store-registered" and download_active) else None,
             "workflow": entry.get("workflow"),
             "releaseTag": release_tag,
+            "directory": entry.get("directory"),
             "lastUpdated": today,
         })
 

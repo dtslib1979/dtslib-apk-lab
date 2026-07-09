@@ -10,6 +10,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-capture-latest/app-debug.apk",
     "workflow": "build-capture-pipeline.yml",
     "releaseTag": "parksy-capture-latest",
+    "directory": "apps/capture-pipeline",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -23,6 +24,7 @@
     "downloadUrl": null,
     "workflow": "build-chrono-call.yml",
     "releaseTag": "chrono-call-latest",
+    "directory": "apps/chrono-call",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -36,6 +38,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-pen-latest/app-debug.apk",
     "workflow": "build-laser-pen.yml",
     "releaseTag": "parksy-pen-latest",
+    "directory": "apps/laser-pen-overlay",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -49,6 +52,7 @@
     "downloadUrl": null,
     "workflow": "build-midi-converter.yml",
     "releaseTag": "midi-converter-latest",
+    "directory": "archive/midi-converter",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -62,6 +66,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-audio-tools.yml",
     "releaseTag": "parksy-audio-tools-latest",
+    "directory": "archive/parksy-audio-tools",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -75,6 +80,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-axis-latest/app-debug.apk",
     "workflow": "build-parksy-axis.yml",
     "releaseTag": "parksy-axis-latest",
+    "directory": "apps/parksy-axis",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -88,6 +94,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-glot.yml",
     "releaseTag": "parksy-glot-latest",
+    "directory": "apps/parksy-glot",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -101,6 +108,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-studio.yml",
     "releaseTag": "parksy-studio-v1.0.0",
+    "directory": "apps/parksy-studio",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -114,6 +122,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-liner.yml",
     "releaseTag": "parksy-liner-latest",
+    "directory": "apps/parksy-liner",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -127,6 +136,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-wavesy.yml",
     "releaseTag": "parksy-wavesy-latest",
+    "directory": "archive/parksy-wavesy",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -140,6 +150,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-melody-v1.1.0/app-debug.apk",
     "workflow": "build-parksy-melody.yml",
     "releaseTag": "parksy-melody-v1.1.0",
+    "directory": "apps/parksy-melody",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -153,6 +164,7 @@
     "downloadUrl": null,
     "workflow": "build-tts-factory.yml",
     "releaseTag": "tts-factory-latest",
+    "directory": "archive/tts-factory",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -166,6 +178,7 @@
     "downloadUrl": null,
     "workflow": null,
     "releaseTag": null,
+    "directory": "devices/smart-glass",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -179,6 +192,7 @@
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/blackhole-latest/app-debug.apk",
     "workflow": "build-blackhole.yml",
     "releaseTag": "blackhole-latest",
+    "directory": "apps/blackhole",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -192,6 +206,7 @@
     "downloadUrl": null,
     "workflow": "build-parksy-printer.yml",
     "releaseTag": "parksy-printer-latest",
+    "directory": "hardware/parksy-printer",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -205,6 +220,7 @@
     "downloadUrl": null,
     "workflow": null,
     "releaseTag": null,
+    "directory": "devices/tablet",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -218,6 +234,7 @@
     "downloadUrl": null,
     "workflow": null,
     "releaseTag": null,
+    "directory": "devices/wearable-audio",
     "lastUpdated": "2026-07-09"
   },
   {
@@ -231,6 +248,7 @@
     "downloadUrl": null,
     "workflow": null,
     "releaseTag": null,
+    "directory": "hardware/toy-kit",
     "lastUpdated": "2026-07-09"
   }
 ]
