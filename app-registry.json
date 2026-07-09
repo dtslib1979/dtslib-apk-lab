@@ -353,5 +353,39 @@
     "kotlin_lines": 5,
     "discontinue_reason": "Edge TTS/Grok 품질로 대체됨. Google Cloud 과금 이슈. APK 불필요.",
     "archived": true
+  },
+  {
+    "id": "smart-glass",
+    "name": "Parksy Glass",
+    "package": null,
+    "directory": "apps/smart-glass",
+    "version": null,
+    "version_code": null,
+    "status": "planned",
+    "category": "wearable",
+    "overlay": false,
+    "description": "1인칭 POV 라이브 퍼포먼스 방송용 스마트 글래스 — 구매 대기, 미빌드",
+    "icon_emoji": "👓",
+    "release_tag": null,
+    "workflow": null,
+    "source_origin": "planning",
+    "theme_strategy": null,
+    "color_file": null,
+    "constants_path": null,
+    "home_screen_path": null,
+    "compile_sdk": null,
+    "min_sdk": null,
+    "target_sdk": null,
+    "java_version": null,
+    "dart_lines": 0,
+    "kotlin_lines": 0,
+    "candidates": [
+      "meta-raybans",
+      "samsung-galaxy-glass-jinju",
+      "xiaomi-ai-glass"
+    ],
+    "purchase_strategy": "중고 진입 — 출시 3~6개월 후 삼성/메타 계열 확보",
+    "use_case": "라이브 퍼포먼스 방송 전용 1인칭 POV 센서, 상시 착용 아님",
+    "whitepaper": "apps/smart-glass/README.md"
   }
 ]
