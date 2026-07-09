@@ -58,13 +58,13 @@
     }
   ],
   "stats": {
-    "total_apps": 12,
-    "store_apps": 8,
-    "total_dart_lines": 19946,
-    "total_kotlin_lines": 5399,
-    "total_code_lines": 25345,
+    "total_apps": 14,
+    "store_apps": 9,
+    "total_dart_lines": 20511,
+    "total_kotlin_lines": 5444,
+    "total_code_lines": 25955,
     "automation_rate": 72,
-    "total_workflows": 11
+    "total_workflows": 14
   },
   "pipeline": {
     "stages": [
@@ -111,6 +111,10 @@
       "label": "All",
       "color": "#D4AF37"
     },
+    "bridge": {
+      "label": "Bridge",
+      "color": "#FF3D00"
+    },
     "audio": {
       "label": "Audio",
       "color": "#FF6B6B"
@@ -135,8 +139,8 @@
       "label": "Creative",
       "color": "#DDA0DD"
     },
-    "hardware": {
-      "label": "Hardware",
+    "wearable": {
+      "label": "Wearable",
       "color": "#E8C547"
     }
   }

@@ -213,24 +213,46 @@ state.json         = 공정 현황판
 개인용 Android 앱 모음 프로젝트. Vercel에 스토어 페이지가 배포되어 있음.
 - Store URL: https://dtslib-apk-lab.vercel.app/
 
+**핵심 개념 — 온디바이스 ADB APK:** 이 레포는 "앱 모음"이 아니라 Good Lock/ADB 천장 위에 있는 것만
+APK로 만드는 최후 수단 창구다 (`~/.claude/CLAUDE.md` ADB 설계 철학 참조). 오버레이·상시 서비스·
+카메라·마이크 점유처럼 원격 제어만으로 못 뚫는 것만 여기 온다. 이 개념을 가장 순수하게 구현한
+앱이 **Blackhole**(폰↔PC 브릿지). 새 앱 제안이 들어오면 먼저 "ADB로 안 되나?"부터 따진다.
+
+앱 목록/카테고리/상태의 source of truth는 항상 `app-registry.json`. 이 문서의 앱 나열은
+개념 설명용 스냅샷이며 어긋나면 registry가 맞다.
+
 ## Brand Guidelines
-모든 앱은 **Parksy** 브랜드를 사용:
+모든 앱은 **Parksy** 브랜드를 사용 (Blackhole은 예외 — dtslib 네임스페이스 유지):
+- Blackhole (blackhole) — 🕳️ bridge, 핵심 개념 대표 앱
 - Parksy Capture (capture-pipeline)
-- Parksy Pen (laser-pen-overlay)
-- Parksy Wavesy (parksy-wavesy)
-- Parksy TTS (tts-factory)
 - Parksy ChronoCall (chrono-call)
-- **Parksy Studio (parksy-studio)** ← ACTIVE DEV
+- Parksy Pen (laser-pen-overlay)
+- Parksy Axis (parksy-axis) — 방송
+- Parksy Studio (parksy-studio) — 방송, 실행률 ~50%
+- Parksy Glot (parksy-glot) — 자막
+- Parksy Liner (parksy-liner) — 창작
+- Parksy Melody (parksy-melody) — 오디오
+- Parksy Glass (smart-glass) — planned, 미빌드
 
 ## Project Structure
 ```
 apps/
+├── blackhole/           # 🕳️ 온디바이스 ADB 브릿지 (핵심 개념)
 ├── capture-pipeline/    # 공유 텍스트 캡처 → GitHub 아카이브
-├── laser-pen-overlay/   # S Pen 레이저펜 오버레이
-├── parksy-wavesy/       # 음원 편집 가위 (MP3/MIDI)
-├── tts-factory/         # TTS 배치 생성기
 ├── chrono-call/         # 통화 녹음 STT 변환
-└── parksy-studio/       # 방송 제작 파이프라인 APK ← ACTIVE DEV
+├── laser-pen-overlay/   # S Pen 레이저펜 오버레이
+├── parksy-axis/         # 방송용 사고 단계 오버레이
+├── parksy-glot/         # 실시간 다국어 자막
+├── parksy-liner/        # 사진 → 스케치 (XDoG)
+├── parksy-melody/       # YouTube 오디오 컷 + 텔레그램 브릿지
+├── parksy-studio/       # 방송 제작 파이프라인 APK
+└── smart-glass/         # planned — 백서만, 코드 없음
+
+archive/                 # 폐기 앱 (코드 보존, 배포 중단)
+├── midi-converter/
+├── parksy-audio-tools/
+├── parksy-wavesy/
+└── tts-factory/
 
 dashboard/
 ├── apps.json            # 스토어 표시용 앱 목록
