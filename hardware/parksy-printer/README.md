@@ -31,7 +31,9 @@ dtslib-papyrus는 콘텐츠를 전자 형태(웹진, MCP, 유튜브)로만 유�
 `docs/PARKSY_APK_PHILOSOPHY.md` "Phase: 하드웨어" 로드맵의 첫 번째 구현체.
 저가 중국 IoT 제품에 커스텀 펌웨어를 얹어 필요한 만큼만 패치하는 방식 —
 완제품을 그대로 쓰는 게 아니라 부품으로 뜯어서 재조립하는 이 레포 전체의 철학과 동일하다
-(스마트 글래스 백서 `apps/smart-glass/README.md`와 같은 패턴).
+(스마트 글래스 백서 `devices/smart-glass/README.md`와 같은 패턴).
+
+같은 개념의 형제 슬롯: [`hardware/toy-kit`](../toy-kit) — 저가 ESP32 로봇/드론 키트로 확장된 일반형.
 
 ## 아날로그 태블릿 서플라이 체인
 

@@ -221,10 +221,15 @@ APK로 만드는 최후 수단 창구다 (`~/.claude/CLAUDE.md` ADB 설계 철�
 "ADB로 안 되나?"부터 따진다.
 
 ```
-PC(WSL2, 연산 두뇌) --ADB--> Phone(devices/phone, 중심) --확장--> Tablet / Wearable-Audio / Smart Glass
+PC(WSL2, 연산 두뇌) --ADB--> Phone(devices/phone, 중심)
+                                ├── 확장(착용) --> Tablet / Wearable-Audio / Smart Glass   (devices/)
+                                └── 컴패니언 앱(WiFi/BT) --> ESP32 물리 하드웨어              (hardware/)
 ```
 
-태블릿·이어폰·글라스는 전부 `devices/`에 폰 슬롯의 확장으로 위치한다. 대등한 별도 축이 아니다.
+태블릿·이어폰·글라스는 `devices/`(폰이 **착용**)에, ESP32 프린터·장난감은 `hardware/`(폰이
+**조종**)에 있다 — "몸에 걸치는 확장" vs "손으로 만들어 조종하는 확장"으로 구분한다.
+`hardware/` 개념은 커뮤니티 검증 패턴(ESP32+Android 컴패니언 앱 로봇/드론) 기반 —
+`hardware/README.md` 참조.
 
 앱 목록/카테고리/상태의 source of truth는 항상 `app-registry.json`. 이 문서의 앱 나열은
 개념 설명용 스냅샷이며 어긋나면 registry가 맞다.
@@ -245,11 +250,15 @@ PC(WSL2, 연산 두뇌) --ADB--> Phone(devices/phone, 중심) --확장--> Tablet
 
 ## Project Structure
 ```
-devices/                 # 온디바이스 확장 슬롯 계층 (개념 지도, 전부 planned 또는 링크)
+devices/                 # 온디바이스 확장 슬롯 계층 — 폰이 "착용"하는 것 (개념 지도)
 ├── phone/                # 기본 슬롯 — 이 레포의 물리적 중심. 구현체는 apps/blackhole
 ├── tablet/                # 확장 슬롯 — planned, 용도 미정
 ├── wearable-audio/        # 확장 슬롯 — planned, 이어폰
 └── smart-glass/           # 확장 슬롯 — planned, 구매 대기 백서
+
+hardware/                 # 물성화된 플러그 — 폰이 "조종"하는 ESP32 물리 하드웨어
+├── parksy-printer/        # planned — 출판사 하드카피 출력, ESC/POS
+└── toy-kit/                # planned — ESP32 로봇/드론류, 용도 미정
 
 apps/                     # 실제 빌드되는 소프트웨어 (Flutter/Kotlin, CI 연결)
 ├── blackhole/            # 🕳️ 온디바이스 ADB 브릿지 (devices/phone 구현체, 핵심 개념)
@@ -260,8 +269,7 @@ apps/                     # 실제 빌드되는 소프트웨어 (Flutter/Kotlin,
 ├── parksy-glot/          # 실시간 다국어 자막
 ├── parksy-liner/         # 사진 → 스케치 (XDoG)
 ├── parksy-melody/        # YouTube 오디오 컷 + 텔레그램 브릿지
-├── parksy-studio/        # 방송 제작 파이프라인 APK
-└── parksy-printer/       # planned — 출판사 하드카피 출력(ESP32), device-slot 개념과 별개
+└── parksy-studio/        # 방송 제작 파이프라인 APK
 
 archive/                  # 폐기 앱 (코드 보존, 배포 중단)
 ├── midi-converter/

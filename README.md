@@ -16,14 +16,9 @@ PC (WSL2)           연산 두뇌 — 무거운 작업은 전부 여기서
   ▼
 Phone (S25 Ultra)    온디바이스 계층의 중심 — devices/phone
   │
-  │  확장
-  ▼
-┌───────────┬──────────────┬─────────────┐
-│  Tablet   │ Wearable-    │ Smart Glass │
-│  (planned)│ Audio(이어폰) │  (planned)  │
-│           │  (planned)   │             │
-└───────────┴──────────────┴─────────────┘
-   devices/tablet  devices/wearable-audio  devices/smart-glass
+  ├── 확장(착용) ──▶ Tablet / Wearable-Audio / Smart Glass       devices/
+  │
+  └── 컴패니언 앱(WiFi/BT) ──▶ ESP32 물리 하드웨어 (프린터/장난감)  hardware/
 ```
 
 폰은 WSL2 PC를 섬기는 SSH 클라이언트다. 대부분의 자동화는 ADB 원격 조종으로 끝나지만,
@@ -31,7 +26,8 @@ Phone (S25 Ultra)    온디바이스 계층의 중심 — devices/phone
 그래서 이 레포의 앱은 "일반 앱스토어 앱"이 아니라 **폰과 PC 사이의 물리적 틈을 메우는 브릿지 부품**이다.
 
 이 개념을 가장 순수하게 구현한 앱이 **[Blackhole](apps/blackhole)** — "모든 디바이스를 PC로 연결한다."
-폰 슬롯의 개념 문서는 [`devices/phone`](devices/phone), 확장 슬롯은 [`devices/`](devices) 참조.
+폰이 **착용**하는 확장은 [`devices/`](devices) (태블릿·이어폰·글라스), 폰이 **조종**하는 물리
+하드웨어는 [`hardware/`](hardware) (ESP32 프린터·장난감) — 둘은 다른 관계라 분리했다.
 
 ## 📦 App 카탈로그 (개념별 분류)
 
@@ -77,10 +73,14 @@ Phone (S25 Ultra)    온디바이스 계층의 중심 — devices/phone
 | **Wearable Audio (이어폰)** | planned | 핸즈프리 오디오 입출력. [상세](devices/wearable-audio/README.md) |
 | **Smart Glass** | planned | 1인칭 POV 라이브 퍼포먼스 방송. [백서](devices/smart-glass/README.md) |
 
-### 🖨️ Hardware — 계획 슬롯
-| App | Status | Description |
+### 🖨️ Hardware — 폰이 조종하는 물리 하드웨어 (전부 planned)
+> 폰이 **착용**하는 [`devices/`](devices)와 달리, 폰이 컴패니언 앱으로 **조종**하는 ESP32 기반
+> 물리 키트. 커뮤니티 검증 패턴(ESP32+Android 앱 로봇/드론) 기반, [개념](hardware/README.md) 참조.
+
+| Slot | Status | Description |
 |-----|--------|-------------|
-| **Parksy Printer** | planned | 출판사 실물 하드카피 출력 — ESP32 + 열지 프린터, 음성→ESC/POS. [상세](apps/parksy-printer/README.md) |
+| **Parksy Printer** | planned | 출판사 실물 하드카피 출력 — ESP32 + 열지 프린터, 음성→ESC/POS. [상세](hardware/parksy-printer/README.md) |
+| **Toy Kit** | planned | ESP32 로봇/드론류 저가 키트, 용도 미정. [상세](hardware/toy-kit/README.md) |
 
 ### 🗄️ Archive — 폐기 (서사 보존, 코드는 archive/ 로 격리)
 | App | Discontinue Reason |

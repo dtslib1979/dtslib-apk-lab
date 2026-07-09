@@ -139,9 +139,13 @@ APK 하나가 동시에:
 - Claude Code로 펌웨어 개발
 - 직접 움직이는 장난감, 필요한 제품 패치
 - 제작 과정 자체가 방송 콘텐츠
-- **parksy-printer**: 출판사(dtslib-papyrus) 실물 하드카피 출력 라인. ESP32 + 열지 전표 프린터.
-  2026-03-17 최초 등록, 4개월 미착수로 2026-07-09 일시 제거했다가 출판사 하드카피 요구사항이
-  실제로 확인되어 즉시 복구(`apps/parksy-printer/README.md` 참조). status: planned.
+- **hardware/** 최상위 폴더로 개념 승격(2026-07-09) — "폰이 착용하는 `devices/`"와
+  "폰이 컴패니언 앱으로 조종하는 `hardware/`"를 명시적으로 분리. 커뮤니티 검증 패턴
+  (ESP32 + Android 앱 로봇/드론) 기반, `hardware/README.md` 참조.
+  - **parksy-printer**: 출판사(dtslib-papyrus) 실물 하드카피 출력 라인. ESP32 + 열지 전표 프린터.
+    2026-03-17 최초 등록, 4개월 미착수로 2026-07-09 일시 제거했다가 출판사 하드카피 요구사항이
+    실제로 확인되어 즉시 복구, `hardware/parksy-printer/README.md`로 정착. status: planned.
+  - **toy-kit**: ESP32 로봇/드론류 일반형 슬롯. status: planned.
 
 ### Phase: 콘텐츠 팩토리 (목표)
 - 팹 라인 가동 → 콘텐츠 양산

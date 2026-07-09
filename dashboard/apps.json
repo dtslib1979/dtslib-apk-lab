@@ -208,5 +208,18 @@
     "workflow": null,
     "releaseTag": null,
     "lastUpdated": "2026-07-09"
+  },
+  {
+    "id": "toy-kit",
+    "name": "Toy Kit",
+    "version": "-",
+    "registryStatus": "planned",
+    "category": "hardware",
+    "description": "저가 ESP32 로봇/드론 키트 — 폰 컴패니언 앱으로 조종. 용도 미정.",
+    "icon": "🤖",
+    "downloadUrl": null,
+    "workflow": null,
+    "releaseTag": null,
+    "lastUpdated": "2026-07-09"
   }
 ]
