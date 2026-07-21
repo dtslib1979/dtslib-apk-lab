@@ -786,3 +786,31 @@ D:\PARKSY\dtslib-localpc\repos\dtslib-apk-lab.md  ← 이 레포 상세
 | **브라우저** | Google Chrome |
 | **이유** | APK 실험실 — Store+Factory IT 튜토리얼 |
 | **URL** | https://dtslib-apk-lab.vercel.app |
+
+---
+
+## 📡 YouTube 채널 API 작업 전 필수 확인 (2026-07-21 확정)
+
+> 유튜브 채널 브랜딩/업로드 등 API 작업하기 전에 이 블록부터 읽는다.
+> 전체 상세: `~/dtslib-papyrus/infra-history/21_YOUTUBE_BRAND_ACCOUNT_OAUTH_20260721.md`,
+> `~/dtslib-papyrus/infra-history/22_CHANNEL_ONETIME_CONSENT_PRINCIPLE_20260721.md`
+
+**핵심 원칙**: `youtube` 스코프는 구글이 "민감한 범위"로 분류하고 parksy-youtube
+프로젝트는 미검증 상태다. **채널마다 최초 1회는 박씨가 PC 앞에서 직접 동의
+클릭이 필요**하지만, 그 뒤로는 영구적으로 원격(Claude Code API 호출)으로
+작업 가능하다 — WSL2가 재부팅 안 하고 브라우저 프로필이 유지되기 때문.
+
+**16개 채널 현황 (2026-07-21 기준)**:
+- ✅ 동의완료(원격 작업 가능): `@blogger-parksy`, `@dtslib-branch`, `@EAE-University`, `@phoneparis-r6q`
+- ❌ 차단 확인: `@BeingEduartEngineer-4`(eae.kr) — "Service unavailable" 뜨면 이 문제
+- ⚠️ 토큰 만료(재로그인 필요): account d 소속 `@dtslib_com`, `@dtslib_world`
+- ❓ 미확인: 나머지 9개 (musician-parksy/visualizer-parksy/technician-parksy/
+  philosopher-parksy/방송인박씨-v1o/espiritu-tango/artrew/alexandria/justino)
+
+**403 "Service unavailable" 뜨면**: 새 GCP 프로젝트 만들지 말 것(헛수고 확인됨,
+똑같이 미검증이라 재현됨). 해법은 (1) 그 채널로 박씨가 PC 앞에서 최초 1회
+동의 클릭, 또는 (2) 구글 앱 검수 제출 뿐이다.
+
+**재사용 도구**: `~/dtslib-papyrus/tools/youtube/yt_oauth_channel.cjs` —
+WSLg Playwright 크래시 3종 해결판 (GPU/chromium빌드/QUIC 이슈 전부 수정 완료,
+문서 §1~2 참조). `node yt_oauth_channel.cjs @채널핸들`로 실행.
