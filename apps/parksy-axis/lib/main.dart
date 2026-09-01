@@ -11,6 +11,7 @@
 ///   - core/ 모듈 분리
 
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'app.dart';
@@ -45,11 +46,48 @@ class _OverlayAppState extends State<_OverlayApp> {
   int _currentW = OverlayDefaults.width;
   int _currentH = OverlayDefaults.height;
 
+  ServerSocket? _ctl;
+
   @override
   void initState() {
     super.initState();
     _listenForData();
     _load();
+    _startCtlSocket();
+  }
+
+  /// 터미널 라우팅용 localhost 커맨드 소켓 (트랙 C: teach_dispatch.sh).
+  /// `echo next | nc 127.0.0.1 8492`  ·  next / prev / reset / jump N
+  Future<void> _startCtlSocket() async {
+    try {
+      _ctl = await ServerSocket.bind(InternetAddress.loopbackIPv4, 8492, shared: true);
+      _ctl!.listen((sock) {
+        sock.cast<List<int>>().transform(utf8.decoder).listen((line) {
+          for (final raw in line.split('\n')) {
+            final cmd = raw.trim().toLowerCase();
+            if (cmd.isEmpty) continue;
+            if (cmd == 'next') _next();
+            else if (cmd == 'prev') {
+              final n = _cfg.stages.length;
+              if (n > 0) setState(() => _idx = (_idx - 1 + n) % n);
+            } else if (cmd == 'reset') _jump(0);
+            else if (cmd.startsWith('jump ')) {
+              final i = int.tryParse(cmd.substring(5).trim());
+              if (i != null) _jump(i);
+            }
+          }
+        });
+      });
+      debugPrint('[Overlay] ctl socket :8492');
+    } catch (e) {
+      debugPrint('[Overlay] ctl socket fail: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctl?.close();
+    super.dispose();
   }
 
   /// 메인 앱에서 shareData()로 설정을 직접 수신
