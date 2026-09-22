@@ -6,13 +6,21 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Insets;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.ViewConfiguration;
+import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.WindowMetrics;
 import android.widget.FrameLayout;
 import android.widget.VideoView;
 
@@ -59,9 +67,24 @@ import java.util.Locale;
  *
  * extras (전부 선택):
  *   w / h    창 크기(dp). 기본 96 x 155 (가로:세로 = 액자 비율 402:650)
- *   x / y    오른쪽·아래 여백(dp). 기본 6 / 6
+ *   x / y    **처음 띄울 때만** 쓰는 오른쪽·아래 여백(dp). 기본 6 / 6.
+ *            한 번 손으로 옮기면 그 위치가 저장되어 이 값은 무시된다 —
+ *            매번 명령으로 위치를 되돌리면 옮겨놓은 자리가 계속 풀려서 못 쓴다.
  *   video    재생할 파일 경로. 절대경로. 안 주면 APK 에 넣은 기본 액자를 쓴다
  *   mute     1=무음(기본), 0=소리 냄
+ *
+ * ── 끌어서 옮기기 (2026-09-22 Boss 요청) ──────────────────────────────────
+ * 액자를 손가락으로 끌면 그대로 따라온다. 손을 떼는 순간 위치를 저장하고,
+ * 다음에 켤 때 같은 자리에 뜬다.
+ *
+ * 왜 절대 좌표(TOP|START)로 바꿨나: 처음엔 Gravity.BOTTOM|END 에 여백을 줬는데,
+ * 그 좌표계는 **오른쪽·아래에서 재는 값**이라 끌 때마다 부호를 뒤집어야 하고
+ * (오른쪽으로 가면 x 가 줄어든다) 화면 밖으로 나가는지도 매번 다시 계산해야 한다.
+ * TOP|START 로 두면 x·y 가 그대로 "왼쪽 위 모서리의 화면 좌표"라 손가락 이동량을
+ * 그냥 더하면 끝난다.
+ *
+ * 손을 뗀 자리를 기억하지 않으면 이 기능은 쓸모가 없다 — 방송 준비를 다시 할
+ * 때마다 액자가 오른쪽 아래로 되돌아가므로 매번 다시 끌어야 한다.
  *
  * ── 무음이 기본인 이유 ────────────────────────────────────────────────────
  * 이 액자는 **녹화 중인 화면에 얹히는 소품**이다. 소리를 내면 Boss 의 목소리나
@@ -81,6 +104,14 @@ public class TvOverlayService extends Service {
 
     private static final int DEFAULT_H_DP = 155;
     private static final int DEFAULT_MARGIN_DP = 6;
+
+    /**
+     * 옮겨놓은 위치 저장소. 플러터가 쓰는 FlutterSharedPreferences 와 **다른 파일**이다 —
+     * 섞으면 나중에 한쪽이 다른 쪽 키를 덮어쓴다.
+     */
+    private static final String PREFS = "axis_tv_position";
+    private static final String KEY_X = "x";
+    private static final String KEY_Y = "y";
 
     private WindowManager wm;
     private FrameLayout root;
@@ -132,8 +163,14 @@ public class TvOverlayService extends Service {
             return;
         }
 
-        FrameLayout box = new FrameLayout(this);
+        final int wPx = dpToPx(wDp);
+        final int hPx = dpToPx(hDp);
+
+        final FrameLayout box = new FrameLayout(this);
         VideoView vv = new VideoView(this);
+        // 영상이 터치를 삼키면 액자를 못 끈다. 클릭 대상에서 빼 둔다.
+        vv.setClickable(false);
+        vv.setFocusable(false);
 
         box.addView(vv, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -143,8 +180,8 @@ public class TvOverlayService extends Service {
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
-        WindowManager.LayoutParams p = new WindowManager.LayoutParams(
-                dpToPx(wDp), dpToPx(hDp),
+        final WindowManager.LayoutParams p = new WindowManager.LayoutParams(
+                wPx, hPx,
                 0, 0,
                 type,
                 // FLAG_NOT_FOCUSABLE 를 쓴다 — 이 창에는 글자 입력란이 없다.
@@ -158,9 +195,81 @@ public class TvOverlayService extends Service {
                         | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT);
 
-        p.gravity = Gravity.BOTTOM | Gravity.END;   // 오른쪽 아래 = 콘티의 반대편
-        p.x = dpToPx(mxDp);
-        p.y = dpToPx(myDp);
+        // ── 위치 좌표계: 왼쪽 위 모서리의 **화면 좌표** (절대값) ────────────────
+        // 예전엔 Gravity.BOTTOM|END + 여백이었다. 그 좌표계는 오른쪽·아래에서
+        // 재는 값이라, 끌 때마다 부호를 뒤집어야 하고(오른쪽으로 가면 x 가 줄어든다)
+        // 한 번 틀리면 액자가 손가락 반대로 간다. TOP|START 로 두면 손가락 이동량을
+        // 그냥 더하면 끝난다.
+        p.gravity = Gravity.TOP | Gravity.START;
+
+        // 끌 수 있는 범위. 처음 놓을 자리를 정할 때 한 번 재고,
+        // 손을 댈 때(ACTION_DOWN)마다 다시 잰다 — 화면 규격이 바뀌었을 수 있다.
+        final Rect lim = usableBounds();
+
+        int[] home = savedPos();
+        if (home != null) {
+            p.x = home[0];
+            p.y = home[1];
+        } else {
+            // 저장된 자리가 없을 때만 여백을 쓴다. 오른쪽 아래 = 콘티의 반대편.
+            p.x = lim.right - wPx - dpToPx(mxDp);
+            p.y = lim.bottom - hPx - dpToPx(myDp);
+        }
+        p.x = clamp(p.x, lim.left, Math.max(lim.left, lim.right - wPx));
+        p.y = clamp(p.y, lim.top, Math.max(lim.top, lim.bottom - hPx));
+
+        // ── 끌어서 옮기기 (2026-09-22 Boss 요청) ────────────────────────────
+        // FLAG_NOT_FOCUSABLE 은 창 **안쪽** 터치를 막지 않는다(막는 건 NOT_TOUCHABLE).
+        // 그래서 이 창은 이미 손가락을 받고 있고, 받은 걸 위치에 반영하기만 하면 된다.
+        final int[] grab = new int[2];    // 손을 댄 지점(화면 좌표)
+        final int[] from = new int[2];    // 그 순간의 창 위치
+        final boolean[] moving = {false};
+        // 손떨림과 끌기를 가른다. 이게 없으면 스치기만 해도 액자가 밀린다.
+        final int slop = ViewConfiguration.get(this).getScaledTouchSlop();
+
+        box.setOnTouchListener((v, e) -> {
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    grab[0] = (int) e.getRawX();
+                    grab[1] = (int) e.getRawY();
+                    from[0] = p.x;
+                    from[1] = p.y;
+                    moving[0] = false;
+                    lim.set(usableBounds());
+                    return true;
+
+                case MotionEvent.ACTION_MOVE: {
+                    int dx = (int) e.getRawX() - grab[0];
+                    int dy = (int) e.getRawY() - grab[1];
+                    if (!moving[0]) {
+                        if (Math.hypot(dx, dy) < slop) return true;   // 아직 스치기
+                        moving[0] = true;
+                    }
+                    // 화면 밖으로는 못 나간다. 안 막으면 상태바·내비바 밑으로
+                    // 들어가 손을 뗀 뒤 다시 못 꺼낸다.
+                    p.x = clamp(from[0] + dx, lim.left, Math.max(lim.left, lim.right - p.width));
+                    p.y = clamp(from[1] + dy, lim.top, Math.max(lim.top, lim.bottom - p.height));
+                    try {
+                        wm.updateViewLayout(box, p);
+                    } catch (Exception ex) {
+                        Log.e(TAG, "옮기기 실패", ex);
+                    }
+                    return true;
+                }
+
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (moving[0]) {
+                        savePos(p.x, p.y);   // 손 뗀 자리를 기억한다 — 다음에 그 자리에 뜬다
+                        Log.i(TAG, "위치 저장 " + p.x + "," + p.y);
+                    }
+                    moving[0] = false;
+                    return true;
+
+                default:
+                    return false;
+            }
+        });
 
         vv.setVideoPath(path);
         vv.setOnPreparedListener(mp -> {
@@ -231,6 +340,58 @@ public class TvOverlayService extends Service {
             Log.e(TAG, "기본 액자를 꺼내지 못했습니다: " + e.getMessage());
             return out.exists() ? out.getAbsolutePath() : null;
         }
+    }
+
+    /**
+     * 액자를 놓을 수 있는 화면 영역(px). 상태바·내비바를 뺀 값이다.
+     *
+     * 왜 빼는가: 이 창은 FLAG_LAYOUT_NO_LIMITS 라 제한이 없으면 상태바 밑이나
+     * 내비바 밑까지 들어간다. 거기 들어가면 **손을 뗀 뒤 다시 못 꺼낸다** —
+     * 액자가 시스템 UI 에 가려 손가락이 닿지 않기 때문이다.
+     *
+     * 실측으로 맞춘 값 (1080x2340 @450dpi, 2026-09-22):
+     *   BOTTOM|END + 6dp 였을 때 창이 y=1754 에 앉았다 → 내비바 135px(=48dp).
+     *   그 값이 그대로 나오는지 확인하는 게 이 계산이 맞는지 보는 방법이다.
+     */
+    private Rect usableBounds() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                WindowMetrics m = wm.getCurrentWindowMetrics();
+                Rect b = new Rect(m.getBounds());
+                Insets in = m.getWindowInsets()
+                        .getInsetsIgnoringVisibility(WindowInsets.Type.systemBars());
+                b.inset(in.left, in.top, in.right, in.bottom);
+                if (b.width() > 0 && b.height() > 0) return b;
+            } catch (Exception e) {
+                Log.w(TAG, "화면 영역을 못 읽어 전체 화면으로 갑니다", e);
+            }
+        }
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        return new Rect(0, 0, dm.widthPixels, dm.heightPixels);
+    }
+
+    /** Boss 가 끌어다 놓은 자리. 없으면 null (= 기본값인 오른쪽 아래를 쓴다는 뜻). */
+    private int[] savedPos() {
+        try {
+            SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
+            if (!sp.contains(KEY_X) || !sp.contains(KEY_Y)) return null;
+            return new int[]{sp.getInt(KEY_X, 0), sp.getInt(KEY_Y, 0)};
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void savePos(int x, int y) {
+        try {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putInt(KEY_X, x).putInt(KEY_Y, y).apply();
+        } catch (Exception e) {
+            Log.w(TAG, "위치 저장 실패 (치명적이지 않음)", e);
+        }
+    }
+
+    private static int clamp(int v, int lo, int hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
     }
 
     private int dpToPx(int dp) {
