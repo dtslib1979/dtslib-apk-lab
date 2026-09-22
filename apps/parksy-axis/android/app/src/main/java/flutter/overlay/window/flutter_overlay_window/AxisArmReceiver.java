@@ -138,7 +138,24 @@ public class AxisArmReceiver extends BroadcastReceiver {
         WindowSetup.width = dpToPx(app, wDp);
         WindowSetup.height = dpToPx(app, hDp);
         WindowSetup.gravity = Gravity.BOTTOM | Gravity.LEFT;
-        WindowSetup.flag = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
+
+        // ── 키보드를 빼앗지 마라 (2026-09-22 실측 버그) ──────────────────────
+        // 여기 원래 FLAG_NOT_TOUCH_MODAL 이 박혀 있었다. 그건 **포커스 가능**한
+        // 창을 만든다 — 플러그인 이름도 그걸 알고 `focusPointer` 라 부른다.
+        // 포커스 가능 = IME(삼성 키보드)가 이 창으로 붙는다. 그런데 이 창엔
+        // 글자 입력란이 없다. 그래서 키보드는 뜨는데 **글자가 터미널로 안 간다.**
+        // Boss 증상: "Axis 구동하면 삼성 키보드가 먹지가 않아. 너랑 말로 대화를
+        // 해야 되는데 불가능해" — 이 한 줄이 원인이다.
+        //
+        // 더 나쁜 건 이 교체가 **아무것도 얻지 못했다**는 점이다. 안드로이드 문서상
+        // FLAG_NOT_FOCUSABLE 은 FLAG_NOT_TOUCH_MODAL 을 **내포한다**
+        // ("this flag will also enable FLAG_NOT_TOUCH_MODAL").
+        // 즉 바깥 터치는 원래도 통과했고, 우리는 포커스만 빼앗은 순수 손실이었다.
+        //
+        // 그리고 NOT_FOCUSABLE 은 **창 안쪽 터치를 막지 않는다** (그건 NOT_TOUCHABLE).
+        // 오버레이의 onTap(_next) · onJump · 드래그는 전부 그대로 산다.
+        // → 되돌린다. 플러그인 기본값이 옳았다.
+        WindowSetup.flag = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         WindowSetup.enableDrag = true;
         WindowSetup.positionGravity = "none";
         WindowSetup.overlayTitle = "Parksy Axis";
