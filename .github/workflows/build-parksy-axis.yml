@@ -54,6 +54,9 @@ jobs:
       - name: Print signing fingerprint
         run: |
           KS="$HOME/.android/debug.keystore"
+          # keytool 은 상위 디렉터리를 만들지 않는다. 러너 이미지에는 ~/.android 가
+          # 아예 없어서, 이 mkdir 없이 첫 빌드가 keytool 에서 죽었다(2026-09-22).
+          mkdir -p "$HOME/.android"
           [ -f "$KS" ] || keytool -genkeypair -v -keystore "$KS" -storepass android \
             -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
             -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
