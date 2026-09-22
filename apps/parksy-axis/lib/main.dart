@@ -57,7 +57,14 @@ class _OverlayAppState extends State<_OverlayApp> {
   }
 
   /// 터미널 라우팅용 localhost 커맨드 소켓 (트랙 C: teach_dispatch.sh).
-  /// `echo next | nc 127.0.0.1 8492`  ·  next / prev / reset / jump N
+  /// `echo next | nc 127.0.0.1 8492`  ·  next / prev / reset / jump N / reload
+  ///
+  /// reload = 콘티를 **서비스 재시작 없이** 다시 읽는다.
+  /// 왜 필요한가: 설정 파일을 바꿔도 _load() 는 initState 에서 한 번뿐이라
+  /// 재시작 전에는 반영되지 않는다. 그런데 서비스 재시작은 창 규격(위치·크기)을
+  /// static 기본값으로 날리고 화면이 깜빡인다 — 녹화 중에는 치명적이다.
+  /// reload 는 _load() 만 다시 부르므로 창은 그대로, 깜빡임 없이 내용만 바뀐다.
+  /// 에이전트가 백그라운드로 콘티를 갈아끼우는 정상 경로가 이 명령이다.
   Future<void> _startCtlSocket() async {
     try {
       _ctl = await ServerSocket.bind(InternetAddress.loopbackIPv4, 8492, shared: true);
@@ -71,6 +78,7 @@ class _OverlayAppState extends State<_OverlayApp> {
               final n = _cfg.stages.length;
               if (n > 0) setState(() => _idx = (_idx - 1 + n) % n);
             } else if (cmd == 'reset') _jump(0);
+            else if (cmd == 'reload') _load();
             else if (cmd.startsWith('jump ')) {
               final i = int.tryParse(cmd.substring(5).trim());
               if (i != null) _jump(i);

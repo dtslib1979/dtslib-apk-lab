@@ -72,16 +72,16 @@
   {
     "id": "parksy-axis",
     "name": "Parksy Axis",
-    "version": "v11.1.0",
+    "version": "v11.2.0",
     "registryStatus": "store-registered",
     "category": "broadcast",
-    "description": "방송용 사고 단계 오버레이 - shareData IPC 동기화",
+    "description": "방송용 사고 단계 오버레이 — 에이전트 백그라운드 무장 + :8492 제어 소켓",
     "icon": "🎯",
     "downloadUrl": "https://github.com/dtslib1979/dtslib-apk-lab/releases/download/parksy-axis-latest/app-debug.apk",
     "workflow": "build-parksy-axis.yml",
     "releaseTag": "parksy-axis-latest",
     "directory": "apps/parksy-axis",
-    "lastUpdated": "2026-07-09"
+    "lastUpdated": "2026-09-22"
   },
   {
     "id": "parksy-glot",

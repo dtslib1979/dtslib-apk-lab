@@ -39,6 +39,27 @@ jobs:
           flutter clean
           flutter pub get
 
+      # ── debug 키스토어 고정 ─────────────────────────────────────────────
+      # 러너는 매번 새 컨테이너라 ~/.android/debug.keystore 가 없으면 Gradle 이
+      # **새 키를 즉석 생성**한다. 그러면 실행마다 서명이 달라져, 폰에 덮어 설치할 때
+      # SIGNATURE_MISMATCH 로 막히고 → 지웠다 깔아야 하고 → 앱 데이터(주입한 콘티·
+      # 누적 라이브러리)가 사라진다. 키를 캐시해서 서명을 한 번 고정한다.
+      # (debug 키는 비밀이 아니다 — 비밀번호가 공개된 안드로이드 표준 키다)
+      - name: Cache debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: parksy-axis-debug-keystore-v1
+
+      - name: Print signing fingerprint
+        run: |
+          KS="$HOME/.android/debug.keystore"
+          [ -f "$KS" ] || keytool -genkeypair -v -keystore "$KS" -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          keytool -list -v -keystore "$KS" -storepass android -alias androiddebugkey \
+            | grep -E 'SHA256|SHA-1' | head -2
+
       - name: Build Debug APK
         run: flutter build apk --debug
 
