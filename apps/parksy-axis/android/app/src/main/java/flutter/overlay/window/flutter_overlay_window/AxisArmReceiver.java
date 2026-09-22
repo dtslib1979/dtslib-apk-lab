@@ -144,8 +144,20 @@ public class AxisArmReceiver extends BroadcastReceiver {
         WindowSetup.overlayTitle = "Parksy Axis";
         WindowSetup.overlayContent = "방송 콘티";
 
-        // ⑥ 서비스 기동
+        // ⑥ 위치 미세조정 — 플러그인의 px/dp 이중환산 버그를 우회한다.
+        //    OverlayService.onStartCommand:
+        //        int dy = startY == DEFAULT_XY ? -statusBarHeightPx() : startY;
+        //        moveOverlay(dx, dy) → params.y = dpToPx(y);
+        //    상태바 높이는 **px** 인데 moveOverlay 는 그 값을 **dp** 로 다시 환산한다.
+        //    실측(2026-09-22, 1080x2340 @450dpi): 상태바 85px → -239px 로 부풀어
+        //    BOTTOM 정렬에서 창이 화면 아래로 239px 밀려났다.
+        //        frame=[0,1601]-[731,2444] vs 부모 하단 2205 → 843px 중 239px(28%)가 화면 밖
+        //    260dp 콘티의 아래 1~2줄이 안 보인다는 뜻이다.
+        //    startY 를 0 으로 **명시**하면 이 기본값 분기를 타지 않아 flush 하게 앉는다.
+        //    x/y 는 콘티 JSON 이 아니라 방송 현장에서 미는 값이라 extras 로 받는다.
         Intent svc = new Intent(app, OverlayService.class);
+        svc.putExtra("startX", intent.getIntExtra("x", 0));
+        svc.putExtra("startY", intent.getIntExtra("y", 0));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             app.startForegroundService(svc);
         } else {
