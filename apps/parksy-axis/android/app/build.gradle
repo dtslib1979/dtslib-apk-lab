@@ -47,6 +47,26 @@ android {
         versionName flutterVersionName
     }
 
+    // ── 서명 키스토어 고정 (CI 전용) ──────────────────────────────────────
+    // 왜: 기본 경로(~/.android/debug.keystore)에 기대면 빌드마다 서명이 달라진다.
+    //     2026-09-22 실측 — CI 로그상 키스토어는 06:22:04 에 만들어졌는데
+    //     APK 에 박힌 인증서는 06:25:20 생성이었다. Gradle 이 그 사이에 다른 키로
+    //     갈아치웠다는 뜻이다. 서명이 달라지면 폰에 **덮어 설치가 거부**되고,
+    //     지웠다 깔면 앱 데이터(누적 콘티)가 날아간다.
+    //     그래서 CI 에서는 경로를 못 박고, 그 파일을 캐시로 물려준다.
+    // AXIS_KEYSTORE 가 없으면(로컬 개발) 이 블록은 아무 일도 하지 않는다.
+    signingConfigs {
+        def ciKeystore = System.getenv("AXIS_KEYSTORE")
+        if (ciKeystore != null && file(ciKeystore).exists()) {
+            debug {
+                storeFile file(ciKeystore)
+                storePassword "android"
+                keyAlias "androiddebugkey"
+                keyPassword "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             signingConfig signingConfigs.debug

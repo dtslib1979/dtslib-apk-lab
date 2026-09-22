@@ -49,7 +49,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
-          key: parksy-axis-debug-keystore-v1
+          key: parksy-axis-debug-keystore-v2
 
       - name: Print signing fingerprint
         run: |
@@ -64,7 +64,39 @@ jobs:
             | grep -E 'SHA256|SHA-1' | head -2
 
       - name: Build Debug APK
+        # AXIS_KEYSTORE 로 경로를 못 박는다. 안 박으면 Gradle 이 기본 경로에서
+        # 다른 키를 만들어 서명이 흔들린다(2026-09-22 실측: 키스토어 06:22:04 생성
+        # vs APK 인증서 06:25:20 생성 = 다른 키).
+        env:
+          AXIS_KEYSTORE: /home/runner/.android/debug.keystore
         run: flutter build apk --debug
+
+      # ── 서명 게이트 ─────────────────────────────────────────────────────
+      # 서명이 어긋난 APK 는 폰에 **덮어 설치가 안 된다.** 그러면 지웠다 깔아야
+      # 하고 앱 데이터가 날아간다. 그런 APK 를 조용히 배포하느니 여기서 죽는다.
+      - name: Verify APK signing cert matches the keystore
+        run: |
+          set -euo pipefail
+          KS="$HOME/.android/debug.keystore"
+          APK=build/app/outputs/flutter-apk/app-debug.apk
+          norm() { tr -d ': \n' | tr 'A-Z' 'a-z'; }
+          WANT=$(keytool -list -v -keystore "$KS" -storepass android -alias androiddebugkey \
+                 | grep -m1 'SHA256:' | sed 's/.*SHA256://' | norm)
+          # apksigner 가 정본(v1/v2/v3 전부 본다). 없으면 keytool 로 폴백(v1 만).
+          APKSIGNER=$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "${APKSIGNER:-}" ] && [ -x "$APKSIGNER" ]; then
+            GOT=$("$APKSIGNER" verify --print-certs "$APK" \
+                  | grep -m1 'SHA-256 digest' | sed 's/.*digest: *//' | norm)
+          else
+            echo "apksigner 를 못 찾음 — keytool 로 폴백"
+            GOT=$(keytool -printcert -jarfile "$APK" \
+                  | grep -m1 'SHA256:' | sed 's/.*SHA256://' | norm)
+          fi
+          echo "keystore : $WANT"
+          echo "apk      : $GOT"
+          [ "$WANT" = "$GOT" ] || {
+            echo "::error::APK 서명이 키스토어와 다릅니다 — 이 APK 는 덮어 설치가 안 됩니다"; exit 1; }
+          echo "서명 일치 ✅ 덮어 설치 가능"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
