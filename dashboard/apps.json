@@ -72,7 +72,7 @@
   {
     "id": "parksy-axis",
     "name": "Parksy Axis",
-    "version": "v11.2.0",
+    "version": "v11.2.1",
     "registryStatus": "store-registered",
     "category": "broadcast",
     "description": "방송용 사고 단계 오버레이 — 에이전트 백그라운드 무장 + :8492 제어 소켓",

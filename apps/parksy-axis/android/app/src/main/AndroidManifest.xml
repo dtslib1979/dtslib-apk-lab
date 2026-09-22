@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="kr.parksy.axis">
 
+    <!-- INTERNET 이 없으면 소켓을 아예 못 연다 (errno=1 EPERM).
+         lib/main.dart 의 제어 소켓(:8492 — next/jump/reload)이 이 권한 없이는
+         bind 단계에서 죽는다. 2026-09-22 로그로 확인:
+           [Overlay] ctl socket fail: SocketException: Failed to create server
+           socket (OS Error: Operation not permitted, errno = 1), port = 8492
+         즉 그 소켓은 **한 번도 동작한 적이 없었다.** try/catch 에 삼켜져
+         조용히 실패하고 있었을 뿐이다. 서버는 loopback 전용이라 외부 노출은 없다. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
