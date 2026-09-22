@@ -15,6 +15,8 @@ import org.json.JSONObject;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.FlutterEngineCache;
 
+import kr.parksy.axis.TvOverlayService;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -62,6 +64,16 @@ public class AxisArmReceiver extends BroadcastReceiver {
     private static final String TAG = "AxisArm";
     public static final String ACTION_ARM = "kr.parksy.axis.ARM";
     public static final String ACTION_OFF = "kr.parksy.axis.OFF";
+
+    /**
+     * 반대편(오른쪽 아래) 나레이터 액자. 콘티와 **별개 창**이다.
+     *
+     * 왜 같은 리시버에 다는가: 밖에서 열 수 있는 문은 이 리시버 하나뿐이다
+     * (오버레이 서비스들은 exported="false"). 명령마다 문을 새로 내면
+     * 매니페스트만 늘고 얻는 게 없다. 그래서 여기가 이 앱의 **유일한 원격 입구**다.
+     */
+    public static final String ACTION_TV = "kr.parksy.axis.TV";
+    public static final String ACTION_TV_OFF = "kr.parksy.axis.TV_OFF";
     private static final String CONFIG = "axis_overlay_config.json";
     private static final String LIBRARY = "axis_rundowns.jsonl";
 
@@ -88,6 +100,32 @@ public class AxisArmReceiver extends BroadcastReceiver {
             Log.i(TAG, "overlay OFF");
             return;
         }
+
+        // ── 나레이터 액자 (오른쪽 아래) ──────────────────────────────────────
+        // 규격·영상 경로는 **준 것만** 넘긴다. 안 준 키를 기본값으로 채워 보내면
+        // 서비스의 기본값을 여기서 또 관리하게 되어 두 곳이 어긋난다.
+        // (콘티 창에서 창 크기를 두 곳에서 관리해 어긋난 적이 있다 — 같은 실수 금지)
+        if (ACTION_TV.equals(intent.getAction())) {
+            Intent tv = new Intent(app, TvOverlayService.class);
+            String video = intent.getStringExtra("video");
+            if (video != null) tv.putExtra("video", video);
+            for (String k : new String[]{"w", "h", "x", "y", "mute"}) {
+                if (intent.hasExtra(k)) tv.putExtra(k, intent.getIntExtra(k, 0));
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                app.startForegroundService(tv);
+            } else {
+                app.startService(tv);
+            }
+            Log.i(TAG, "tv overlay ON");
+            return;
+        }
+        if (ACTION_TV_OFF.equals(intent.getAction())) {
+            app.stopService(new Intent(app, TvOverlayService.class));
+            Log.i(TAG, "tv overlay OFF");
+            return;
+        }
+
         if (!ACTION_ARM.equals(intent.getAction())) return;
 
         String rundown = intent.getStringExtra("rundown");

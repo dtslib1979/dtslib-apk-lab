@@ -48,6 +48,8 @@
             <intent-filter>
                 <action android:name="kr.parksy.axis.ARM"/>
                 <action android:name="kr.parksy.axis.OFF"/>
+                <action android:name="kr.parksy.axis.TV"/>
+                <action android:name="kr.parksy.axis.TV_OFF"/>
             </intent-filter>
         </receiver>
 
@@ -61,6 +63,21 @@
             <meta-data
                 android:name="io.flutter.embedding.android.OverlayEntryPoint"
                 android:value="overlayMain"/>
+        </service>
+
+        <!-- 반대편(오른쪽 아래) 나레이터 액자 — 콘티와 별개 창.
+             Flutter 가 아니라 네이티브 VideoView 다. 이유는 TvOverlayService 주석 참고:
+             플러그인(flutter_overlay_window)은 창을 하나만 만들 수 있어서,
+             두 번째 창은 플러그인 밖에서 직접 띄워야 한다.
+             foregroundServiceType="specialUse" 인 이유는 OverlayService 와 같다 —
+             녹화 내내 살아 있어야 하는데, 일반 백그라운드 서비스는 안드로이드가 죽인다. -->
+        <service
+            android:name="kr.parksy.axis.TvOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="overlay_window"/>
         </service>
 
         <meta-data

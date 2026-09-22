@@ -6,8 +6,8 @@ library;
 /// 앱 정보
 abstract final class AppInfo {
   static const String name = 'Parksy Axis';
-  static const String version = '11.2.2';
-  static const int versionCode = 9;
+  static const String version = '11.3.0';
+  static const int versionCode = 10;
   static const String packageName = 'kr.parksy.axis';
 }
 
